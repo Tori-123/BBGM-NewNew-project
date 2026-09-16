@@ -1,0 +1,32 @@
+---
+description: 前端实现约定
+globs: frontend/**/*
+alwaysApply: false
+---
+
+# 前端
+
+栈：React + Vite + Tailwind（`frontend/`）。新增依赖先说明原因，优先现有能力；不要无故加 Redux/Zustand，页面状态够用就用组件 state。
+
+## UI 与路由
+
+以 `docs/UI_BLUEPRINT.md` 为准（Scoop 印刷版：报头、多页路由、无底部 Tab）。
+
+- 需要新页面/路由：先对 `docs/PRD.md` Must，再改蓝图，再写代码。
+- 主页槽位按蓝图用 `GET /api/v1/posts` 的 `items[n]`，不要发明 featured 标记。
+- 图框、Photo of the Day、Track of the Day、搜索提交说明是静态壳；**不要**绑定 schema 没有的 `image_url` / 封面字段。
+- `opinion` / `photo` 不请求非法 `category`（会 422）。
+
+## 数据
+
+字段只来自 `docs/schema.md`：`PostSummary` / `PostDetail` / `UserPrivate` / `error`。
+
+- 后端未就绪：用 schema **第 2 节 Mock**（Jordan Hale / Priya Nair 等），形状必须与真实接口相同。
+- 联调后走真实 `/api/v1` + Cookie 会话；Mock 不得留作生产行为。
+- 可以读 schema 与 `backend/` 以便联调。若改了后端响应形状，必须先改 `docs/schema.md` 并改前端绑定。
+
+## 鉴权与错误
+
+- 启动：`GET /api/v1/me`；`401` 是访客，不是错误条。
+- 发帖 `POST /api/v1/posts` 在对应栏目页内；Community 未登录去 `/sign-in?next=/community`。
+- 错误用 `error.message` 与 `error.fields[].field|message`，不要 toast 盖报头，不要断网假数据充错误处理。

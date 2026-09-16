@@ -1,0 +1,33 @@
+---
+description: 全局目录与契约优先级
+globs: "*"
+alwaysApply: true
+---
+
+# 全局架构
+
+BBGM Scoop 是校园 Web：登录发帖、按栏目阅读、活动帖带时间地点。前后端分目录，不要搭成单仓混写或后台套件。
+
+## 目录
+
+允许的顶层：`.cursor/rules/`、`backend/`、`docs/`、`frontend/`、根目录 `README.md`、`TASK_TRACKER.md`（若有）、`.env.example`。
+
+- 业务源码：前端只在 `frontend/`，后端只在 `backend/`，文档只在 `docs/`。
+- 不要在根目录新建 `/src`、`/api`、`/app`、`/components` 等业务文件夹。
+- 不要擅自换成 Next.js、Nest、微服务或指定云厂商。当前栈：React + Vite + Tailwind；Python + FastAPI。
+
+## 契约优先级
+
+改功能前先读文档，不要默默发明第三套字段。
+
+1. `docs/PRD.md`：做什么 / Must / Won't（无教务、无推荐算法、无支付、无 AI 审核）。
+2. `docs/schema.md`：**唯一**接口与 JSON 真相（`/api/v1`、Cookie `scoop_session`、错误包络 `error.code|message|fields`）。
+3. `docs/UI_BLUEPRINT.md`：页面、槽位、绑定哪些响应字段。
+
+代码与文档冲突时：先改 schema/蓝图/PRD，或明确指出冲突并停下等确认。禁止只在代码里加 `image_url`、`featured`、`kicker` 等 schema 没有的字段。
+
+跨层修改（联调、修契约）是允许的；改 backend 时同步 schema 与前端调用，改前端绑定前核对 schema。
+
+## 密钥
+
+密钥只在 `.env`。仓库里只留 `.env.example` 占位（`DATABASE_URL`、`SESSION_SECRET`、`FRONTEND_ORIGIN`）。不要提交 `.env`，不要把密钥写进规则、文档或源码。
