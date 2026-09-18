@@ -1,4 +1,5 @@
 import json
+import shutil
 from pathlib import Path
 from uuid import uuid4
 
@@ -64,3 +65,9 @@ def save_post_image(post_id: str, ext: str, data: bytes) -> str:
     name = f"{uuid4()}.{ext}"
     (folder / name).write_bytes(data)
     return f"/uploads/posts/{post_id}/{name}"
+
+
+def delete_post_images(post_id: str) -> None:
+    folder = POST_IMAGE_DIR / post_id
+    if folder.exists():
+        shutil.rmtree(folder, ignore_errors=True)

@@ -17,7 +17,7 @@ async function request(path, options = {}) {
       credentials: "include",
       ...options,
       headers: {
-        ...(options.body ? { "Content-Type": "application/json" } : {}),
+        ...(options.body && !(options.body instanceof FormData) ? { "Content-Type": "application/json" } : {}),
         ...options.headers,
       },
     });
@@ -98,7 +98,17 @@ export const api = {
     return request(`/posts?${query}`);
   },
   getPost: (id) => request(`/posts/${encodeURIComponent(id)}`),
-  createPost: (body) => request("/posts", { method: "POST", body: JSON.stringify(body) }),
+  createPost: (body, files = []) => {
+    if (files.length) {
+      const form = new FormData();
+      form.append("title", body.title);
+      form.append("body", body.body);
+      form.append("category", body.category);
+      files.slice(0, 4).forEach((file) => form.append("images", file));
+      return request("/posts", { method: "POST", body: form });
+    }
+    return request("/posts", { method: "POST", body: JSON.stringify(body) });
+  },
   uploadPostImage: (postId, file) => uploadFile(`/posts/${encodeURIComponent(postId)}/images`, file),
   myPosts: ({ page = 1, pageSize = 20 } = {}) => {
     const query = new URLSearchParams({

@@ -16,9 +16,8 @@ Path、Method、JSON **必须**与 `docs/schema.md` 一致。
 - 成功：对象直接放 JSON 根（不要再包一层 `data`）。
 - 错误：`{"error":{"code","message","fields":[{"field","message"}]}}`，状态码按 schema 表。
 - id：UUID 字符串。时间：UTC ISO 8601 带 `Z`。列表：`items` `page` `page_size` `total`。
-- 栏目枚举仅 `news` | `dorm_life` | `sports` | `events`。`status` 本版仅 `published`。
-- 活动不是独立资源：`is_activity` + `starts_at` + `location`。
-- 响应不要出现 `password`、`password_hash`、审计记录。公开帖作者只用 `author.id`、`author.display_name`。
+- 栏目枚举仅 `news` | `sports` | `forum`。`status` 本版仅 `published`。
+- 响应不要出现 `password`、`password_hash`、审计记录、`is_activity`、`starts_at`、`location`。公开帖作者只用 `author.id`、`author.display_name`、`author.avatar`。
 
 要改形状：先改 `docs/schema.md`，再改后端，并同步前端。不要只在代码里加字段。
 

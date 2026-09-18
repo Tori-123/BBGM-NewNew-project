@@ -1,8 +1,8 @@
-# BBGM Scoop API 契约（第一版）
+# Elegram API 契约（第一版）
 
 依据：`docs/PRD.md` Must Have 与 Entity Flow。本文件同时约束前端 Mock 与后端实现。不包含业务代码。
 
-第一版 **无公开审计查询接口**（M10 仅服务端落库）。不包含编辑 / 删除帖或评论 / 检索（Should）。包含 Community 评论（楼中楼）、角色与精选复制。
+第一版 **无公开审计查询接口**（M10 仅服务端落库）。不包含编辑 / 删除帖或评论 / 检索（Should）。包含 Forum 评论（楼中楼）、角色与精选复制。
 
 ---
 
@@ -14,7 +14,7 @@
 /api/v1
 ```
 
-默认 JSON：`Content-Type: application/json`。例外：`POST /api/v1/me/avatar` 与 `POST /api/v1/posts/{post_id}/images` 为 `multipart/form-data`（字段名 `file`）。
+默认 JSON：`Content-Type: application/json`。例外：`POST /api/v1/me/avatar` 与 `POST /api/v1/posts/{post_id}/images` 为 `multipart/form-data`（字段名 `file`）。`POST /api/v1/posts` 还可为 `multipart/form-data`（字段 `title` `body` `category`，重复文件字段 `images`）。
 
 ### 鉴权
 
@@ -43,7 +43,7 @@ Content-Type: application/json
 }
 ```
 
-公开读接口（栏目列表、详情、首页列表、Community 评论列表）**不**要求鉴权。
+公开读接口（栏目列表、详情、首页列表、Forum 评论列表）**不**要求鉴权。
 
 ### 通用错误包络
 
@@ -66,10 +66,10 @@ Content-Type: application/json
 | 400 | `bad_request` | 分页参数非法等无法归到字段校验的请求错误 |
 | 401 | `unauthenticated` | 无会话或会话无效 |
 | 401 | `invalid_credentials` | 登录邮箱或密码不对（不区分「用户不存在」与「密码错误」） |
-| 403 | `forbidden` | 已登录但无权（学生发四栏、非编辑精选、非管理员改角色） |
+| 403 | `forbidden` | 已登录但无权（学生发校报栏目、非编辑精选、非管理员改角色） |
 | 404 | `not_found` | 帖子、评论父楼或用户不存在 |
 | 409 | `email_taken` | 注册邮箱已被占用 |
-| 422 | `validation_error` | 缺必填、超长、非法栏目、活动缺时间/地点 |
+| 422 | `validation_error` | 缺必填、超长、非法栏目、非法配图 |
 | 503 | `storage_unavailable` | 存储写入失败；不得返回成功或半截资源 |
 
 成功响应不包 `{ "data": ... }` 中间层：对象或列表字段直接放在 JSON 根上。
@@ -83,7 +83,7 @@ Content-Type: application/json
 | 分页 Query | `page` 整数 ≥ 1，默认 `1`；`page_size` 整数 1–50，默认 `20` |
 | 分页非法 | `400` + `bad_request` |
 | 列表成功 | `{ "items": [...], "page", "page_size", "total" }`；空列表 `items` 为 `[]`，`total` 为 `0` |
-| 排序 | 已发布帖按 `created_at` 降序；Community 楼层按 `created_at` 升序（楼号 1 起） |
+| 排序 | 已发布帖按 `created_at` 降序；Forum 楼层按 `created_at` 升序（楼号 1 起） |
 
 ### 共享字段形状
 
@@ -113,19 +113,16 @@ Content-Type: application/json
 | `id` | string | |
 | `title` | string | |
 | `excerpt` | string | 由 `body` 截断，最多 160 字，供卡片绑定；不是另一份正文 |
-| `category` | string | `news` \| `dorm_life` \| `sports` \| `events` \| `community` |
-| `is_activity` | boolean | |
-| `starts_at` | string \| null | 活动必有；非活动为 `null` |
-| `location` | string \| null | 活动必有；非活动为 `null` |
+| `category` | string | `news` \| `sports` \| `forum` |
 | `status` | string | 本版恒为 `published` |
 | `created_at` | string | |
 | `updated_at` | string | 创建时与 `created_at` 相同 |
 | `author` | AuthorPublic | |
-| `reply_count` | integer | 楼层数。四栏与无 `category` 的列表为 `0` |
-| `reply_preview` | ReplyPreview[] | Community 最多 4 条楼层（无楼中楼）。其他列表为 `[]` |
-| `images` | string[] | Community 配图，同源路径 `/uploads/posts/{post_id}/{file}`，最多 4 张。四栏与无 `category` 的列表为 `[]` |
+| `reply_count` | integer | 楼层数。校报栏目与无 `category` 的列表为 `0` |
+| `reply_preview` | ReplyPreview[] | Forum 最多 4 条楼层（无楼中楼）。其他列表为 `[]` |
+| `images` | string[] | Forum 配图，同源路径 `/uploads/posts/{post_id}/{file}`，最多 4 张。校报栏目与无 `category` 的列表为 `[]` |
 
-**ReplyPreview**（Community 卡片用）
+**ReplyPreview**（Forum 卡片用）
 
 | 字段 | 类型 | 说明 |
 | --- | --- | --- |
@@ -276,13 +273,13 @@ Content-Type: application/json
 #### `GET /api/v1/posts`
 
 - **鉴权：** 否
-- **职责：** 列出已发布帖。无 `category` 时供首页近期露出，**只含四栏**（`news` `dorm_life` `sports` `events`），不含 Community。有 `category` 时只返回该栏目（含 `community`）。
+- **职责：** 列出已发布帖。无 `category` 时供首页近期露出，**只含校报栏目**（`news` `sports`），不含 Forum。有 `category` 时只返回该栏目（含 `forum`）。
 
 **Query**
 
 | 参数 | 类型 | 必填 | 约束 |
 | --- | --- | --- | --- |
-| `category` | string | 否 | 若出现必须是 `news` \| `dorm_life` \| `sports` \| `events` \| `community` |
+| `category` | string | 否 | 若出现必须是 `news` \| `sports` \| `forum` |
 | `page` | integer | 否 | ≥ 1，默认 1 |
 | `page_size` | integer | 否 | 1–50，默认 20 |
 
@@ -292,8 +289,6 @@ Content-Type: application/json
 - `400` `bad_request`（`page` / `page_size` 非法）
 - `422` `validation_error`（`category` 有值但不在枚举内）
 - `503` `storage_unavailable`
-
-列表项必须带上 `is_activity`、`starts_at`、`location`，读者无需点进详情也能判断是否为活动（P3-US2）。
 
 ---
 
@@ -320,37 +315,38 @@ Content-Type: application/json
 #### `POST /api/v1/posts`
 
 - **鉴权：** 是
-- **职责：** 当前用户发布帖子，状态直接为 `published`；服务端同时写审计（不在响应中返回）。`student` 只能发 `community` 且 `is_activity=false`。`editor` / `admin` 可发四栏或 Community。
+- **职责：** 当前用户发布帖子，状态直接为 `published`；服务端同时写审计（不在响应中返回）。`student` 只能发 `forum`。`editor` / `admin` 可发校报栏目或 Forum。Forum 可在同一次请求附带最多 4 张图；非法文件则**不落帖行**。
 
-**Request body**
+**Request（JSON）** `Content-Type: application/json`
 
 | 字段 | 类型 | 必填 | 约束 |
 | --- | --- | --- | --- |
 | `title` | string | 是 | 去掉首尾空白后 1–120 字符 |
 | `body` | string | 是 | 去掉首尾空白后 1–20000 字符 |
-| `category` | string | 是 | `news` \| `dorm_life` \| `sports` \| `events` \| `community` |
-| `is_activity` | boolean | 是 | `community` 必须为 `false` |
-| `starts_at` | string \| null | 条件 | `is_activity=true` 时必填，ISO 8601 UTC；`false` 时必须 `null` 或不传（视为 `null`） |
-| `location` | string \| null | 条件 | `is_activity=true` 时去掉空白后 1–200 字符；`false` 时必须 `null` 或不传 |
+| `category` | string | 是 | `news` \| `sports` \| `forum` |
+
+**Request（multipart）** `Content-Type: multipart/form-data`
+
+同样三个文本字段，外加重复文件字段 `images`（0–4，jpeg / png / webp，每张 ≤2MB）。**仅 `forum`** 可带图；校报栏目带 `images` → `422` 且不落帖。
 
 作者取当前会话用户，客户端不可传 `author_id` / `status`。
 
 **Response**
 
-- `201` + `PostDetail`（含服务端生成的 `id`、`excerpt`、`created_at`、`updated_at`、`author`、`status=published`）
+- `201` + `PostDetail`（含服务端生成的 `id`、`excerpt`、`created_at`、`updated_at`、`author`、`status=published`；Forum 若带图则 `images` 已填）
 - `401` `unauthenticated`
-- `403` `forbidden`（`student` 发四栏）
-- `422` `validation_error`（缺标题/正文/栏目、非法栏目、活动缺 `starts_at` 或 `location`、非活动却带活动字段、Community 标为活动）
-- `503` `storage_unavailable`（帖子与审计任一写入失败则整笔失败，不返回 201）
+- `403` `forbidden`（`student` 发校报栏目）
+- `422` `validation_error`（缺标题/正文/栏目、非法栏目、非法或过多配图、非 Forum 带图）
+- `503` `storage_unavailable`（帖子、审计或配图任一写入失败则整笔失败，不返回 201）
 
-创建成功时 `images` 为 `[]`。配图用下面的上传接口追加。
+无图时 `images` 为 `[]`。之后可用下面的上传接口补图。
 
 ---
 
 #### `POST /api/v1/posts/{post_id}/images`
 
 - **鉴权：** 是（须该帖作者）
-- **职责：** 给 Community 主帖追加一张图。`Content-Type: multipart/form-data`，字段名 `file`。jpeg / png / webp，≤2MB。每帖最多 4 张。
+- **职责：** 给 Forum 主帖追加一张图。`Content-Type: multipart/form-data`，字段名 `file`。jpeg / png / webp，≤2MB。每帖最多 4 张。
 
 **Response**
 
@@ -358,7 +354,7 @@ Content-Type: application/json
 - `401` `unauthenticated`
 - `403` `forbidden`（不是作者）
 - `404` `not_found`
-- `422` `validation_error`（非 Community、已满 4 张、类型或大小非法）
+- `422` `validation_error`（非 Forum、已满 4 张、类型或大小非法）
 - `503` `storage_unavailable`
 
 ---
@@ -368,7 +364,7 @@ Content-Type: application/json
 - **鉴权：** 是
 - **职责：** 当前用户自己发过的帖（P1-US2），含已发布内容。
 
-**Query：** 与列表相同的 `page`、`page_size`（无 `category` 过滤；「我的帖子」含 Community 与四栏）。
+**Query：** 与列表相同的 `page`、`page_size`（无 `category` 过滤；「我的帖子」含 Forum 与校报栏目）。
 
 **Response**
 
@@ -384,7 +380,7 @@ Content-Type: application/json
 #### `GET /api/v1/posts/{post_id}/comments`
 
 - **鉴权：** 否
-- **职责：** 列出 Community 帖的楼层（含楼中楼）。分页作用在**楼层**上。`floor` 是全帖楼号，不是当前页内序号。
+- **职责：** 列出 Forum 帖的楼层（含楼中楼）。分页作用在**楼层**上。`floor` 是全帖楼号，不是当前页内序号。
 
 **Query：** `page`、`page_size`（同通用分页）。
 
@@ -393,13 +389,13 @@ Content-Type: application/json
 - `200` `{ items: CommentFloor[], page, page_size, total }`（`total` 为楼层总数）
 - `400` `bad_request`（非法 `post_id` 或分页）
 - `404` `not_found`（帖不存在）
-- `422` `validation_error`（帖存在但不是 Community）
+- `422` `validation_error`（帖存在但不是 Forum）
 - `503` `storage_unavailable`
 
 #### `POST /api/v1/posts/{post_id}/comments`
 
 - **鉴权：** 是
-- **职责：** 在 Community 帖下发楼层或楼中楼。本版不能改删评论。
+- **职责：** 在 Forum 帖下发楼层或楼中楼。本版不能改删评论。
 
 **Request body**
 
@@ -413,7 +409,7 @@ Content-Type: application/json
 - `201` + 所创建的 `CommentFloor`（新楼，`replies` 为 `[]`）或 `CommentReply`
 - `401` `unauthenticated`
 - `404` `not_found`（帖或 `parent_id` 楼层不存在）
-- `422` `validation_error`（非 Community 帖、正文非法、`parent_id` 不是该帖楼层）
+- `422` `validation_error`（非 Forum 帖、正文非法、`parent_id` 不是该帖楼层）
 - `503` `storage_unavailable`
 
 ### 1.4 Promote
@@ -421,18 +417,15 @@ Content-Type: application/json
 #### `POST /api/v1/posts/{post_id}/promote`
 
 - **鉴权：** 是（须 `editor` 或 `admin`）
-- **职责：** 把 Community 帖复制成一篇四栏新帖；源帖不改。作者为当前编辑。同时写审计。
+- **职责：** 把 Forum 帖复制成一篇校报新帖；源帖不改。作者为当前编辑。同时写审计。
 
 **Request body**
 
 | 字段 | 类型 | 必填 | 约束 |
 | --- | --- | --- | --- |
-| `category` | string | 是 | `news` \| `dorm_life` \| `sports` \| `events`（不能是 `community`） |
+| `category` | string | 是 | `news` \| `sports`（不能是 `forum`） |
 | `title` | string | 否 | 若传：1–120 字符；不传则用源帖标题 |
 | `body` | string | 否 | 若传：1–20000 字符；不传则用源帖正文 |
-| `is_activity` | boolean | 否 | 默认 `false` |
-| `starts_at` | string \| null | 条件 | 与发帖相同的活动规则 |
-| `location` | string \| null | 条件 | 与发帖相同的活动规则 |
 
 **Response**
 
@@ -440,7 +433,7 @@ Content-Type: application/json
 - `401` `unauthenticated`
 - `403` `forbidden`（`student`）
 - `404` `not_found`（源帖不存在）
-- `422` `validation_error`（源帖不是 Community、栏目非法、活动字段非法）
+- `422` `validation_error`（源帖不是 Forum、栏目非法）
 - `503` `storage_unavailable`
 
 ### 1.5 Admin users
@@ -494,14 +487,14 @@ Content-Type: application/json
 
 ## 2. Mock 数据
 
-内容贴合 P1 发帖学生、P2 读者、P3 活动组织者。账号为虚构 BBGM 学生，禁止 `foo` / `test`。
+内容贴合 P1 发帖学生、P2 读者、P3 学生编辑。账号为虚构校园用户，禁止 `foo` / `test`。
 
 公共 id（前端可把同一人串起来）：
 
 | 谁 | `id` | 角色 |
 | --- | --- | --- |
-| Jordan Hale | `8f2a1c6e-4b90-4d3a-9e1f-2c7b0d84a511` | P1 发帖：宿舍讨论 |
-| Priya Nair | `c3d9e0a4-1f27-4b8c-a056-9e4d2b71c880` | P3 组织者：体育活动 |
+| Jordan Hale | `8f2a1c6e-4b90-4d3a-9e1f-2c7b0d84a511` | P1 发帖：Forum 讨论 |
+| Priya Nair | `c3d9e0a4-1f27-4b8c-a056-9e4d2b71c880` | P3 编辑：体育稿 |
 | Wei Chen | `a11b2203-88e4-4f0d-b7c1-5d9a3e2f0146` | 读者向 News 帖作者 |
 
 ---
@@ -513,7 +506,7 @@ Content-Type: application/json
 ```json
 {
   "id": "8f2a1c6e-4b90-4d3a-9e1f-2c7b0d84a511",
-  "email": "jordan.hale@bbgm.edu",
+  "email": "jordan.hale@example.com",
   "display_name": "Jordan Hale",
   "role": "student",
   "created_at": "2026-09-10T11:02:18Z"
@@ -543,7 +536,7 @@ Content-Type: application/json
 ```json
 {
   "id": "c3d9e0a4-1f27-4b8c-a056-9e4d2b71c880",
-  "email": "priya.nair@bbgm.edu",
+  "email": "priya.nair@example.com",
   "display_name": "Priya Nair",
   "role": "editor",
   "created_at": "2026-08-21T09:10:00Z"
@@ -591,7 +584,7 @@ Content-Type: application/json
 ```json
 {
   "id": "8f2a1c6e-4b90-4d3a-9e1f-2c7b0d84a511",
-  "email": "jordan.hale@bbgm.edu",
+  "email": "jordan.hale@example.com",
   "display_name": "Jordan Hale",
   "role": "student",
   "created_at": "2026-09-10T11:02:18Z"
@@ -623,10 +616,7 @@ Content-Type: application/json
       "id": "5e8c41b2-9d70-4aa1-8c3e-0b6f2d9a4471",
       "title": "East Hall laundry room will close Friday night",
       "excerpt": "Facilities posted a handwritten note on the basement door: the dryers are being replaced this weekend. Bring quarters to West Hall if you still need a machine tonight.",
-      "category": "dorm_life",
-      "is_activity": false,
-      "starts_at": null,
-      "location": null,
+      "category": "news",
       "status": "published",
       "created_at": "2026-09-10T16:40:12Z",
       "updated_at": "2026-09-10T16:40:12Z",
@@ -640,9 +630,6 @@ Content-Type: application/json
       "title": "Intramural basketball finals — Saturday at the old gym",
       "excerpt": "East Hall plays the faculty pick-up team for the dorm cup. Doors open at 16:30; bring student ID. We still need two table scorers.",
       "category": "sports",
-      "is_activity": true,
-      "starts_at": "2026-09-13T17:00:00Z",
-      "location": "Old Gym, Court 2",
       "status": "published",
       "created_at": "2026-09-10T14:05:44Z",
       "updated_at": "2026-09-10T14:05:44Z",
@@ -656,9 +643,6 @@ Content-Type: application/json
       "title": "Library 24-hour desks start the week before midterms",
       "excerpt": "The third-floor quiet wing will stay open overnight from 21 September. Snacks are allowed in the lobby only; no sleeping bags.",
       "category": "news",
-      "is_activity": false,
-      "starts_at": null,
-      "location": null,
       "status": "published",
       "created_at": "2026-09-09T08:15:03Z",
       "updated_at": "2026-09-09T08:15:03Z",
@@ -695,7 +679,7 @@ Content-Type: application/json
     "code": "validation_error",
     "message": "One or more fields are invalid.",
     "fields": [
-      { "field": "category", "message": "Must be one of: news, dorm_life, sports, events, community." }
+      { "field": "category", "message": "Must be one of: news, sports, forum." }
     ]
   }
 }
@@ -703,9 +687,9 @@ Content-Type: application/json
 
 ---
 
-### 2.6 `GET /api/v1/posts?category=events`
+### 2.6 `GET /api/v1/posts?category=sports`
 
-**成功 `200`**（大型活动栏目；列表即可读时间地点）
+**成功 `200`**
 
 ```json
 {
@@ -714,10 +698,7 @@ Content-Type: application/json
       "id": "91c4d2e8-0a17-4b5f-8e33-7c1a9d04b226",
       "title": "Back-to-hall mixer: all East and West residents",
       "excerpt": "RA council is hosting the first mixer of term. No ticket, but you need a dorm lanyard at the door. Playlist sign-up on the whiteboard.",
-      "category": "events",
-      "is_activity": true,
-      "starts_at": "2026-09-12T11:00:00Z",
-      "location": "School Auditorium lobby",
+      "category": "sports",
       "status": "published",
       "created_at": "2026-09-08T19:22:10Z",
       "updated_at": "2026-09-08T19:22:10Z",
@@ -735,7 +716,7 @@ Content-Type: application/json
 
 **错误 `400`（分页非法）**
 
-`GET /api/v1/posts?category=events&page=0`
+`GET /api/v1/posts?category=sports&page=0`
 
 ```json
 {
@@ -751,7 +732,7 @@ Content-Type: application/json
 
 ### 2.7 `GET /api/v1/posts/{post_id}`
 
-**成功 `200`**（Jordan 的宿舍帖全文）
+**成功 `200`**（Jordan 的洗衣房帖全文）
 
 ```json
 {
@@ -759,10 +740,7 @@ Content-Type: application/json
   "title": "East Hall laundry room will close Friday night",
   "excerpt": "Facilities posted a handwritten note on the basement door: the dryers are being replaced this weekend. Bring quarters to West Hall if you still need a machine tonight.",
   "body": "Facilities posted a handwritten note on the basement door: the dryers are being replaced this weekend. Bring quarters to West Hall if you still need a machine tonight.\n\nThe note says work starts at 18:00 Friday and should finish Sunday afternoon. If you already left clothes in a machine, the RAs will bag them and leave them on the folding table.\n\nWest Hall basement is staying open. It was packed last time the East machines died, so go early.",
-  "category": "dorm_life",
-  "is_activity": false,
-  "starts_at": null,
-  "location": null,
+  "category": "news",
   "status": "published",
   "created_at": "2026-09-10T16:40:12Z",
   "updated_at": "2026-09-10T16:40:12Z",
@@ -789,7 +767,7 @@ Content-Type: application/json
 
 ### 2.8 `POST /api/v1/posts`
 
-**成功 `201`**（Priya 发体育活动帖）
+**成功 `201`**（Priya 发体育稿）
 
 请求示例（非响应，便于 Mock 对照）：
 
@@ -797,10 +775,7 @@ Content-Type: application/json
 {
   "title": "Intramural basketball finals — Saturday at the old gym",
   "body": "East Hall plays the faculty pick-up team for the dorm cup. Doors open at 16:30; bring student ID. We still need two table scorers.\n\nCheer section is first come, first served on the bleachers. No outside horns.",
-  "category": "sports",
-  "is_activity": true,
-  "starts_at": "2026-09-13T17:00:00Z",
-  "location": "Old Gym, Court 2"
+  "category": "sports"
 }
 ```
 
@@ -813,9 +788,6 @@ Content-Type: application/json
   "excerpt": "East Hall plays the faculty pick-up team for the dorm cup. Doors open at 16:30; bring student ID. We still need two table scorers.",
   "body": "East Hall plays the faculty pick-up team for the dorm cup. Doors open at 16:30; bring student ID. We still need two table scorers.\n\nCheer section is first come, first served on the bleachers. No outside horns.",
   "category": "sports",
-  "is_activity": true,
-  "starts_at": "2026-09-13T17:00:00Z",
-  "location": "Old Gym, Court 2",
   "status": "published",
   "created_at": "2026-09-10T14:05:44Z",
   "updated_at": "2026-09-10T14:05:44Z",
@@ -826,7 +798,7 @@ Content-Type: application/json
 }
 ```
 
-**错误 `422`（活动缺地点；对应 PRD AC11 / P1-US3）**
+**错误 `422`（空标题；对应 PRD AC10 / P1-US3）**
 
 ```json
 {
@@ -834,7 +806,7 @@ Content-Type: application/json
     "code": "validation_error",
     "message": "One or more fields are invalid.",
     "fields": [
-      { "field": "location", "message": "Location is required when this post is an activity." }
+      { "field": "title", "message": "Title must be 1–120 characters." }
     ]
   }
 }
@@ -868,7 +840,7 @@ Content-Type: application/json
 
 ### 2.9 `GET /api/v1/me/posts`
 
-**成功 `200`**（Jordan 查看自己发出的宿舍帖）
+**成功 `200`**（Jordan 查看自己发出的稿）
 
 ```json
 {
@@ -877,10 +849,7 @@ Content-Type: application/json
       "id": "5e8c41b2-9d70-4aa1-8c3e-0b6f2d9a4471",
       "title": "East Hall laundry room will close Friday night",
       "excerpt": "Facilities posted a handwritten note on the basement door: the dryers are being replaced this weekend. Bring quarters to West Hall if you still need a machine tonight.",
-      "category": "dorm_life",
-      "is_activity": false,
-      "starts_at": null,
-      "location": null,
+      "category": "news",
       "status": "published",
       "created_at": "2026-09-10T16:40:12Z",
       "updated_at": "2026-09-10T16:40:12Z",

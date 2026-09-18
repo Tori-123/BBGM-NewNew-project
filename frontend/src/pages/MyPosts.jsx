@@ -68,8 +68,8 @@ export default function MyPosts() {
             {canEditPaper(user) ? (
               <span className="text-neutral-500">Publish from the section you want to update.</span>
             ) : (
-              <Link to="/community" className="text-[#1A4FBF]">
-                Write in Community
+              <Link to="/forum" className="text-[#1A4FBF]">
+                Write in Forum
               </Link>
             )}
           </p>

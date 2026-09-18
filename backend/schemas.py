@@ -1,9 +1,9 @@
 from pydantic import BaseModel, ConfigDict
 
 
-NEWSPAPER_CATEGORIES = ("news", "dorm_life", "sports", "events")
-CATEGORIES = (*NEWSPAPER_CATEGORIES, "community")
-CATEGORY_MESSAGE = "Must be one of: news, dorm_life, sports, events, community."
+NEWSPAPER_CATEGORIES = ("news", "sports")
+CATEGORIES = (*NEWSPAPER_CATEGORIES, "forum")
+CATEGORY_MESSAGE = "Must be one of: news, sports, forum."
 ROLES = ("student", "editor", "admin")
 STAFF_ROLES = ("editor", "admin")
 ASSIGNABLE_ROLES = ("student", "editor")
@@ -28,9 +28,6 @@ class CreatePostBody(BaseModel):
     title: str
     body: str
     category: str
-    is_activity: bool
-    starts_at: str | None = None
-    location: str | None = None
 
 
 class SetAvatarPresetBody(BaseModel):
@@ -74,9 +71,6 @@ class PromoteBody(BaseModel):
     category: str
     title: str | None = None
     body: str | None = None
-    is_activity: bool = False
-    starts_at: str | None = None
-    location: str | None = None
 
 
 class PatchUserRoleBody(BaseModel):
@@ -122,9 +116,6 @@ class PostSummary(BaseModel):
     title: str
     excerpt: str
     category: str
-    is_activity: bool
-    starts_at: str | None
-    location: str | None
     status: str
     created_at: str
     updated_at: str

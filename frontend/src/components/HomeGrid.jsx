@@ -1,7 +1,7 @@
 import { Link } from "react-router-dom";
 import { useAuth } from "../auth";
-import { canEditPaper, categoryLabel } from "../format";
-import { ActivityLine, Dek, Headline, ImageWell, Kicker, SectionRule, StoryTile, TitleLine } from "./ui";
+import { canEditPaper } from "../format";
+import { Dek, Headline, ImageWell, Kicker, SectionRule, StoryTile, TitleLine } from "./ui";
 
 const PLACEHOLDER = {
   featured: {
@@ -12,8 +12,8 @@ const PLACEHOLDER = {
     kicker: "NEWS",
     title: "Secondary campus story with a strong image",
   },
-  dorm: {
-    kicker: "DORM LIFE",
+  campus: {
+    kicker: "NEWS",
     title: "A smaller story with a different rhythm",
   },
   sports: {
@@ -50,7 +50,7 @@ function SlotTitle({ post, fallback, className }) {
 function Hero({ items, loading }) {
   const featured = loading ? null : slot(items, 0);
   const secondary = loading ? null : slot(items, 1);
-  const dorm = loading ? null : slot(items, 2);
+  const campus = loading ? null : slot(items, 2);
   const sports = loading ? null : slot(items, 3);
 
   return (
@@ -75,8 +75,8 @@ function Hero({ items, loading }) {
           <article>
             <ImageWell className="aspect-square w-full" />
             <div className="mt-3 border-b border-neutral-200 pb-4">
-              <SlotKicker post={dorm} fallback={PLACEHOLDER.dorm.kicker} />
-              <SlotTitle post={dorm} fallback={PLACEHOLDER.dorm.title} className="mt-1 text-[21px] font-semibold" />
+              <SlotKicker post={campus} fallback={PLACEHOLDER.campus.kicker} />
+              <SlotTitle post={campus} fallback={PLACEHOLDER.campus.title} className="mt-1 text-[21px] font-semibold" />
             </div>
           </article>
         </div>
@@ -92,7 +92,6 @@ function Hero({ items, loading }) {
           className="mt-1 text-[40px] font-bold sm:text-[44px]"
         />
         {featured?.excerpt ? <Dek>{featured.excerpt}</Dek> : null}
-        <ActivityLine post={featured} />
       </div>
 
       <div className="grid grid-cols-[minmax(120px,0.85fr)_1.15fr] gap-4 lg:col-span-5">
@@ -107,7 +106,6 @@ function Hero({ items, loading }) {
               {PLACEHOLDER.sports.dek}
             </p>
           )}
-          <ActivityLine post={sports} />
         </article>
       </div>
     </div>
@@ -122,8 +120,8 @@ function EmptyFeatured({ user }) {
         <p className="font-sans text-sm text-neutral-500">Publish from the section you want to update.</p>
       ) : (
         <p className="font-sans text-sm">
-          <Link to="/community" className="text-[#1A4FBF]">
-            Write in Community
+          <Link to="/forum" className="text-[#1A4FBF]">
+            Write in Forum
           </Link>
         </p>
       )}
@@ -144,7 +142,6 @@ function StaticRail({ kicker, title, note, wellClassName = "h-28" }) {
 
 export default function HomeGrid({ items, total, loading }) {
   const { user } = useAuth();
-  const upcoming = items.filter((item) => item.is_activity).slice(0, 3);
   const emptyCampus = !loading && total === 0;
 
   return (
@@ -220,30 +217,6 @@ export default function HomeGrid({ items, total, loading }) {
             note="A campus track will live here later. No Spotify embed in this version."
             wellClassName="h-16"
           />
-          <section>
-            <h2 className="font-sans text-[11px] font-semibold uppercase tracking-[0.18em] text-[#1A4FBF]">
-              Upcoming
-            </h2>
-            {loading ? (
-              <div className="mt-3 space-y-3">
-                <TitleLine />
-                <TitleLine className="w-1/2" />
-              </div>
-            ) : upcoming.length === 0 ? (
-              <p className="mt-3 font-serif text-lg font-semibold">No upcoming events posted.</p>
-            ) : (
-              <ul className="mt-3 space-y-4">
-                {upcoming.map((post) => (
-                  <li key={post.id}>
-                    <Headline to={`/posts/${post.id}`} className="text-lg font-semibold">
-                      {post.title}
-                    </Headline>
-                    <ActivityLine post={post} />
-                  </li>
-                ))}
-              </ul>
-            )}
-          </section>
           <StaticRail
             kicker="Student Art"
             title="Open wall"

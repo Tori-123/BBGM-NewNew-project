@@ -144,9 +144,9 @@ def _auth() -> tuple[str, str | None]:
 
 def main() -> None:
     token, neighbor = _auth()
-    status, listed, _ = _request("GET", "/posts?category=community&page_size=50", token=token)
+    status, listed, _ = _request("GET", "/posts?category=forum&page_size=50", token=token)
     if status != 200:
-        raise SystemExit(f"Could not list community posts ({status}).")
+        raise SystemExit(f"Could not list forum posts ({status}).")
     have = {item["title"] for item in (listed or {}).get("items", [])}
     created = 0
     for thread in THREADS:
@@ -159,8 +159,7 @@ def main() -> None:
             body={
                 "title": thread["title"],
                 "body": thread["body"],
-                "category": "community",
-                "is_activity": False,
+                "category": "forum",
             },
         )
         if status != 201:
@@ -188,7 +187,7 @@ def main() -> None:
             if status != 201:
                 raise SystemExit(f"Could not add nested reply on {thread['title']!r} ({status}).")
         created += 1
-    print(f"seeded {created} community threads", file=sys.stderr)
+    print(f"seeded {created} forum threads", file=sys.stderr)
 
 
 if __name__ == "__main__":

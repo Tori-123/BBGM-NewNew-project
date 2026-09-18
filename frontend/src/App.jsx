@@ -21,13 +21,14 @@ export default function App() {
             <Route path="/" element={<Home />} />
             <Route path="/news" element={<Category category="news" title="News" />} />
             <Route path="/sports" element={<Category category="sports" title="Sports" />} />
-            <Route path="/dorm-life" element={<Category category="dorm_life" title="Dorm Life" />} />
-            <Route path="/community" element={<Category category="community" title="Community" />} />
-            <Route path="/events" element={<Category category="events" title="Events" />} />
+            <Route path="/forum" element={<Category category="forum" title="Forum" />} />
             <Route path="/opinion" element={<StaticCategory title="Opinion" />} />
-            <Route path="/photo" element={<StaticCategory title="Photo" />} />
+            <Route path="/community" element={<Navigate to="/forum" replace />} />
+            <Route path="/submit" element={<Navigate to="/forum" replace />} />
+            <Route path="/dorm-life" element={<Navigate to="/" replace />} />
+            <Route path="/events" element={<Navigate to="/" replace />} />
+            <Route path="/photo" element={<Navigate to="/" replace />} />
             <Route path="/posts/:postId" element={<PostDetail />} />
-            <Route path="/submit" element={<Navigate to="/community" replace />} />
             <Route path="/me/posts" element={<MyPosts />} />
             <Route path="/me/avatar" element={<AvatarSettings />} />
             <Route path="/admin/users" element={<AdminUsers />} />

@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { ActivityLine, Dateline, Dek, Headline, ImageWell, Kicker, TitleLine } from "./ui";
+import { Dateline, Dek, Headline, ImageWell, Kicker, TitleLine } from "./ui";
 
 export function StoryRow({ post }) {
   return (
@@ -11,7 +11,6 @@ export function StoryRow({ post }) {
           {post.title}
         </Headline>
         <Dek>{post.excerpt}</Dek>
-        <ActivityLine post={post} />
         <Dateline iso={post.created_at} />
       </div>
     </article>

@@ -120,6 +120,22 @@ def migrate_schema(engine) -> None:
                     "ALTER TABLE posts ADD COLUMN images TEXT NOT NULL DEFAULT '[]'"
                 )
     Base.metadata.create_all(engine)
+    if engine.dialect.name == "sqlite":
+        with engine.begin() as conn:
+            tables = {
+                row[0]
+                for row in conn.exec_driver_sql(
+                    "SELECT name FROM sqlite_master WHERE type='table'"
+                ).fetchall()
+            }
+            if "posts" in tables:
+                conn.exec_driver_sql("UPDATE posts SET category='forum' WHERE category='community'")
+                conn.exec_driver_sql("UPDATE posts SET category='news' WHERE category='dorm_life'")
+                conn.exec_driver_sql("UPDATE posts SET category='sports' WHERE category='events'")
+                conn.exec_driver_sql(
+                    "UPDATE posts SET is_activity=0, starts_at=NULL, location=NULL "
+                    "WHERE is_activity != 0 OR starts_at IS NOT NULL OR location IS NOT NULL"
+                )
 
 
 def init_db(engine) -> None:

@@ -1,8 +1,9 @@
-from fastapi import APIRouter, Depends, File, Query, UploadFile
+from fastapi import APIRouter, Depends, File, Query, Request, UploadFile
 from fastapi.responses import JSONResponse
 from sqlalchemy import func, select
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session, joinedload
+from starlette.datastructures import UploadFile as StarletteUploadFile
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from deps import get_current_user, get_db
@@ -11,6 +12,7 @@ from avatars import (
     ALLOWED_TYPES,
     MAX_POST_IMAGE_BYTES,
     MAX_POST_IMAGES,
+    delete_post_images,
     dump_images,
     normalize_avatar,
     parse_images,
@@ -35,7 +37,7 @@ from schemas import (
     ReplyPreview,
 )
 from store import create_comment, create_post_with_audit
-from validate import parse_optional_category, parse_page, parse_page_size, parse_starts_at, parse_uuid
+from validate import parse_optional_category, parse_page, parse_page_size, parse_uuid
 
 router = APIRouter()
 
@@ -55,15 +57,12 @@ def _summary(
     reply_preview: list[ReplyPreview] | None = None,
     include_images: bool = False,
 ) -> PostSummary:
-    images = parse_images(getattr(post, "images", None)) if include_images and post.category == "community" else []
+    images = parse_images(getattr(post, "images", None)) if include_images and post.category == "forum" else []
     return PostSummary(
         id=post.id,
         title=post.title,
         excerpt=post.excerpt,
         category=post.category,
-        is_activity=post.is_activity,
-        starts_at=to_iso(post.starts_at) if post.starts_at else None,
-        location=post.location,
         status=post.status,
         created_at=to_iso(post.created_at),
         updated_at=to_iso(post.updated_at),
@@ -76,7 +75,7 @@ def _summary(
 
 def _detail(post: Post) -> dict:
     return PostDetail(
-        **_summary(post, include_images=post.category == "community").model_dump(),
+        **_summary(post, include_images=post.category == "forum").model_dump(),
         body=post.body,
     ).model_dump()
 
@@ -93,52 +92,11 @@ def _published_post(db: Session, post_id: str) -> Post:
     return post
 
 
-def _require_community(post: Post) -> None:
-    if post.category != "community":
+def _require_forum(post: Post) -> None:
+    if post.category != "forum":
         raise validation_error(
-            [{"field": "category", "message": "Comments are only available on community posts."}]
+            [{"field": "category", "message": "Comments are only available on forum posts."}]
         )
-
-
-def _activity_field_errors(is_activity: bool, starts_at: str | None, location: str | None) -> list[dict[str, str]]:
-    fields: list[dict[str, str]] = []
-    if is_activity:
-        if not starts_at:
-            fields.append(
-                {"field": "starts_at", "message": "Start time is required when this post is an activity."}
-            )
-        else:
-            try:
-                parse_starts_at(starts_at)
-            except ApiError as exc:
-                if exc.code == "validation_error":
-                    fields.extend(exc.fields)
-                else:
-                    raise
-        place = (location or "").strip()
-        if not place or len(place) > 200:
-            fields.append(
-                {
-                    "field": "location",
-                    "message": "Location is required when this post is an activity.",
-                }
-            )
-    else:
-        if starts_at is not None:
-            fields.append(
-                {
-                    "field": "starts_at",
-                    "message": "Start time must be empty when this post is not an activity.",
-                }
-            )
-        if location is not None:
-            fields.append(
-                {
-                    "field": "location",
-                    "message": "Location must be empty when this post is not an activity.",
-                }
-            )
-    return fields
 
 
 def _post_field_errors(body: CreatePostBody) -> list[dict[str, str]]:
@@ -151,9 +109,6 @@ def _post_field_errors(body: CreatePostBody) -> list[dict[str, str]]:
         fields.append({"field": "body", "message": "Body must be 1–20000 characters."})
     if body.category not in CATEGORIES:
         fields.append({"field": "category", "message": CATEGORY_MESSAGE})
-    if body.category == "community" and body.is_activity:
-        fields.append({"field": "is_activity", "message": "Community posts cannot be activities."})
-    fields.extend(_activity_field_errors(body.is_activity, body.starts_at, body.location))
     return fields
 
 
@@ -177,8 +132,8 @@ def _list_posts(db: Session, *, page: int, page_size: int, category: str | None,
         ).all()
     except SQLAlchemyError as exc:
         raise StorageError() from exc
-    previews = _community_previews(db, rows) if category == "community" else {}
-    include_images = category == "community"
+    previews = _forum_previews(db, rows) if category == "forum" else {}
+    include_images = category == "forum"
     return PostList(
         items=[
             _summary(
@@ -195,8 +150,8 @@ def _list_posts(db: Session, *, page: int, page_size: int, category: str | None,
     ).model_dump()
 
 
-def _community_previews(db: Session, posts: list[Post]) -> dict[str, tuple[int, list[ReplyPreview]]]:
-    ids = [post.id for post in posts if post.category == "community"]
+def _forum_previews(db: Session, posts: list[Post]) -> dict[str, tuple[int, list[ReplyPreview]]]:
+    ids = [post.id for post in posts if post.category == "forum"]
     if not ids:
         return {}
     try:
@@ -283,7 +238,7 @@ def list_comments(
     parsed_page = parse_page(page)
     parsed_size = parse_page_size(page_size)
     post = _published_post(db, post_id)
-    _require_community(post)
+    _require_forum(post)
 
     floor_filter = [Comment.post_id == post_id, Comment.parent_id.is_(None)]
     try:
@@ -329,7 +284,7 @@ def create_post_comment(
 ):
     post_id = parse_uuid(post_id)
     post = _published_post(db, post_id)
-    _require_community(post)
+    _require_forum(post)
 
     text = body.body.strip()
     fields: list[dict[str, str]] = []
@@ -390,9 +345,9 @@ def promote_post(
 
     post_id = parse_uuid(post_id)
     source = _published_post(db, post_id)
-    if source.category != "community":
+    if source.category != "forum":
         raise validation_error(
-            [{"field": "category", "message": "Only community posts can be promoted."}]
+            [{"field": "category", "message": "Only forum posts can be promoted."}]
         )
 
     title = (body.title if body.title is not None else source.title).strip()
@@ -406,15 +361,12 @@ def promote_post(
         fields.append(
             {
                 "field": "category",
-                "message": "Must be one of: news, dorm_life, sports, events.",
+                "message": "Must be one of: news, sports.",
             }
         )
-    fields.extend(_activity_field_errors(body.is_activity, body.starts_at, body.location))
     if fields:
         raise validation_error(fields)
 
-    starts_at = parse_starts_at(body.starts_at) if body.is_activity else None
-    location = body.location.strip() if body.is_activity else None
     try:
         post = create_post_with_audit(
             db,
@@ -422,9 +374,6 @@ def promote_post(
             title=title,
             body=text,
             category=body.category,
-            is_activity=body.is_activity,
-            starts_at=starts_at,
-            location=location,
         )
     except StorageError:
         raise ApiError(
@@ -445,14 +394,14 @@ async def upload_post_image(
     post = _published_post(db, parse_uuid(post_id))
     if post.author_id != user.id:
         raise forbidden()
-    if post.category != "community":
+    if post.category != "forum":
         raise validation_error(
-            [{"field": "category", "message": "Images can only be added to community posts."}]
+            [{"field": "category", "message": "Images can only be added to forum posts."}]
         )
     images = parse_images(getattr(post, "images", None))
     if len(images) >= MAX_POST_IMAGES:
         raise validation_error(
-            [{"field": "file", "message": "Community posts can have at most 4 images."}]
+            [{"field": "file", "message": "Forum posts can have at most 4 images."}]
         )
     content_type = (file.content_type or "").split(";")[0].strip().lower()
     ext = ALLOWED_TYPES.get(content_type)
@@ -479,20 +428,68 @@ def get_post(post_id: str, db: Session = Depends(get_db)):
     return _detail(_published_post(db, parse_uuid(post_id)))
 
 
+def _image_field_errors(category: str, uploads: list[tuple[str, bytes]]) -> list[dict[str, str]]:
+    fields: list[dict[str, str]] = []
+    if uploads and category != "forum":
+        fields.append({"field": "images", "message": "Images can only be added to forum posts."})
+        return fields
+    if len(uploads) > MAX_POST_IMAGES:
+        fields.append({"field": "images", "message": "Forum posts can have at most 4 images."})
+        return fields
+    for _ext, data in uploads:
+        if not data or len(data) > MAX_POST_IMAGE_BYTES:
+            fields.append({"field": "images", "message": "Image must be 1–2000000 bytes."})
+            break
+    return fields
+
+
+async def _read_upload_images(items: list) -> tuple[list[tuple[str, bytes]], list[dict[str, str]]]:
+    uploads: list[tuple[str, bytes]] = []
+    for item in items:
+        if not isinstance(item, StarletteUploadFile):
+            continue
+        content_type = (item.content_type or "").split(";")[0].strip().lower()
+        ext = ALLOWED_TYPES.get(content_type)
+        if ext is None:
+            return [], [{"field": "images", "message": "Image must be a jpeg, png, or webp file."}]
+        data = await item.read()
+        uploads.append((ext, data))
+    return uploads, []
+
+
 @router.post("/posts", status_code=201)
-def create_post(
-    body: CreatePostBody,
+async def create_post(
+    request: Request,
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+    content_type = (request.headers.get("content-type") or "").split(";")[0].strip().lower()
+    uploads: list[tuple[str, bytes]] = []
+    if content_type == "application/json":
+        payload = await request.json()
+        if not isinstance(payload, dict):
+            raise validation_error([{"field": "title", "message": "Title must be 1–120 characters."}])
+        body = CreatePostBody.model_validate(payload)
+    elif content_type.startswith("multipart/form-data"):
+        form = await request.form()
+        body = CreatePostBody(
+            title=str(form.get("title") or ""),
+            body=str(form.get("body") or ""),
+            category=str(form.get("category") or ""),
+        )
+        uploads, upload_fields = await _read_upload_images(form.getlist("images"))
+        if upload_fields:
+            raise validation_error(upload_fields)
+    else:
+        raise validation_error([{"field": "title", "message": "Title must be 1–120 characters."}])
+
     fields = _post_field_errors(body)
+    fields.extend(_image_field_errors(body.category, uploads))
     if fields:
         raise validation_error(fields)
-    if user.role not in STAFF_ROLES and body.category != "community":
-        raise forbidden("Students can only publish in community.")
+    if user.role not in STAFF_ROLES and body.category != "forum":
+        raise forbidden("Students can only publish in forum.")
 
-    starts_at = parse_starts_at(body.starts_at) if body.is_activity else None
-    location = body.location.strip() if body.is_activity else None
     try:
         post = create_post_with_audit(
             db,
@@ -500,16 +497,27 @@ def create_post(
             title=body.title.strip(),
             body=body.body.strip(),
             category=body.category,
-            is_activity=body.is_activity,
-            starts_at=starts_at,
-            location=location,
         )
+        if uploads:
+            paths = [save_post_image(post.id, ext, data) for ext, data in uploads]
+            post.images = dump_images(paths)
+            db.flush()
     except StorageError:
+        delete_post_images(getattr(post, "id", "") if "post" in locals() else "")
         raise ApiError(
             503,
             "storage_unavailable",
             "Could not save the post. Try again in a moment.",
         ) from None
+    except OSError as exc:
+        if "post" in locals():
+            db.rollback()
+            delete_post_images(post.id)
+        raise StorageError() from exc
+    except SQLAlchemyError as exc:
+        if "post" in locals():
+            delete_post_images(post.id)
+        raise StorageError() from exc
     return JSONResponse(status_code=201, content=_detail(post))
 
 

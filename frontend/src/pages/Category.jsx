@@ -8,6 +8,23 @@ import { EmptyCategory, StoryRow, StoryRowSkeleton } from "../components/StoryRo
 import { ErrorBanner, FrontPageLink, SectionRule } from "../components/ui";
 import { canEditPaper } from "../format";
 
+function ComposeFab({ to, onClick }) {
+  const className =
+    "fixed bottom-6 right-6 z-20 flex h-14 w-14 items-center justify-center rounded-full bg-[#1A4FBF] text-[2rem] leading-none text-white";
+  if (to) {
+    return (
+      <Link to={to} className={className} aria-label="Write a post">
+        +
+      </Link>
+    );
+  }
+  return (
+    <button type="button" onClick={onClick} className={className} aria-label="Write a post">
+      +
+    </button>
+  );
+}
+
 export default function Category({ category, title }) {
   const { user } = useAuth();
   const [items, setItems] = useState([]);
@@ -19,8 +36,8 @@ export default function Category({ category, title }) {
   const [loadingMore, setLoadingMore] = useState(false);
   const [writing, setWriting] = useState(false);
 
-  const isCommunity = category === "community";
-  const canWrite = isCommunity ? Boolean(user) : canEditPaper(user);
+  const isForum = category === "forum";
+  const canWrite = isForum ? Boolean(user) : canEditPaper(user);
 
   useEffect(() => {
     let cancelled = false;
@@ -50,6 +67,15 @@ export default function Category({ category, title }) {
     };
   }, [category]);
 
+  useEffect(() => {
+    if (!writing) return undefined;
+    function onKey(event) {
+      if (event.key === "Escape") setWriting(false);
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [writing]);
+
   function loadOlder() {
     const next = page + 1;
     setLoadingMore(true);
@@ -78,7 +104,7 @@ export default function Category({ category, title }) {
     <div className="mt-8">
       <FrontPageLink />
       <SectionRule>{title}</SectionRule>
-      {canWrite ? (
+      {canWrite && !isForum ? (
         writing ? (
           <ComposeForm category={category} onPublished={onPublished} />
         ) : (
@@ -90,16 +116,10 @@ export default function Category({ category, title }) {
             Write
           </button>
         )
-      ) : isCommunity && !user ? (
-        <p className="mb-6 font-sans text-sm text-neutral-500">
-          <Link to="/sign-in?next=/community" className="text-[#1A4FBF]">
-            Sign in to post
-          </Link>
-        </p>
       ) : null}
       <ErrorBanner error={error} />
       {loading ? (
-        isCommunity ? (
+        isForum ? (
           <>
             <CommunityCardSkeleton />
             <CommunityCardSkeleton />
@@ -117,7 +137,7 @@ export default function Category({ category, title }) {
       ) : (
         <>
           {items.map((post) =>
-            isCommunity ? (
+            isForum ? (
               <CommunityCard key={post.id} post={post} />
             ) : (
               <StoryRow key={post.id} post={post} />
@@ -135,6 +155,26 @@ export default function Category({ category, title }) {
           ) : null}
         </>
       )}
+      {isForum && !writing ? (
+        user ? (
+          <ComposeFab onClick={() => setWriting(true)} />
+        ) : (
+          <ComposeFab to="/sign-in?next=/forum" />
+        )
+      ) : null}
+      {isForum && writing ? (
+        <div className="fixed inset-0 z-30 flex items-start justify-center overflow-y-auto bg-black/40 px-4 py-10">
+          <button
+            type="button"
+            className="absolute inset-0 cursor-default"
+            aria-label="Close compose"
+            onClick={() => setWriting(false)}
+          />
+          <div className="relative z-10 w-full max-w-2xl bg-white p-8">
+            <ComposeForm category={category} onPublished={onPublished} onCancel={() => setWriting(false)} />
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

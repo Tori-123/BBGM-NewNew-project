@@ -1,44 +1,42 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { ApiError, api, fieldMessage } from "../api";
 import { useAuth } from "../auth";
 import { Avatar } from "./Avatar";
 import { ErrorBanner, FieldError } from "./ui";
-import { toUtcZ } from "../format";
 
-export default function ComposeForm({ category, onPublished }) {
+export default function ComposeForm({ category, onPublished, onCancel }) {
   const { user, setUser } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
-  const isCommunity = category === "community";
+  const isForum = category === "forum";
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
-  const [isActivity, setIsActivity] = useState(false);
-  const [startsAt, setStartsAt] = useState("");
-  const [place, setPlace] = useState("");
   const [images, setImages] = useState([]);
   const [error, setError] = useState(null);
   const [submitting, setSubmitting] = useState(false);
+  const imagesRef = useRef(images);
+  imagesRef.current = images;
+
+  useEffect(() => {
+    return () => {
+      imagesRef.current.forEach((item) => URL.revokeObjectURL(item.preview));
+    };
+  }, []);
 
   async function onPublish(event) {
     event.preventDefault();
     setSubmitting(true);
     setError(null);
-    const activity = !isCommunity && isActivity;
-    const payload = {
-      title,
-      body,
-      category,
-      is_activity: activity,
-      starts_at: activity ? toUtcZ(startsAt) : null,
-      location: activity ? place : null,
-    };
+    const payload = { title, body, category };
     try {
-      let created = await api.createPost(payload);
-      if (isCommunity && images.length) {
-        for (const file of images.slice(0, 4)) {
-          created = await api.uploadPostImage(created.id, file);
-        }
+      const created = await api.createPost(
+        payload,
+        isForum ? images.map((item) => item.file) : [],
+      );
+      if (isForum) {
+        navigate(`/posts/${created.id}`);
+        return;
       }
       onPublished(created);
     } catch (err) {
@@ -53,18 +51,28 @@ export default function ComposeForm({ category, onPublished }) {
     }
   }
 
-  function onActivityChange(checked) {
-    setIsActivity(checked);
-    if (!checked) {
-      setStartsAt("");
-      setPlace("");
-    }
+  function onFiles(event) {
+    const next = Array.from(event.target.files || []).slice(0, 4);
+    setImages((current) => {
+      current.forEach((item) => URL.revokeObjectURL(item.preview));
+      return next.map((file) => ({ file, preview: URL.createObjectURL(file) }));
+    });
+    event.target.value = "";
+  }
+
+  function removeImage(index) {
+    setImages((current) => {
+      const copy = [...current];
+      URL.revokeObjectURL(copy[index].preview);
+      copy.splice(index, 1);
+      return copy;
+    });
   }
 
   const topMessage = error && (!error.fields || error.fields.length === 0) ? error : null;
 
   return (
-    <form onSubmit={onPublish} className="mb-8 border-b border-black pb-8">
+    <form onSubmit={onPublish} className={onCancel ? "mb-0" : "mb-8 border-b border-black pb-8"}>
       <div className="mb-4 flex items-center gap-3">
         <Avatar avatar={user.avatar} size={40} />
         <div>
@@ -84,6 +92,7 @@ export default function ComposeForm({ category, onPublished }) {
         id="compose-title"
         value={title}
         onChange={(event) => setTitle(event.target.value)}
+        autoFocus={Boolean(onCancel)}
         className="mt-2 w-full border-0 border-b border-black bg-transparent py-2 font-serif text-3xl outline-none"
       />
       <FieldError message={fieldMessage(error, "title")} />
@@ -100,43 +109,7 @@ export default function ComposeForm({ category, onPublished }) {
       />
       <FieldError message={fieldMessage(error, "body")} />
 
-      {!isCommunity ? (
-        <>
-          <label className="mt-6 flex items-center gap-2 font-sans text-sm">
-            <input
-              type="checkbox"
-              checked={isActivity}
-              onChange={(event) => onActivityChange(event.target.checked)}
-            />
-            This post is an activity
-          </label>
-          {isActivity ? (
-            <>
-              <label className="mt-6 block font-sans text-[11px] uppercase tracking-[0.16em] text-[#1A4FBF]" htmlFor="compose-starts-at">
-                Starts at
-              </label>
-              <input
-                id="compose-starts-at"
-                type="datetime-local"
-                value={startsAt}
-                onChange={(event) => setStartsAt(event.target.value)}
-                className="mt-2 w-full border border-black px-2 py-2 font-sans text-sm outline-none"
-              />
-              <FieldError message={fieldMessage(error, "starts_at")} />
-              <label className="mt-6 block font-sans text-[11px] uppercase tracking-[0.16em] text-[#1A4FBF]" htmlFor="compose-location">
-                Location
-              </label>
-              <input
-                id="compose-location"
-                value={place}
-                onChange={(event) => setPlace(event.target.value)}
-                className="mt-2 w-full border-b border-black py-2 font-sans text-sm outline-none"
-              />
-              <FieldError message={fieldMessage(error, "location")} />
-            </>
-          ) : null}
-        </>
-      ) : (
+      {isForum ? (
         <>
           <label className="mt-6 block font-sans text-[11px] uppercase tracking-[0.16em] text-[#1A4FBF]" htmlFor="compose-images">
             Photos
@@ -146,24 +119,49 @@ export default function ComposeForm({ category, onPublished }) {
             type="file"
             accept="image/jpeg,image/png,image/webp"
             multiple
-            onChange={(event) => setImages(Array.from(event.target.files || []).slice(0, 4))}
+            onChange={onFiles}
             className="mt-2 block font-sans text-sm"
           />
           <p className="mt-1 font-sans text-xs text-neutral-500">Up to 4 jpeg, png, or webp files, 2MB each.</p>
           {images.length ? (
-            <p className="mt-1 font-sans text-xs text-neutral-500">{images.length} selected.</p>
+            <ul className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
+              {images.map((item, index) => (
+                <li key={item.preview} className="relative">
+                  <img src={item.preview} alt="" className="h-24 w-full border border-black object-cover" />
+                  <button
+                    type="button"
+                    onClick={() => removeImage(index)}
+                    className="mt-1 font-sans text-[11px] uppercase tracking-[0.14em] text-[#1A4FBF]"
+                  >
+                    Remove
+                  </button>
+                </li>
+              ))}
+            </ul>
           ) : null}
+          <FieldError message={fieldMessage(error, "images")} />
           <FieldError message={fieldMessage(error, "file")} />
         </>
-      )}
+      ) : null}
 
-      <button
-        type="submit"
-        disabled={submitting}
-        className="mt-6 rounded-[2px] bg-black px-5 py-2 font-sans text-[11px] uppercase tracking-[0.18em] text-white"
-      >
-        Publish
-      </button>
+      <div className="mt-6 flex items-center gap-4">
+        <button
+          type="submit"
+          disabled={submitting}
+          className="rounded-[2px] bg-black px-5 py-2 font-sans text-[11px] uppercase tracking-[0.18em] text-white"
+        >
+          Publish
+        </button>
+        {onCancel ? (
+          <button
+            type="button"
+            onClick={onCancel}
+            className="font-sans text-[11px] uppercase tracking-[0.18em] text-neutral-500"
+          >
+            Cancel
+          </button>
+        ) : null}
+      </div>
     </form>
   );
 }

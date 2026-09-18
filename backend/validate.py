@@ -1,5 +1,4 @@
 import re
-from datetime import datetime, timezone
 from uuid import UUID
 
 from errors import ApiError, validation_error
@@ -40,23 +39,6 @@ def parse_uuid(value: str, field: str = "post_id") -> str:
         return str(UUID(value))
     except ValueError as exc:
         raise ApiError(400, "bad_request", f"{field} must be a UUID.") from exc
-
-
-def parse_starts_at(value: str) -> datetime:
-    raw = value.strip()
-    if raw.endswith("Z"):
-        raw = raw[:-1] + "+00:00"
-    try:
-        parsed = datetime.fromisoformat(raw)
-    except ValueError as exc:
-        raise validation_error(
-            [{"field": "starts_at", "message": "Must be an ISO 8601 UTC datetime."}]
-        ) from exc
-    if parsed.tzinfo is None:
-        raise validation_error(
-            [{"field": "starts_at", "message": "Must be an ISO 8601 UTC datetime."}]
-        )
-    return parsed.astimezone(timezone.utc).replace(microsecond=0)
 
 
 def normalize_email(value: str) -> str:

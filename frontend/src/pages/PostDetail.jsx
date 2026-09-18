@@ -4,7 +4,7 @@ import { ApiError, api, fieldMessage } from "../api";
 import { useAuth } from "../auth";
 import { uploadSrc } from "../avatar";
 import { Avatar } from "../components/Avatar";
-import { ActivityLine, ErrorBanner, FieldError, FrontPageLink, Headline, ImageWell, Kicker, TitleLine } from "../components/ui";
+import { ErrorBanner, FieldError, FrontPageLink, Headline, ImageWell, Kicker, TitleLine } from "../components/ui";
 import { NEWSPAPER_OPTIONS, canEditPaper, formatDateline } from "../format";
 
 export default function PostDetail() {
@@ -41,7 +41,7 @@ export default function PostDetail() {
         setError(null);
         setPromoteTitle(data.title);
         setPromoteBody(data.body);
-        if (data.category === "community") {
+        if (data.category === "forum") {
           return api.listComments(postId).then((thread) => {
             if (cancelled) return;
             setComments(thread.items);
@@ -65,7 +65,7 @@ export default function PostDetail() {
   }, [postId]);
 
   const notFound = error instanceof ApiError && error.code === "not_found";
-  const isCommunity = post?.category === "community";
+  const isForum = post?.category === "forum";
   const staff = canEditPaper(user);
 
   async function onComment(event) {
@@ -120,7 +120,6 @@ export default function PostDetail() {
         category: promoteCategory,
         title: promoteTitle,
         body: promoteBody,
-        is_activity: false,
       });
       navigate(`/posts/${created.id}`);
     } catch (err) {
@@ -148,14 +147,13 @@ export default function PostDetail() {
           <Kicker category={post.category} />
           <Headline className="mt-2 text-4xl sm:text-5xl">{post.title}</Headline>
           <div className="mt-3 flex items-center gap-3">
-            {isCommunity ? <Avatar avatar={post.author?.avatar} size={48} /> : null}
+            {isForum ? <Avatar avatar={post.author?.avatar} size={48} /> : null}
             <p className="font-sans text-sm text-neutral-500">
               {post.author?.display_name}
               {post.created_at ? ` · ${formatDateline(post.created_at)}` : ""}
             </p>
           </div>
-          <ActivityLine post={post} />
-          {isCommunity ? (
+          {isForum ? (
             post.images?.length ? (
               <div className="mt-6 grid gap-3">
                 {post.images.map((src) => (
@@ -175,7 +173,7 @@ export default function PostDetail() {
             {post.body}
           </div>
 
-          {isCommunity && staff ? (
+          {isForum && staff ? (
             <form onSubmit={onPromote} className="mt-12 border-t border-black pt-8">
               <h2 className="font-serif text-2xl">Copy to the paper</h2>
               <ErrorBanner error={promoteError && !promoteError.fields?.length ? promoteError : null} />
@@ -227,7 +225,7 @@ export default function PostDetail() {
             </form>
           ) : null}
 
-          {isCommunity ? (
+          {isForum ? (
             <section className="mt-12 border-t border-black pt-8">
               <h2 className="font-serif text-2xl">Replies</h2>
               <ErrorBanner error={commentError && !commentError.fields?.length ? commentError : null} />

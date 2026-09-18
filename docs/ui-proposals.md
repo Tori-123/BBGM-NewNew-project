@@ -1,6 +1,6 @@
-# BBGM Scoop UI 提案
+# Elegram UI 提案
 
-依据：`docs/PRD.md`、`docs/schema.md`，以及你提供的 BBGM Scoop 页面稿（报头、头条、LATEST / FEATURES、CAMPUS LIFE、边栏）。
+依据：`docs/PRD.md`、`docs/schema.md`。产品名 Elegram；报头为斜体字标，不是学校官方媒体。
 
 **约束：** 不另起皮肤。主页按截图还原（报头、导航、头条网格、LATEST、FEATURES、CAMPUS LIFE、右侧栏）。三案共用同一套视觉代币；区分的是内页（登录 / 发帖 / 栏目 / 我的帖子）怎么铺进这张报纸，而不是换成仪表盘或社交 App。
 
@@ -15,10 +15,10 @@
 | 代币 | 取值 |
 | --- | --- |
 | 页底 | `#FFFFFF`，正文近黑 `#111111` |
-| 品牌蓝 | `#1A4FBF`：`BBGM` 斜体字标、栏目 kicker、边栏小标题、链接 |
+| 品牌蓝 | `#1A4FBF`：`Elegram` 斜体字标、栏目 kicker、边栏小标题、链接 |
 | 图片占位 | `#D6DEEE` 矩形，无圆角、无阴影、无渐变 |
 | 分割 | 1px / 2px 纯黑横线；栏目名旁一条加长黑线（如 `LATEST ———`） |
-| 报头字 | `BBGM` 蓝色斜体衬线；竖线分隔；`SCOOP` 黑色超粗衬线 |
+| 报头字 | `Elegram` 蓝色斜体衬线 |
 | 标题字 | 高对比衬线（建议 **Playfair Display** 或 **Source Serif 4**） |
 | 导航 / UI |  Grotesque 无衬线（建议 **Inter** 或系统 ui-sans），导航全大写、字距略开 |
 | kicker | 约 11px、全大写、蓝色、跟踪（NEWS / DORM LIFE / FEATURED / SPORTS） |
@@ -30,26 +30,26 @@
 | 主页块 | 第一版数据 |
 | --- | --- |
 | 头条 FEATURED、右侧副条、LATEST、FEATURES、CAMPUS LIFE | `GET /posts` 按时间填入；无图时用 `#D6DEEE` 占位 |
-| 导航 NEWS / SPORTS / DORM LIFE / EVENTS | 进栏目列表（Must） |
-| 导航 OPINION / PHOTO | 可进空栏目页（Could）；不要从报头删掉 |
+| 导航 NEWS / SPORTS / FORUM | 进栏目列表（Must） |
+| 导航 OPINION | 可进空栏目页（Could） |
 | SUBMIT | 发帖主操作（Must）；未登录先去登录 |
 | 顶栏搜索 | 保留外形（截图）；第一版不接检索接口，提交时用报头下一条静态说明「Search comes in a later version」 |
 | PHOTO OF THE DAY、TRACK OF THE DAY、STUDENT ART | 保留栏位；无数据用空态，不接 Spotify 也可（Could） |
-| UPCOMING | 绑 `is_activity=true` 的帖（Must 活动露出） |
+| UPCOMING | 本版不绑数据（活动字段已删） |
 
 ---
 
-### 提案 1：Scoop 印刷版（主页 = 截图）
+### 提案 1：Elegram 印刷版（主页 = 截图）
 
 - **视觉基调**：白底、黑线、蓝 kicker、衬线大标题、浅紫蓝图框。气质是独立学生报纸，不是论坛或后台。读者（P2）扫报头和头条就能信这是校园媒体；发帖者（P1/P3）走同一套报纸，而不是跳进另一套产品皮。
 - **信息架构与布局**：
-  - **全局壳（除登录注册外每页）：** 顶栏 `ABOUT` `CONTACT` + 今日日期 → 报头（搜索 / `BBGM | SCOOP` / Student Media）→ 标语 → 导航 `NEWS SPORTS DORM LIFE OPINION EVENTS PHOTO SUBMIT`。在顶栏右侧日期左侧加账号，不破坏截图报头：未登录 `SIGN IN`；已登录展示名 + `MY POSTS` + `SIGN OUT`。
+  - **全局壳（除登录注册外每页）：** 顶栏 `ABOUT` `CONTACT` + 今日日期 → 报头（搜索 / `Elegram` / Community hosted）→ 标语 → 导航。在顶栏右侧日期左侧加账号：未登录 `SIGN IN`；已登录展示名 + `MY POSTS` + `SIGN OUT`。
   - **首页 `/`：** 严格按截图。主栏：FEATURED 大图+大标题 → LATEST（左大图 + 右三条）→ FEATURES（左窄列 + 右大图）→ CAMPUS LIFE 三列 → SPECIAL FEATURE 大图+文。右栏：Photo of the Day、Track of the Day、Upcoming、Student Art。FEATURED 取列表第一条；副条与 LATEST 取后续 `PostSummary`；活动帖在卡片上用 kicker 下的一行时间+地点（schema 已有 `starts_at` / `location`）。
   - **栏目 `/news` `/sports` `/dorm-life` `/events`：** 报头+导航保留，当前栏目在导航下划黑线。版面像报纸栏目页：左大标题「SPORTS」+ 黑线，下列 `PostSummary` 行（左占位图、蓝 kicker、衬线标题、excerpt；活动行加时间地点）。右侧可继续用 Upcoming 窄栏。
   - **详情 `/posts/:id`：** 文章页。蓝 kicker → 衬线大标题 → 作者 `display_name` 与 `created_at` → 活动则时间地点单独一行 → 占位图 → `body` 长栏正文（约 65–72 字符宽）。不是卡片堆。
   - **发帖 `/submit`（导航 SUBMIT）：** 仍在报头下。版心像「投稿台」：左栏标题/正文（衬线标题输入、无衬线正文）；右栏栏目、是否活动、活动时间与地点。主按钮 `Publish` 放右栏底部，黑色填充、无圆角或极小圆角，像印刷按钮而不是 App pill。
   - **我的帖子 `/me/posts`：** FEATURES 那种紧凑行列表（小图 + 标题），每行进详情。
-  - **登录/注册 `/sign-in` `/register`：** 保留顶栏与报头（证明还在 Scoop），版心一条黑线下列窄表：邮箱、密码、展示名（仅注册）、`Sign in` / `Create account`。不要全屏插画、不要居中大卡片悬浮。
+  - **登录/注册 `/sign-in` `/register`：** 保留顶栏与报头，版心一条黑线下列窄表：邮箱、密码、展示名（仅注册）、`Sign in` / `Create account`。不要全屏插画、不要居中大卡片悬浮。
 - **关键状态怎么呈现**：
   - **空列表：** 栏目名 + 黑线仍在；图框位置留 `#D6DEEE`；其下衬线一句 “No stories in Dorm Life yet.” + 已登录则文字链 “Be the first to publish”。边栏无活动：Upcoming 标题在，文案 “No upcoming events posted.”
   - **加载：** 不闪骨架 App；图框保持浅紫蓝，标题位置一条 2px 浅灰横线即可。整页不要转菊花挡住报头。
@@ -59,7 +59,7 @@
 
 ---
 
-### 提案 2：Scoop 栏目版（主页仍 = 截图，内页更密）
+### 提案 2：Elegram 栏目版（主页仍 = 截图，内页更密）
 
 - **视觉基调：** 与提案 1 同一报头、同一蓝黑白、同一图框。内页把「栏目列表」做成更密的新闻栏（行高更紧、图更小），方便 P2 一次扫完 Sports / Dorm / Events。气质仍是报纸内页，不是表格后台。
 - **信息架构与布局：**
@@ -78,7 +78,7 @@
 
 ---
 
-### 提案 3：Scoop 投稿版（主页仍 = 截图，发帖路径更显）
+### 提案 3：Elegram 投稿版（主页仍 = 截图，发帖路径更显）
 
 - **视觉基调：** 仍是截图那张报。只把顶栏账号与 `SUBMIT` 加重：`SUBMIT` 用蓝色小 caps（与 kicker 同色），已登录展示名放在 Student Media 那一列下方。不改首页模块，不改字体体系。
 - **信息架构与布局：**

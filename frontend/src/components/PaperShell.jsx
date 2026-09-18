@@ -91,22 +91,20 @@ export default function PaperShell() {
 
           <Link
             to="/"
-            aria-label="BBGM Scoop home"
-            className="relative z-10 flex cursor-pointer items-center justify-center gap-4 whitespace-nowrap no-underline sm:gap-5"
+            aria-label="Elegram home"
+            className="relative z-10 flex cursor-pointer items-center justify-center whitespace-nowrap no-underline"
           >
-            <span className="font-wordmark-bbgm text-[56px] sm:text-[72px]">BBGM</span>
-            <span className="h-[52px] w-px bg-black sm:h-[66px]" aria-hidden="true" />
-            <span className="font-wordmark-scoop text-[60px] sm:text-[78px]">SCOOP</span>
+            <span className="font-wordmark-elegram text-[52px] sm:text-[68px]">Elegram</span>
           </Link>
 
-          <Link to="/" className="text-right no-underline">
+          <div className="text-right">
             <p className="font-sans text-[10px] font-semibold tracking-[0.16em] text-[#1A4FBF]">
-              BBGM STUDENT MEDIA
+              COMMUNITY HOSTED
             </p>
             <p className="mt-[3px] font-sans text-[10px] font-normal tracking-[0.01em] text-neutral-500">
-              Independent Student Journalism
+              Independent campus forum
             </p>
-          </Link>
+          </div>
         </header>
 
         <p className="pb-6 pt-4 text-center font-sans text-[13px] font-semibold uppercase tracking-[0.28em] text-[#111111]">
@@ -131,6 +129,10 @@ export default function PaperShell() {
         ) : null}
 
         <Outlet />
+
+        <p className="mt-16 border-t border-neutral-200 pt-4 font-sans text-[11px] leading-5 text-neutral-500">
+          Community-hosted. Not associated with BASIS Bilingual Guangming.
+        </p>
       </div>
     </div>
   );

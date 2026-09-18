@@ -50,9 +50,6 @@ def create_post_with_audit(
     title: str,
     body: str,
     category: str,
-    is_activity: bool,
-    starts_at,
-    location: str | None,
 ) -> Post:
     now = utc_now()
     post = Post(
@@ -62,9 +59,9 @@ def create_post_with_audit(
         body=body,
         excerpt=make_excerpt(body),
         category=category,
-        is_activity=is_activity,
-        starts_at=starts_at,
-        location=location,
+        is_activity=False,
+        starts_at=None,
+        location=None,
         status="published",
         images="[]",
         created_at=now,

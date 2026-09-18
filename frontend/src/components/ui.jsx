@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { categoryLabel, formatDateline, formatStartsAt } from "../format";
+import { categoryLabel, formatDateline } from "../format";
 
 export function ImageWell({ className = "h-40" }) {
   return <div className={`bg-[#D6DEEE] ${className}`} aria-hidden="true" />;
@@ -57,16 +57,6 @@ export function Dek({ children }) {
   return <p className="mt-2 font-sans text-sm leading-relaxed text-neutral-800">{children}</p>;
 }
 
-export function ActivityLine({ post }) {
-  if (!post?.is_activity) return null;
-  return (
-    <p className="mt-1 font-sans text-[13px] text-neutral-500">
-      {formatStartsAt(post.starts_at)}
-      {post.location ? ` · ${post.location}` : ""}
-    </p>
-  );
-}
-
 export function Dateline({ iso }) {
   if (!iso) return null;
   return <p className="mt-1 font-sans text-xs text-neutral-500">{formatDateline(iso)}</p>;
@@ -99,7 +89,6 @@ export function StoryTile({ post, wellClassName = "h-36", showExcerpt = true, sh
           {post.title}
         </Headline>
         {showExcerpt ? <Dek>{post.excerpt}</Dek> : null}
-        <ActivityLine post={post} />
         {showDate ? <Dateline iso={post.created_at} /> : null}
       </div>
     </article>

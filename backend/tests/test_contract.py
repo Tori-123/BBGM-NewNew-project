@@ -26,19 +26,19 @@ def test_missing_session_secret_fails_startup(tmp_path, monkeypatch):
 
 
 def test_register_login_create_post_public_read_and_persist(tmp_path, monkeypatch):
-    app = _make_app(tmp_path, monkeypatch, admin_email="jordan.hale@bbgm.edu")
+    app = _make_app(tmp_path, monkeypatch, admin_email="jordan.hale@example.com")
     with TestClient(app) as client:
         register = client.post(
             "/api/v1/auth/register",
             json={
-                "email": "Jordan.Hale@bbgm.edu",
+                "email": "Jordan.Hale@example.com",
                 "password": "east-hall-8",
                 "display_name": "Jordan Hale",
             },
         )
         assert register.status_code == 201, register.text
         body = register.json()
-        assert body["email"] == "jordan.hale@bbgm.edu"
+        assert body["email"] == "jordan.hale@example.com"
         assert body["display_name"] == "Jordan Hale"
         assert body["role"] == "admin"
         assert "password" not in body and "password_hash" not in body
@@ -46,7 +46,7 @@ def test_register_login_create_post_public_read_and_persist(tmp_path, monkeypatc
 
         login = client.post(
             "/api/v1/auth/login",
-            json={"email": "jordan.hale@bbgm.edu", "password": "east-hall-8"},
+            json={"email": "jordan.hale@example.com", "password": "east-hall-8"},
         )
         assert login.status_code == 200, login.text
         assert login.json()["id"] == body["id"]
@@ -56,8 +56,7 @@ def test_register_login_create_post_public_read_and_persist(tmp_path, monkeypatc
             json={
                 "title": "East Hall laundry room will close Friday night",
                 "body": "Facilities posted a handwritten note on the basement door.",
-                "category": "dorm_life",
-                "is_activity": False,
+                "category": "news",
                 "author_id": "should-be-ignored",
                 "status": "draft",
             },
@@ -77,15 +76,11 @@ def test_register_login_create_post_public_read_and_persist(tmp_path, monkeypatc
                 "title": "Intramural basketball finals — Saturday at the old gym",
                 "body": "East Hall plays the faculty pick-up team for the dorm cup.",
                 "category": "sports",
-                "is_activity": True,
-                "starts_at": "2026-09-13T17:00:00Z",
-                "location": "Old Gym, Court 2",
             },
         )
         assert activity.status_code == 201, activity.text
-        assert activity.json()["is_activity"] is True
-        assert activity.json()["starts_at"] == "2026-09-13T17:00:00Z"
-        assert activity.json()["location"] == "Old Gym, Court 2"
+        assert activity.json()["category"] == "sports"
+        assert "is_activity" not in activity.json()
 
         mine = client.get("/api/v1/me/posts")
         assert mine.status_code == 200
@@ -102,9 +97,8 @@ def test_register_login_create_post_public_read_and_persist(tmp_path, monkeypatc
         assert listed.json()["total"] == 2
         titles = {item["title"] for item in listed.json()["items"]}
         assert "East Hall laundry room will close Friday night" in titles
-        sports = next(item for item in listed.json()["items"] if item["is_activity"])
-        assert sports["starts_at"] == "2026-09-13T17:00:00Z"
-        assert sports["location"] == "Old Gym, Court 2"
+        sports = next(item for item in listed.json()["items"] if item["category"] == "sports")
+        assert sports["title"] == "Intramural basketball finals — Saturday at the old gym"
 
         detail = guest.get(f"/api/v1/posts/{post['id']}")
         assert detail.status_code == 200
@@ -119,7 +113,7 @@ def test_register_login_create_post_public_read_and_persist(tmp_path, monkeypatc
     with TestClient(reopened) as client:
         login = client.post(
             "/api/v1/auth/login",
-            json={"email": "jordan.hale@bbgm.edu", "password": "east-hall-8"},
+            json={"email": "jordan.hale@example.com", "password": "east-hall-8"},
         )
         assert login.status_code == 200
         listed = client.get("/api/v1/posts")
@@ -131,12 +125,12 @@ def test_register_login_create_post_public_read_and_persist(tmp_path, monkeypatc
 
 
 def test_error_paths_do_not_write_posts(tmp_path, monkeypatch):
-    app = _make_app(tmp_path, monkeypatch, admin_email="priya.nair@bbgm.edu")
+    app = _make_app(tmp_path, monkeypatch, admin_email="priya.nair@example.com")
     with TestClient(app) as client:
         client.post(
             "/api/v1/auth/register",
             json={
-                "email": "priya.nair@bbgm.edu",
+                "email": "priya.nair@example.com",
                 "password": "old-gym-17",
                 "display_name": "Priya Nair",
             },
@@ -144,14 +138,14 @@ def test_error_paths_do_not_write_posts(tmp_path, monkeypatch):
 
         bad_login = client.post(
             "/api/v1/auth/login",
-            json={"email": "priya.nair@bbgm.edu", "password": "wrong-pass"},
+            json={"email": "priya.nair@example.com", "password": "wrong-pass"},
         )
         assert bad_login.status_code == 401
         assert bad_login.json()["error"]["code"] == "invalid_credentials"
 
         missing = client.post(
             "/api/v1/auth/login",
-            json={"email": "nobody@bbgm.edu", "password": "old-gym-17"},
+            json={"email": "nobody@example.com", "password": "old-gym-17"},
         )
         assert missing.status_code == 401
         assert missing.json()["error"]["message"] == "Email or password is incorrect."
@@ -163,7 +157,6 @@ def test_error_paths_do_not_write_posts(tmp_path, monkeypatch):
                 "title": "Should not publish",
                 "body": "Visitor cannot post.",
                 "category": "news",
-                "is_activity": False,
             },
         )
         assert unauth.status_code == 401
@@ -172,12 +165,12 @@ def test_error_paths_do_not_write_posts(tmp_path, monkeypatch):
     with TestClient(app) as client:
         client.post(
             "/api/v1/auth/login",
-            json={"email": "priya.nair@bbgm.edu", "password": "old-gym-17"},
+            json={"email": "priya.nair@example.com", "password": "old-gym-17"},
         )
 
         empty_title = client.post(
             "/api/v1/posts",
-            json={"title": "   ", "body": "Has a body", "category": "news", "is_activity": False},
+            json={"title": "   ", "body": "Has a body", "category": "news"},
         )
         assert empty_title.status_code == 422
         assert empty_title.json()["error"]["code"] == "validation_error"
@@ -188,24 +181,9 @@ def test_error_paths_do_not_write_posts(tmp_path, monkeypatch):
                 "title": "Hall gossip",
                 "body": "Not a real column.",
                 "category": "gossip",
-                "is_activity": False,
             },
         )
         assert bad_category.status_code == 422
-
-        missing_location = client.post(
-            "/api/v1/posts",
-            json={
-                "title": "Intramural basketball finals",
-                "body": "East Hall plays the faculty pick-up team.",
-                "category": "sports",
-                "is_activity": True,
-                "starts_at": "2026-09-13T17:00:00Z",
-            },
-        )
-        assert missing_location.status_code == 422
-        fields = {item["field"] for item in missing_location.json()["error"]["fields"]}
-        assert "location" in fields
 
         listed = client.get("/api/v1/posts")
         assert listed.json()["total"] == 0
@@ -222,9 +200,6 @@ def test_error_paths_do_not_write_posts(tmp_path, monkeypatch):
                 "title": "Intramural basketball finals — Saturday at the old gym",
                 "body": "East Hall plays the faculty pick-up team for the dorm cup.",
                 "category": "sports",
-                "is_activity": True,
-                "starts_at": "2026-09-13T17:00:00Z",
-                "location": "Old Gym, Court 2",
             },
         )
         assert failed.status_code == 503
@@ -236,12 +211,12 @@ def test_error_paths_do_not_write_posts(tmp_path, monkeypatch):
 
 
 def test_cookie_required_only_on_private_routes(tmp_path, monkeypatch):
-    app = _make_app(tmp_path, monkeypatch, admin_email="wei.chen@bbgm.edu")
+    app = _make_app(tmp_path, monkeypatch, admin_email="wei.chen@example.com")
     with TestClient(app) as client:
         client.post(
             "/api/v1/auth/register",
             json={
-                "email": "wei.chen@bbgm.edu",
+                "email": "wei.chen@example.com",
                 "password": "library-24",
                 "display_name": "Wei Chen",
             },
@@ -252,7 +227,6 @@ def test_cookie_required_only_on_private_routes(tmp_path, monkeypatch):
                 "title": "Library 24-hour desks start the week before midterms",
                 "body": "The third-floor quiet wing will stay open overnight.",
                 "category": "news",
-                "is_activity": False,
             },
         )
         post_id = created.json()["id"]
@@ -277,7 +251,6 @@ def test_cookie_required_only_on_private_routes(tmp_path, monkeypatch):
                 "title": "Another note",
                 "body": "Needs a session.",
                 "category": "news",
-                "is_activity": False,
             },
         )
         assert create.status_code == 401
@@ -305,12 +278,12 @@ def test_cookie_required_only_on_private_routes(tmp_path, monkeypatch):
 
 
 def test_student_community_comments_promote_and_admin_roles(tmp_path, monkeypatch):
-    app = _make_app(tmp_path, monkeypatch, admin_email="ada.min@bbgm.edu")
+    app = _make_app(tmp_path, monkeypatch, admin_email="ada.min@example.com")
     with TestClient(app) as client:
         student = client.post(
             "/api/v1/auth/register",
             json={
-                "email": "jordan.hale@bbgm.edu",
+                "email": "jordan.hale@example.com",
                 "password": "east-hall-8",
                 "display_name": "Jordan Hale",
             },
@@ -324,7 +297,6 @@ def test_student_community_comments_promote_and_admin_roles(tmp_path, monkeypatc
                 "title": "Should stay off the paper",
                 "body": "Students cannot write news.",
                 "category": "news",
-                "is_activity": False,
             },
         )
         assert blocked.status_code == 403
@@ -335,19 +307,18 @@ def test_student_community_comments_promote_and_admin_roles(tmp_path, monkeypatc
             json={
                 "title": "Laundry chat in the stairwell",
                 "body": "Who still has quarters for East Hall?",
-                "category": "community",
-                "is_activity": False,
+                "category": "forum",
             },
         )
         assert community.status_code == 201, community.text
         post_id = community.json()["id"]
-        assert community.json()["category"] == "community"
+        assert community.json()["category"] == "forum"
 
         home = client.get("/api/v1/posts")
         assert home.status_code == 200
         assert home.json()["total"] == 0
 
-        board = client.get("/api/v1/posts?category=community")
+        board = client.get("/api/v1/posts?category=forum")
         assert board.json()["total"] == 1
         assert board.json()["items"][0]["id"] == post_id
 
@@ -394,7 +365,7 @@ def test_student_community_comments_promote_and_admin_roles(tmp_path, monkeypatc
         assert comments.json()["items"][0]["replies"][0]["body"] == "I will come by after dinner."
         assert comments.json()["items"][0]["author"]["avatar"] == "preset:oak"
 
-        board_after = guest.get("/api/v1/posts?category=community")
+        board_after = guest.get("/api/v1/posts?category=forum")
         card = board_after.json()["items"][0]
         assert card["reply_count"] == 1
         assert len(card["reply_preview"]) == 1
@@ -404,14 +375,14 @@ def test_student_community_comments_promote_and_admin_roles(tmp_path, monkeypatc
 
         promote_denied = client.post(
             f"/api/v1/posts/{post_id}/promote",
-            json={"category": "dorm_life"},
+            json={"category": "news"},
         )
         assert promote_denied.status_code == 403
 
         admin = client.post(
             "/api/v1/auth/register",
             json={
-                "email": "Ada.Min@bbgm.edu",
+                "email": "Ada.Min@example.com",
                 "password": "desk-key-99",
                 "display_name": "Ada Min",
             },
@@ -433,19 +404,19 @@ def test_student_community_comments_promote_and_admin_roles(tmp_path, monkeypatc
 
         client.post(
             "/api/v1/auth/login",
-            json={"email": "jordan.hale@bbgm.edu", "password": "east-hall-8"},
+            json={"email": "jordan.hale@example.com", "password": "east-hall-8"},
         )
         me = client.get("/api/v1/me")
         assert me.json()["role"] == "editor"
 
         promoted = client.post(
             f"/api/v1/posts/{post_id}/promote",
-            json={"category": "dorm_life", "title": "East Hall is short on quarters"},
+            json={"category": "news", "title": "East Hall is short on quarters"},
         )
         assert promoted.status_code == 201, promoted.text
         news_id = promoted.json()["id"]
         assert news_id != post_id
-        assert promoted.json()["category"] == "dorm_life"
+        assert promoted.json()["category"] == "news"
         assert promoted.json()["title"] == "East Hall is short on quarters"
         assert guest.get(f"/api/v1/posts/{post_id}").json()["title"] == "Laundry chat in the stairwell"
         assert guest.get("/api/v1/posts").json()["total"] == 1
@@ -455,14 +426,14 @@ def test_student_community_comments_promote_and_admin_roles(tmp_path, monkeypatc
 
         client.post(
             "/api/v1/auth/login",
-            json={"email": "jordan.hale@bbgm.edu", "password": "east-hall-8"},
+            json={"email": "jordan.hale@example.com", "password": "east-hall-8"},
         )
         admin_as_editor = client.get("/api/v1/admin/users")
         assert admin_as_editor.status_code == 403
 
         client.post(
             "/api/v1/auth/login",
-            json={"email": "ada.min@bbgm.edu", "password": "desk-key-99"},
+            json={"email": "ada.min@example.com", "password": "desk-key-99"},
         )
         revoked = client.patch(
             f"/api/v1/admin/users/{student_id}",
@@ -487,7 +458,7 @@ def test_avatar_preset_upload_and_reply_preview_cap(tmp_path, monkeypatch):
         created = client.post(
             "/api/v1/auth/register",
             json={
-                "email": "jordan.hale@bbgm.edu",
+                "email": "jordan.hale@example.com",
                 "password": "east-hall-8",
                 "display_name": "Jordan Hale",
             },
@@ -525,8 +496,7 @@ def test_avatar_preset_upload_and_reply_preview_cap(tmp_path, monkeypatch):
             json={
                 "title": "Five floors in the laundry thread",
                 "body": "Post the machine number if you grab one.",
-                "category": "community",
-                "is_activity": False,
+                "category": "forum",
             },
         )
         post_id = post.json()["id"]
@@ -537,7 +507,7 @@ def test_avatar_preset_upload_and_reply_preview_cap(tmp_path, monkeypatch):
             )
             assert reply.status_code == 201
 
-        board = client.get("/api/v1/posts?category=community")
+        board = client.get("/api/v1/posts?category=forum")
         card = board.json()["items"][0]
         assert card["reply_count"] == 5
         assert len(card["reply_preview"]) == 4
@@ -550,12 +520,12 @@ def test_community_post_images_and_newspaper_rejected(tmp_path, monkeypatch):
     import avatars
 
     monkeypatch.setattr(avatars, "POST_IMAGE_DIR", tmp_path / "posts")
-    app = _make_app(tmp_path, monkeypatch, admin_email="ada.min@bbgm.edu")
+    app = _make_app(tmp_path, monkeypatch, admin_email="ada.min@example.com")
     with TestClient(app) as client:
         student = client.post(
             "/api/v1/auth/register",
             json={
-                "email": "jordan.hale@bbgm.edu",
+                "email": "jordan.hale@example.com",
                 "password": "east-hall-8",
                 "display_name": "Jordan Hale",
             },
@@ -566,8 +536,7 @@ def test_community_post_images_and_newspaper_rejected(tmp_path, monkeypatch):
             json={
                 "title": "Photo of the broken dryer",
                 "body": "The third machine is still leaking.",
-                "category": "community",
-                "is_activity": False,
+                "category": "forum",
             },
         )
         post_id = community.json()["id"]
@@ -593,7 +562,7 @@ def test_community_post_images_and_newspaper_rejected(tmp_path, monkeypatch):
         )
         assert overflow.status_code == 422
 
-        board = client.get("/api/v1/posts?category=community")
+        board = client.get("/api/v1/posts?category=forum")
         assert len(board.json()["items"][0]["images"]) == 4
         home = client.get("/api/v1/posts")
         assert home.json()["items"] == []
@@ -602,7 +571,7 @@ def test_community_post_images_and_newspaper_rejected(tmp_path, monkeypatch):
         other = guest.post(
             "/api/v1/auth/register",
             json={
-                "email": "priya.nair@bbgm.edu",
+                "email": "priya.nair@example.com",
                 "password": "old-gym-17",
                 "display_name": "Priya Nair",
             },
@@ -617,7 +586,7 @@ def test_community_post_images_and_newspaper_rejected(tmp_path, monkeypatch):
         editor = client.post(
             "/api/v1/auth/register",
             json={
-                "email": "ada.min@bbgm.edu",
+                "email": "ada.min@example.com",
                 "password": "desk-key-99",
                 "display_name": "Ada Min",
             },
@@ -628,8 +597,7 @@ def test_community_post_images_and_newspaper_rejected(tmp_path, monkeypatch):
             json={
                 "title": "Dryer replacement notice",
                 "body": "Facilities will swap the East Hall machines Friday.",
-                "category": "dorm_life",
-                "is_activity": False,
+                "category": "news",
             },
         )
         assert paper.json()["images"] == []
@@ -640,4 +608,33 @@ def test_community_post_images_and_newspaper_rejected(tmp_path, monkeypatch):
         assert blocked.status_code == 422
         listed = client.get("/api/v1/posts")
         assert listed.json()["items"][0]["images"] == []
+
+        before = client.get("/api/v1/posts?category=forum").json()["total"]
+        bad_multi = client.post(
+            "/api/v1/posts",
+            data={"title": "Should not land", "body": "Bad attachment.", "category": "forum"},
+            files=[("images", ("notes.txt", b"hello", "text/plain"))],
+        )
+        assert bad_multi.status_code == 422
+        assert client.get("/api/v1/posts?category=forum").json()["total"] == before
+
+        paper_images = client.post(
+            "/api/v1/posts",
+            data={"title": "Paper with photo", "body": "Should fail.", "category": "news"},
+            files=[("images", ("cover.png", b"\x89PNG\r\n" + b"x" * 20, "image/png"))],
+        )
+        assert paper_images.status_code == 422
+
+        created = client.post(
+            "/api/v1/posts",
+            data={
+                "title": "One-shot laundry photo",
+                "body": "The leak from the third machine.",
+                "category": "forum",
+            },
+            files=[("images", ("leak.png", b"\x89PNG\r\n" + b"x" * 20, "image/png"))],
+        )
+        assert created.status_code == 201, created.text
+        assert created.json()["category"] == "forum"
+        assert len(created.json()["images"]) == 1
     app.state.engine.dispose()

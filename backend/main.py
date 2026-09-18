@@ -16,7 +16,7 @@ def create_app() -> FastAPI:
     engine = make_engine(settings.database_url)
     init_db(engine)
 
-    app = FastAPI(title="BBGM Scoop API")
+    app = FastAPI(title="Elegram API")
     app.state.settings = settings
     app.state.engine = engine
     app.state.session_factory = make_session_factory(engine)

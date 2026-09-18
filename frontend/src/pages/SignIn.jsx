@@ -72,7 +72,7 @@ export default function SignIn() {
         </button>
       </form>
       <p className="mt-6 font-sans text-sm text-neutral-500">
-        New to Scoop?{" "}
+        New to Elegram?{" "}
         <Link to={`/register${params.get("next") ? `?next=${encodeURIComponent(params.get("next"))}` : ""}`} className="text-[#1A4FBF]">
           Create an account
         </Link>

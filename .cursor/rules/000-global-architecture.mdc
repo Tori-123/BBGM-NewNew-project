@@ -6,7 +6,7 @@ alwaysApply: true
 
 # 全局架构
 
-BBGM Scoop 是校园 Web：登录发帖、按栏目阅读、活动帖带时间地点。前后端分目录，不要搭成单仓混写或后台套件。
+Elegram 是社区托管的校园 Web：登录发帖、按栏目阅读。与 BASIS Bilingual Guangming 无关。前后端分目录，不要搭成单仓混写或后台套件。
 
 ## 目录
 
