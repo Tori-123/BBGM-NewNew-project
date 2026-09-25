@@ -8,6 +8,7 @@ from deps import get_admin_user, get_db
 from errors import ApiError, StorageError, forbidden, validation_error
 from models import User, to_iso
 from schemas import ASSIGNABLE_ROLES, PatchUserRoleBody, UserList, UserPrivate
+from store import revoke_user_sessions
 from validate import parse_page, parse_page_size, parse_uuid
 
 router = APIRouter()
@@ -20,6 +21,7 @@ def _user_private(user: User) -> dict:
         display_name=user.display_name,
         role=user.role,
         avatar=normalize_avatar(getattr(user, "avatar", None)),
+        banned=bool(user.banned),
         created_at=to_iso(user.created_at),
     ).model_dump()
 
@@ -55,11 +57,15 @@ def list_users(
 def patch_user_role(
     user_id: str,
     body: PatchUserRoleBody,
-    _: User = Depends(get_admin_user),
+    actor: User = Depends(get_admin_user),
     db: Session = Depends(get_db),
 ):
     user_id = parse_uuid(user_id, "user_id")
-    if body.role not in ASSIGNABLE_ROLES:
+    if body.role is None and body.banned is None:
+        raise validation_error(
+            [{"field": "role", "message": "Provide a role or a banned flag."}]
+        )
+    if body.role is not None and body.role not in ASSIGNABLE_ROLES:
         raise validation_error([{"field": "role", "message": "Must be one of: student, editor."}])
     try:
         target = db.scalar(select(User).where(User.id == user_id))
@@ -69,5 +75,12 @@ def patch_user_role(
         raise ApiError(404, "not_found", "User not found.")
     if target.role == "admin":
         raise forbidden("Admin accounts cannot be changed here.")
-    target.role = body.role
+    if body.banned is True and target.id == actor.id:
+        raise forbidden("You cannot ban your own account.")
+    if body.role is not None:
+        target.role = body.role
+    if body.banned is not None:
+        target.banned = body.banned
+        if body.banned:
+            revoke_user_sessions(db, target.id)
     return _user_private(target)

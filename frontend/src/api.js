@@ -146,6 +146,14 @@ export const api = {
       method: "PATCH",
       body: JSON.stringify({ role }),
     }),
+  setUserBanned: (userId, banned) =>
+    request(`/admin/users/${encodeURIComponent(userId)}`, {
+      method: "PATCH",
+      body: JSON.stringify({ banned }),
+    }),
+  deletePost: (postId) => request(`/posts/${encodeURIComponent(postId)}`, { method: "DELETE" }),
+  likePost: (postId) => request(`/posts/${encodeURIComponent(postId)}/likes`, { method: "POST" }),
+  unlikePost: (postId) => request(`/posts/${encodeURIComponent(postId)}/likes`, { method: "DELETE" }),
 };
 
 export function fieldMessage(error, field) {

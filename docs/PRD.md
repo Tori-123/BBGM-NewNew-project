@@ -41,6 +41,7 @@
 - **P1-US4：** 作为已登录学生，我想在 Forum 详情跟一楼或回某一楼（楼中楼），以便讨论留在该帖下面。
 - **P1-US5：** 作为已登录学生，我想选一个自带头像或上传自己的照片，以便同学在讨论里认出我。
 - **P1-US6：** 作为已登录学生，我想在 Forum 发帖时附上现场照片，以便同学在卡片和详情里看到图，而不是只读文字。
+- **P1-US7：** 作为已登录学生，我想在 Forum 列表给主帖点赞或取消，以便用数量表示认同；未登录只能看见数量。
 
 ### P2 校园读者
 
@@ -73,17 +74,21 @@ Must 服务主故事 P1-US1（Forum 发帖被看见）以及角色、跟帖、�
 | M4 | 发帖 | 标题、正文、栏目必填；发布后状态为 `published`，作者绑定当前用户。`student` 栏目只能是 `forum`。Forum 可在同一次请求附带最多 4 张图。 |
 | M6 | 按栏目阅读 | 栏目页只列出该栏目已发布帖；详情页展示全文、作者展示名、时间、栏目。 |
 | M7 | 首页露出 | 首页能进入各栏目，并展示近期 **News / Sports** 已发布帖，不含未精选的 Forum 帖。 |
-| M8 | 持久化 | 用户（含角色）、会话、帖子、评论写入应用存储；重启后仍可登录并读到已发帖与评论。 |
+| M8 | 持久化 | 用户（含角色）、会话、帖子、评论、Forum 主帖点赞写入应用存储；重启后仍可登录并读到已发帖、评论与赞数。 |
 | M9 | 关键错误处理 | 密码错误、未登录发帖/跟帖、缺必填、非法栏目、非法配图、无权限、存储失败：均返回明确失败，不创建半截已发布帖或评论。 |
 | M10 | 写操作留痕 | 发帖或精选复制成功时记录 `author_id`、`created_at`；服务端另写一条审计记录（谁、何时、创建了哪篇帖）。 |
 | M11 | Forum | 与 News / Sports 平级的单一讨论区；一个列表，不是用户自建多吧。 |
 | M12 | 楼层与楼中楼 | 仅 Forum 详情：楼层 + 一层楼中楼。未登录可读；登录可写。校报详情不加评论。 |
 | M13 | 角色 | `student` / `editor` / `admin`。`ADMIN_EMAIL` 在注册或登录时升为 `admin`。 |
-| M14 | 精选复制 | `editor` / `admin` 将 Forum 帖复制为 News 或 Sports 新帖，可改标题/正文/栏目；源帖不变。 |
-| M15 | 管理员用户列表 | `admin` 查看用户并授予或取消 `editor`；不能用此接口提拔或改动 `admin`。 |
+| M14 | 精选复制 | `editor` / `admin` 在 `/paper` 将 Forum 帖复制为 News 或 Sports 新帖，可改标题/正文/栏目；源帖不变。Forum 详情与 `/forum` 列表不放该表单。 |
+| M15 | 管理员用户列表 | `admin` 查看用户并授予或取消 `editor`，并可封禁或解封。不能提拔、改动或封禁 `admin`，也不能封禁自己。 |
 | M16 | 头像 | 自带预设（`preset:oak` 等）或上传一张图；出现在顶栏、Forum 帖/楼、栏目内发帖表。校报栏目没有封面图字段。 |
-| M17 | Forum 卡片 | `/forum` 每条显示作者头像、标题、作者、前 4 条楼层预览；有图时露出 `images[0]`。点标题进详情看全部楼层与楼中楼。校报列表仍用原印刷行。 |
+| M17 | Forum 卡片 | `/forum` 每条为独立模块卡：头像、展示名、时间、标题、`excerpt`、有则 `images[0]`；底栏气泡（`reply_count`，点进详情）与拇指（`like_count`）。列表不展开楼层预览。校报列表仍用原印刷行。 |
 | M18 | Forum 配图 | Forum 主帖作者可在发帖时或之后上传最多 4 张 jpeg/png/webp（每张 ≤2MB），存在 `images[]`。校报帖与精选复制出的新帖 `images` 恒为 `[]`。跟帖不传图。 |
+| M19 | Forum 点赞 | 仅 Forum 主帖。登录可赞/取消（同一用户同一帖不加倍）；未登录只读数量，点赞去登录。校报帖不可赞。 |
+| M20 | 停留时看到新帖 | 首页、News / Sports / Forum 打开后重复请求已有公开列表；他人新发的帖进入当前列表，无需整页刷新。Forum 详情同样拉新楼层。后台拉失败不打断当前阅读、不盖错误条。不另开推送通道或新字段。 |
+| M21 | 管理员删帖 | 仅 `admin` 可删除已发布帖。帖、其评论、点赞、配图与该帖审计一并去掉。作者与 `editor` 仍不能改删。 |
+| M22 | 封禁账号 | 仅 `admin` 可封禁或解封。被封禁者不能登录、发帖、跟帖、点赞、改头像或精选；已发帖与评论仍公开。封禁时作废其会话。 |
 
 ### Should Have
 
@@ -102,7 +107,7 @@ Must 服务主故事 P1-US1（Forum 发帖被看见）以及角色、跟帖、�
 | C1 | Featured / 头条精选、Submit 编辑流 | 学生媒体校报形态，不阻塞普通发帖。 |
 | C2 | Opinion、Photo of the Day、Student Art | 页面稿或静态壳，非主故事必需。本版无独立 Photo / Events / Dorm Life 栏目。 |
 | C3 | Track of the Day / Spotify 嵌入 | 第三方点缀；无此主站仍成立。 |
-| C4 | 草稿、关注、点赞、推荐信息流 | 社交增强。 |
+| C4 | 草稿、关注、推荐信息流 | 社交增强。Forum 主帖点赞已在 M19。 |
 | C5 | 校园 SSO / 学号目录同步 | 开放问题，第一版不阻塞自建账号。 |
 | C6 | 先审后发工作流 | 与「学生有权限自己发帖」的默认冲突，留待政策确定。 |
 
@@ -116,7 +121,7 @@ Must 服务主故事 P1-US1（Forum 发帖被看见）以及角色、跟帖、�
 | W4 | 未评估的 AI 写作或审核模型 | README 明确不默认上线。 |
 | W5 | 向量库、微服务拆分、指定云厂商 | 未评估，不写入本版承诺。 |
 | W6 | 用户自建吧、校报帖下评论、三层以上嵌套 | Forum 只有一个吧；楼中楼两层。 |
-| W7 | 下架、删评、完整审核后台 | 本轮管理员只做用户列表与授予编辑。 |
+| W7 | 单条删评、下架状态、完整审核后台 | 管理员可删整帖（M21）与封禁账号（M22）。不能只删一楼，没有 `hidden` 状态。 |
 | W8 | 活动时间地点、Dorm Life / Events / Photo 栏目 | 本版只保留 News、Sports、Forum；Opinion 为静态空栏。 |
 
 登录、数据库、多页面路由、测试均不在 Won't 中。它们按主故事需要出现在 Must 或工程实践中。
@@ -142,15 +147,19 @@ Must 服务主故事 P1-US1（Forum 发帖被看见）以及角色、跟帖、�
 8. 给定登录页，当邮箱不存在或密码错误，则登录失败、不建立已登录会话，并提示凭据无效（不提示「仅密码错误」与「仅用户不存在」的区别亦可，但不得登录成功）。
 9. 给定未登录访客，当直接请求发帖或提交发帖接口，则拒绝创建帖子，并要求登录（跳转登录或等价错误）。
 10. 给定已登录用户，当标题为空、正文为空、未选栏目、或栏目不在允许集合内，则拒绝发布，停留在可编辑状态，已有输入不丢（刷新导致丢失除外），存储中不出现该条 `published` 帖。
-12. 给定用户 A 的已发布帖，当用户 B 已登录并尝试修改或删除该帖，则失败且帖内容不变。
+12. 给定用户 A 的已发布帖，当另一名非 `admin` 用户尝试修改或删除该帖，则失败且帖内容不变。`admin` 删除见第 27 条。
 13. 给定发帖请求已通过校验，当存储写入失败，则向用户返回失败、不展示「发布成功」，且列表中不出现该帖。
 18. 给定已登录学生，当向 `news` / `sports` 发帖，则 `403 forbidden`，存储中不出现该帖。
 19. 给定 Forum 帖，当未登录读取评论则成功；当未登录跟帖则 `401`，不落评论。
 20. 给定已登录用户在 Forum 详情，当发表楼层或回复某一楼，则该帖下可见；回复不能再套一层。
-21. 给定编辑或管理员，当精选一条 Forum 帖到 News 或 Sports，则可改标题/正文/栏目并得到新帖 URL；源帖仍在 Forum。
+21. 给定编辑或管理员在 `/paper` 选中一条 Forum 帖，当精选到 News 或 Sports，则可改标题/正文/栏目并得到新帖 URL；源帖仍在 Forum。Forum 详情不展示该表单。
 22. 给定管理员打开用户列表，当把一名学生设为编辑或取消编辑，则对方角色更新；学生调用管理员接口则 `403`。
 23. 给定校报详情页，当请求该帖的评论接口，则 `422`，页面不展示楼中楼。
 24. 给定已登录学生在 Forum 发帖并附上合法图片，当发布成功，则详情与 Forum 卡片能读到同一组 `images`；非法图片或向校报帖配图则失败且不落半截帖，校报 `images` 仍为 `[]`。
+25. 给定已登录用户在 Forum 列表，当点赞一帖再取消，则 `like_count` 与 `liked` 随之变化且刷新后仍对；再点一次已赞不加倍。未登录点赞不写入，去登录。校报帖点赞失败。
+26. 给定会话 A 停在 Forum 列表（不整页刷新），当会话 B 发布一条 Forum 帖，则数秒内 A 的列表顶部出现该标题。首页与 News / Sports 对校报新稿同样成立。Forum 详情对他人新楼层同样成立。拉新失败时 A 仍看得到已有内容。
+27. 给定管理员，当删除一条已发布帖，则该帖详情为 `404`，列表中不再出现，其评论与配图一并消失。学生或编辑调用删除则 `403`，帖仍在。
+28. 给定管理员封禁一名学生，当该学生再登录或发帖，则拒绝且不建立可用会话；其已发帖仍可被他人读到。解封后可用原密码登录。学生不能封禁他人；不能封禁 `admin` 或自己。
 
 ### 4.3 关键非功能（可测、且为本产品需要）
 
@@ -183,9 +192,10 @@ Elegram 应用（Web 页面 + 服务端）
 
 | 实体 | 关键字段 | 生命周期 |
 | --- | --- | --- |
-| User | id, email, password_hash, display_name, role, avatar, created_at | 注册为 `student`，默认头像 `preset:oak`；可改预设或上传 |
+| User | id, email, password_hash, display_name, role, avatar, banned, created_at | 注册为 `student`，`banned` 默认 false；封禁后不能登录写操作，帖仍在 |
 | Session | 可校验的登录凭证，绑定 user_id，可失效 | 登录创建 → 退出或过期销毁 |
-| Post | id, author_id, title, body, category, status, images, created_at, updated_at | 校验通过后直接 `published`；Forum 可有 `images`；Should 才有 `hidden` / 作者删除 |
+| Post | id, author_id, title, body, category, status, images, created_at, updated_at | 校验通过后直接 `published`；Forum 可有 `images`。`admin` 可整帖删除。作者自删与 `hidden` 仍属 Should |
+| PostLike | user_id, post_id, created_at | 仅 Forum 主帖；同一用户同一帖唯一；取消则删行 |
 | Comment | id, post_id, author_id, parent_id, body, created_at | 仅 Forum；`parent_id` 空为楼层，非空为该楼的楼中楼 |
 | AuditEvent | id, actor_id, action, post_id, at | 发帖或精选复制成功时追加；只增不改 |
 
@@ -199,8 +209,10 @@ Elegram 应用（Web 页面 + 服务端）
 User 1 ─── * Post
 User 1 ─── * Session
 User 1 ─── * Comment
+User 1 ─── * PostLike
 User 1 ─── * AuditEvent（作为 actor）
 Post 1 ─── * Comment
+Post 1 ─── * PostLike
 Post 1 ─── * AuditEvent
 Comment 1 ─── * Comment（楼中楼，parent 必须是楼层）
 ```
@@ -210,15 +222,17 @@ Comment 1 ─── * Comment（楼中楼，parent 必须是楼层）
 | 注册 | User（查邮箱唯一） | User |
 | 登录 | User | Session（匹配 `ADMIN_EMAIL` 时升 `admin`） |
 | 退出 | Session | 删除或作废 Session |
-| 浏览首页 / 校报 / Forum / 详情 | Post（`published`）；Forum 详情另读 Comment | 无 |
+| 浏览首页 / 校报 / Forum / 详情 | Post（`published`）；Forum 详情另读 Comment；Forum 列表读点赞计数 | 无 |
+| 点赞 / 取消赞 | User、Post（须 Forum） | PostLike |
 | 学生发帖 | User（当前会话） | Post（仅 `forum`）、AuditEvent |
 | 编辑发校报 / 精选 | User | Post、AuditEvent |
 | 跟帖 | User、Post（须 Forum） | Comment |
 | 我的帖子 | Post where author = 当前用户 | 无 |
-| 管理员改角色 | User 列表 | User.role（`student` / `editor`） |
+| 管理员改角色 / 封禁 | User 列表 | User.role（`student` / `editor`）或 `banned`；封禁时作废该用户 Session |
+| 管理员删帖 | Post | 删除 Post 及其 Comment、PostLike、配图与该帖 AuditEvent |
 
-未登录：只读 `published` Post 与 Forum 评论。  
-`student`：写 Forum 帖与评论。  
+未登录：只读 `published` Post 与 Forum 评论与赞数。  
+`student`：写 Forum 帖、评论与主帖点赞。  
 `editor` / `admin`：另写校报帖与精选复制。  
-`admin`：另改他人 `editor` 身份。  
+`admin`：另改他人 `editor` 身份、封禁或解封、删除已发布帖。  
 存储失败时：上述写动作整笔失败，不出现「有详情 URL 但库中无行」或「有行无审计」的半成功（审计与帖子同一事务，或等价回滚）。

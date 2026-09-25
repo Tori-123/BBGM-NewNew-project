@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "../api";
 import { useAuth } from "../auth";
@@ -7,6 +7,7 @@ import ComposeForm from "../components/ComposeForm";
 import { EmptyCategory, StoryRow, StoryRowSkeleton } from "../components/StoryRow";
 import { ErrorBanner, FrontPageLink, SectionRule } from "../components/ui";
 import { canEditPaper } from "../format";
+import { mergeLivePosts, useLiveRefresh } from "../live";
 
 function ComposeFab({ to, onClick }) {
   const className =
@@ -35,6 +36,7 @@ export default function Category({ category, title }) {
   const [error, setError] = useState(null);
   const [loadingMore, setLoadingMore] = useState(false);
   const [writing, setWriting] = useState(false);
+  const [ready, setReady] = useState(false);
 
   const isForum = category === "forum";
   const canWrite = isForum ? Boolean(user) : canEditPaper(user);
@@ -42,6 +44,7 @@ export default function Category({ category, title }) {
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
+    setReady(false);
     setWriting(false);
     api
       .listPosts({ category, page: 1, pageSize: 20 })
@@ -60,12 +63,28 @@ export default function Category({ category, title }) {
         setError(err);
       })
       .finally(() => {
-        if (!cancelled) setLoading(false);
+        if (!cancelled) {
+          setLoading(false);
+          setReady(true);
+        }
       });
     return () => {
       cancelled = true;
     };
   }, [category]);
+
+  const refreshList = useCallback(
+    () =>
+      api.listPosts({ category, page: 1, pageSize }).then((data) => {
+        setItems((current) => mergeLivePosts(current, data.items));
+        setPageSize(data.page_size);
+        setTotal(data.total);
+        setError(null);
+      }),
+    [category, pageSize],
+  );
+
+  useLiveRefresh(ready, refreshList);
 
   useEffect(() => {
     if (!writing) return undefined;

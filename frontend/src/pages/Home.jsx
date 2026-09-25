@@ -1,17 +1,20 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { api } from "../api";
 import HomeGrid from "../components/HomeGrid";
 import { ErrorBanner } from "../components/ui";
+import { useLiveRefresh } from "../live";
 
 export default function Home() {
   const [items, setItems] = useState([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [ready, setReady] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
+    setReady(false);
     api
       .listPosts({ page: 1, pageSize: 20 })
       .then((data) => {
@@ -27,12 +30,27 @@ export default function Home() {
         setError(err);
       })
       .finally(() => {
-        if (!cancelled) setLoading(false);
+        if (!cancelled) {
+          setLoading(false);
+          setReady(true);
+        }
       });
     return () => {
       cancelled = true;
     };
   }, []);
+
+  const refreshHome = useCallback(
+    () =>
+      api.listPosts({ page: 1, pageSize: 20 }).then((data) => {
+        setItems(data.items);
+        setTotal(data.total);
+        setError(null);
+      }),
+    [],
+  );
+
+  useLiveRefresh(ready, refreshHome);
 
   return (
     <div>

@@ -1,11 +1,12 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { ApiError, api, fieldMessage } from "../api";
 import { useAuth } from "../auth";
 import { uploadSrc } from "../avatar";
 import { Avatar } from "../components/Avatar";
 import { ErrorBanner, FieldError, FrontPageLink, Headline, ImageWell, Kicker, TitleLine } from "../components/ui";
-import { NEWSPAPER_OPTIONS, canEditPaper, formatDateline } from "../format";
+import { formatDateline } from "../format";
+import { mergeLiveFloors, useLiveRefresh } from "../live";
 
 export default function PostDetail() {
   const { postId } = useParams();
@@ -21,15 +22,14 @@ export default function PostDetail() {
   const [commentBody, setCommentBody] = useState("");
   const [replyTo, setReplyTo] = useState(null);
   const [commentSubmitting, setCommentSubmitting] = useState(false);
-  const [promoteTitle, setPromoteTitle] = useState("");
-  const [promoteBody, setPromoteBody] = useState("");
-  const [promoteCategory, setPromoteCategory] = useState("");
-  const [promoteError, setPromoteError] = useState(null);
-  const [promoteSubmitting, setPromoteSubmitting] = useState(false);
+  const [ready, setReady] = useState(false);
+  const commentPageRef = useRef(1);
+  commentPageRef.current = commentPage;
 
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
+    setReady(false);
     setPost(null);
     setComments([]);
     setCommentError(null);
@@ -39,8 +39,6 @@ export default function PostDetail() {
         if (cancelled) return;
         setPost(data);
         setError(null);
-        setPromoteTitle(data.title);
-        setPromoteBody(data.body);
         if (data.category === "forum") {
           return api.listComments(postId).then((thread) => {
             if (cancelled) return;
@@ -57,16 +55,61 @@ export default function PostDetail() {
         setError(err);
       })
       .finally(() => {
-        if (!cancelled) setLoading(false);
+        if (!cancelled) {
+          setLoading(false);
+          setReady(true);
+        }
       });
     return () => {
       cancelled = true;
     };
   }, [postId]);
 
+  const refreshThread = useCallback(async () => {
+    const data = await api.getPost(postId);
+    setPost(data);
+    setError(null);
+    if (data.category !== "forum") return;
+    const pageSize = 20;
+    const loadedPages = commentPageRef.current;
+    let floors = [];
+    let total = 0;
+    for (let page = 1; page <= loadedPages; page += 1) {
+      const chunk = await api.listComments(postId, { page, pageSize });
+      floors = mergeLiveFloors(floors, chunk.items);
+      total = chunk.total;
+    }
+    if (total > floors.length) {
+      const extra = await api.listComments(postId, { page: loadedPages + 1, pageSize });
+      floors = mergeLiveFloors(floors, extra.items);
+      total = extra.total;
+      setCommentPage(loadedPages + 1);
+    }
+    setComments(floors);
+    setCommentTotal(total);
+  }, [postId]);
+
   const notFound = error instanceof ApiError && error.code === "not_found";
   const isForum = post?.category === "forum";
-  const staff = canEditPaper(user);
+
+  useLiveRefresh(ready && !commentSubmitting && !notFound, refreshThread);
+
+  async function onDelete() {
+    if (!post || !window.confirm("Delete this post?")) return;
+    setError(null);
+    try {
+      await api.deletePost(postId);
+      const back = post.category === "news" || post.category === "sports" ? `/${post.category}` : "/forum";
+      navigate(back);
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 401) {
+        setUser(null);
+        navigate(`/sign-in?next=/posts/${postId}`);
+        return;
+      }
+      setError(err);
+    }
+  }
 
   async function onComment(event) {
     event.preventDefault();
@@ -108,24 +151,6 @@ export default function PostDetail() {
       setCommentTotal(thread.total);
     } catch (err) {
       setCommentError(err);
-    }
-  }
-
-  async function onPromote(event) {
-    event.preventDefault();
-    setPromoteSubmitting(true);
-    setPromoteError(null);
-    try {
-      const created = await api.promotePost(postId, {
-        category: promoteCategory,
-        title: promoteTitle,
-        body: promoteBody,
-      });
-      navigate(`/posts/${created.id}`);
-    } catch (err) {
-      setPromoteError(err);
-    } finally {
-      setPromoteSubmitting(false);
     }
   }
 
@@ -173,56 +198,14 @@ export default function PostDetail() {
             {post.body}
           </div>
 
-          {isForum && staff ? (
-            <form onSubmit={onPromote} className="mt-12 border-t border-black pt-8">
-              <h2 className="font-serif text-2xl">Copy to the paper</h2>
-              <ErrorBanner error={promoteError && !promoteError.fields?.length ? promoteError : null} />
-              <label className="mt-4 block font-sans text-[11px] uppercase tracking-[0.16em] text-[#1A4FBF]" htmlFor="promote-category">
-                Section
-              </label>
-              <select
-                id="promote-category"
-                value={promoteCategory}
-                onChange={(event) => setPromoteCategory(event.target.value)}
-                className="mt-2 w-full border border-black bg-white px-2 py-2 font-sans text-sm outline-none"
-              >
-                <option value="">Select a section</option>
-                {NEWSPAPER_OPTIONS.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-              <FieldError message={fieldMessage(promoteError, "category")} />
-              <label className="mt-4 block font-sans text-[11px] uppercase tracking-[0.16em] text-[#1A4FBF]" htmlFor="promote-title">
-                Title
-              </label>
-              <input
-                id="promote-title"
-                value={promoteTitle}
-                onChange={(event) => setPromoteTitle(event.target.value)}
-                className="mt-2 w-full border-b border-black py-2 font-serif text-xl outline-none"
-              />
-              <FieldError message={fieldMessage(promoteError, "title")} />
-              <label className="mt-4 block font-sans text-[11px] uppercase tracking-[0.16em] text-[#1A4FBF]" htmlFor="promote-body">
-                Body
-              </label>
-              <textarea
-                id="promote-body"
-                value={promoteBody}
-                onChange={(event) => setPromoteBody(event.target.value)}
-                rows={8}
-                className="mt-2 w-full border border-black p-3 font-sans text-sm outline-none"
-              />
-              <FieldError message={fieldMessage(promoteError, "body")} />
-              <button
-                type="submit"
-                disabled={promoteSubmitting}
-                className="mt-6 rounded-[2px] bg-black px-5 py-2 font-sans text-[11px] uppercase tracking-[0.18em] text-white"
-              >
-                Publish copy
-              </button>
-            </form>
+          {user?.role === "admin" ? (
+            <button
+              type="button"
+              onClick={onDelete}
+              className="mt-8 font-sans text-[11px] uppercase tracking-[0.18em] text-red-700"
+            >
+              Delete
+            </button>
           ) : null}
 
           {isForum ? (

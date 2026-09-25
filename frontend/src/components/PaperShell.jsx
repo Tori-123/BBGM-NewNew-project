@@ -62,6 +62,7 @@ export default function PaperShell() {
                 </Link>
                 <Link to="/me/avatar">Avatar</Link>
                 <Link to="/me/posts">My Posts</Link>
+                {user.role === "editor" || user.role === "admin" ? <Link to="/paper">Paper</Link> : null}
                 {user.role === "admin" ? <Link to="/admin/users">Users</Link> : null}
                 <button type="button" onClick={onSignOut} className="uppercase">
                   Sign Out

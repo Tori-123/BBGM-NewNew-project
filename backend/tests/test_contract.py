@@ -638,3 +638,196 @@ def test_community_post_images_and_newspaper_rejected(tmp_path, monkeypatch):
         assert created.json()["category"] == "forum"
         assert len(created.json()["images"]) == 1
     app.state.engine.dispose()
+
+
+def test_forum_likes_idempotent_guest_and_newspaper_rejected(tmp_path, monkeypatch):
+    app = _make_app(tmp_path, monkeypatch, admin_email="jordan.hale@example.com")
+    with TestClient(app) as client:
+        client.post(
+            "/api/v1/auth/register",
+            json={
+                "email": "jordan.hale@example.com",
+                "password": "east-hall-8",
+                "display_name": "Jordan Hale",
+            },
+        )
+        forum = client.post(
+            "/api/v1/posts",
+            json={
+                "title": "Who has dryer quarters?",
+                "body": "The change machine is still dark.",
+                "category": "forum",
+            },
+        )
+        post_id = forum.json()["id"]
+        assert forum.json()["like_count"] == 0
+        assert forum.json()["liked"] is False
+
+        first = client.post(f"/api/v1/posts/{post_id}/likes")
+        assert first.status_code == 201, first.text
+        assert first.json() == {"like_count": 1, "liked": True}
+
+        again = client.post(f"/api/v1/posts/{post_id}/likes")
+        assert again.status_code == 200
+        assert again.json()["like_count"] == 1
+
+        listed = client.get("/api/v1/posts?category=forum")
+        card = listed.json()["items"][0]
+        assert card["like_count"] == 1
+        assert card["liked"] is True
+
+        guest = TestClient(app)
+        guest_list = guest.get("/api/v1/posts?category=forum")
+        assert guest_list.json()["items"][0]["liked"] is False
+        assert guest_list.json()["items"][0]["like_count"] == 1
+        assert guest.post(f"/api/v1/posts/{post_id}/likes").status_code == 401
+
+        removed = client.delete(f"/api/v1/posts/{post_id}/likes")
+        assert removed.status_code == 200
+        assert removed.json() == {"like_count": 0, "liked": False}
+        assert client.delete(f"/api/v1/posts/{post_id}/likes").json()["like_count"] == 0
+
+        news = client.post(
+            "/api/v1/posts",
+            json={
+                "title": "East Hall laundry: who still has quarters?",
+                "body": "The change machine is dark again.",
+                "category": "news",
+            },
+        )
+        news_id = news.json()["id"]
+        paper_like = client.post(f"/api/v1/posts/{news_id}/likes")
+        assert paper_like.status_code == 422
+        home = client.get("/api/v1/posts")
+        assert home.json()["items"][0]["like_count"] == 0
+        assert home.json()["items"][0]["liked"] is False
+    app.state.engine.dispose()
+
+
+def test_admin_delete_post_and_ban_account(tmp_path, monkeypatch):
+    app = _make_app(tmp_path, monkeypatch, admin_email="ada.min@example.com")
+    with TestClient(app) as client:
+        student = client.post(
+            "/api/v1/auth/register",
+            json={
+                "email": "jordan.hale@example.com",
+                "password": "east-hall-8",
+                "display_name": "Jordan Hale",
+            },
+        )
+        assert student.status_code == 201
+        assert student.json()["banned"] is False
+        student_id = student.json()["id"]
+        created = client.post(
+            "/api/v1/posts",
+            json={
+                "title": "Who still has the dorm key",
+                "body": "It was on the oak table.",
+                "category": "forum",
+            },
+        )
+        assert created.status_code == 201, created.text
+        post_id = created.json()["id"]
+        replied = client.post(
+            f"/api/v1/posts/{post_id}/comments",
+            json={"body": "I saw it after dinner."},
+        )
+        assert replied.status_code == 201, replied.text
+
+        denied = client.delete(f"/api/v1/posts/{post_id}")
+        assert denied.status_code == 403
+        assert client.get(f"/api/v1/posts/{post_id}").status_code == 200
+
+        ban_denied = client.patch(
+            f"/api/v1/admin/users/{student_id}",
+            json={"banned": True},
+        )
+        assert ban_denied.status_code == 403
+
+        client.post(
+            "/api/v1/auth/register",
+            json={
+                "email": "ada.min@example.com",
+                "password": "desk-key-99",
+                "display_name": "Ada Min",
+            },
+        )
+        admin = client.post(
+            "/api/v1/auth/login",
+            json={"email": "ada.min@example.com", "password": "desk-key-99"},
+        )
+        assert admin.status_code == 200, admin.text
+        admin_id = admin.json()["id"]
+
+        self_ban = client.patch(f"/api/v1/admin/users/{admin_id}", json={"banned": True})
+        assert self_ban.status_code == 403
+
+        removed = client.delete(f"/api/v1/posts/{post_id}")
+        assert removed.status_code == 204
+        assert client.get(f"/api/v1/posts/{post_id}").status_code == 404
+        listed = client.get("/api/v1/posts?category=forum")
+        assert all(item["id"] != post_id for item in listed.json()["items"])
+
+        kept = client.post(
+            "/api/v1/posts",
+            json={
+                "title": "Ada keeps this note",
+                "body": "Written before the ban test continues.",
+                "category": "forum",
+            },
+        )
+        # admin is editor-capable; the kept post is admin's. Student still has no second post.
+        # Re-login as student and publish one that must survive a ban.
+        client.cookies.clear()
+        student_login = client.post(
+            "/api/v1/auth/login",
+            json={"email": "jordan.hale@example.com", "password": "east-hall-8"},
+        )
+        assert student_login.status_code == 200
+        survivor = client.post(
+            "/api/v1/posts",
+            json={
+                "title": "Jordan's note stays up",
+                "body": "Ban should not hide this.",
+                "category": "forum",
+            },
+        )
+        assert survivor.status_code == 201, survivor.text
+        survivor_id = survivor.json()["id"]
+
+        client.cookies.clear()
+        client.post(
+            "/api/v1/auth/login",
+            json={"email": "ada.min@example.com", "password": "desk-key-99"},
+        )
+        banned = client.patch(f"/api/v1/admin/users/{student_id}", json={"banned": True})
+        assert banned.status_code == 200, banned.text
+        assert banned.json()["banned"] is True
+
+        client.cookies.clear()
+        locked = client.post(
+            "/api/v1/auth/login",
+            json={"email": "jordan.hale@example.com", "password": "east-hall-8"},
+        )
+        assert locked.status_code == 403
+        assert locked.json()["error"]["code"] == "account_banned"
+        assert "scoop_session" not in locked.cookies
+        still_there = client.get(f"/api/v1/posts/{survivor_id}")
+        assert still_there.status_code == 200
+        assert still_there.json()["title"] == "Jordan's note stays up"
+
+        client.post(
+            "/api/v1/auth/login",
+            json={"email": "ada.min@example.com", "password": "desk-key-99"},
+        )
+        unbanned = client.patch(f"/api/v1/admin/users/{student_id}", json={"banned": False})
+        assert unbanned.status_code == 200
+        assert unbanned.json()["banned"] is False
+        client.cookies.clear()
+        restored = client.post(
+            "/api/v1/auth/login",
+            json={"email": "jordan.hale@example.com", "password": "east-hall-8"},
+        )
+        assert restored.status_code == 200, restored.text
+        assert kept.status_code == 201
+    app.state.engine.dispose()

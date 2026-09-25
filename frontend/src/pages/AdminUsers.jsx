@@ -54,6 +54,16 @@ export default function AdminUsers() {
     };
   }, [user, navigate, setUser]);
 
+  async function setBanned(target, banned) {
+    setError(null);
+    try {
+      const updated = await api.setUserBanned(target.id, banned);
+      setItems((current) => current.map((item) => (item.id === updated.id ? updated : item)));
+    } catch (err) {
+      setError(err);
+    }
+  }
+
   async function setRole(target, role) {
     setError(null);
     try {
@@ -103,9 +113,18 @@ export default function AdminUsers() {
                     <button
                       type="button"
                       onClick={() => setRole(item, "student")}
-                      className="uppercase tracking-[0.12em] text-[#1A4FBF]"
+                      className="mr-4 uppercase tracking-[0.12em] text-[#1A4FBF]"
                     >
                       Remove editor
+                    </button>
+                  ) : null}
+                  {item.role !== "admin" && item.id !== user.id ? (
+                    <button
+                      type="button"
+                      onClick={() => setBanned(item, !item.banned)}
+                      className="uppercase tracking-[0.12em] text-[#1A4FBF]"
+                    >
+                      {item.banned ? "Unban" : "Ban"}
                     </button>
                   ) : null}
                 </td>

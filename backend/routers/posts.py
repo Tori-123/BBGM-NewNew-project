@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session, joinedload
 from starlette.datastructures import UploadFile as StarletteUploadFile
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
-from deps import get_current_user, get_db
+from deps import get_admin_user, get_current_user, get_db, get_optional_user
 from errors import ApiError, StorageError, forbidden, validation_error
 from avatars import (
     ALLOWED_TYPES,
@@ -30,13 +30,24 @@ from schemas import (
     CommentReply,
     CreateCommentBody,
     CreatePostBody,
+    LikeState,
     PostDetail,
     PostList,
     PostSummary,
     PromoteBody,
     ReplyPreview,
 )
-from store import create_comment, create_post_with_audit
+from store import (
+    add_like,
+    count_likes,
+    create_comment,
+    create_post_with_audit,
+    delete_post_graph,
+    like_counts_for_posts,
+    liked_post_ids,
+    remove_like,
+    user_liked,
+)
 from validate import parse_optional_category, parse_page, parse_page_size, parse_uuid
 
 router = APIRouter()
@@ -56,6 +67,8 @@ def _summary(
     reply_count: int = 0,
     reply_preview: list[ReplyPreview] | None = None,
     include_images: bool = False,
+    like_count: int = 0,
+    liked: bool = False,
 ) -> PostSummary:
     images = parse_images(getattr(post, "images", None)) if include_images and post.category == "forum" else []
     return PostSummary(
@@ -70,12 +83,19 @@ def _summary(
         reply_count=reply_count,
         reply_preview=reply_preview or [],
         images=images,
+        like_count=like_count if post.category == "forum" else 0,
+        liked=liked if post.category == "forum" else False,
     )
 
 
-def _detail(post: Post) -> dict:
+def _detail(post: Post, *, like_count: int = 0, liked: bool = False) -> dict:
     return PostDetail(
-        **_summary(post, include_images=post.category == "forum").model_dump(),
+        **_summary(
+            post,
+            include_images=post.category == "forum",
+            like_count=like_count,
+            liked=liked,
+        ).model_dump(),
         body=post.body,
     ).model_dump()
 
@@ -112,7 +132,15 @@ def _post_field_errors(body: CreatePostBody) -> list[dict[str, str]]:
     return fields
 
 
-def _list_posts(db: Session, *, page: int, page_size: int, category: str | None, author_id: str | None) -> dict:
+def _list_posts(
+    db: Session,
+    *,
+    page: int,
+    page_size: int,
+    category: str | None,
+    author_id: str | None,
+    viewer: User | None = None,
+) -> dict:
     filters = [Post.status == "published"]
     if category is not None:
         filters.append(Post.category == category)
@@ -134,6 +162,9 @@ def _list_posts(db: Session, *, page: int, page_size: int, category: str | None,
         raise StorageError() from exc
     previews = _forum_previews(db, rows) if category == "forum" else {}
     include_images = category == "forum"
+    forum_ids = [post.id for post in rows if post.category == "forum"]
+    like_counts = like_counts_for_posts(db, forum_ids)
+    liked_ids = liked_post_ids(db, user_id=viewer.id, post_ids=forum_ids) if viewer else set()
     return PostList(
         items=[
             _summary(
@@ -141,6 +172,8 @@ def _list_posts(db: Session, *, page: int, page_size: int, category: str | None,
                 reply_count=previews.get(post.id, (0, []))[0],
                 reply_preview=previews.get(post.id, (0, []))[1],
                 include_images=include_images,
+                like_count=like_counts.get(post.id, 0),
+                liked=post.id in liked_ids,
             )
             for post in rows
         ],
@@ -217,6 +250,7 @@ def _reply_payload(comment: Comment) -> dict:
 @router.get("/posts")
 def list_posts(
     db: Session = Depends(get_db),
+    viewer: User | None = Depends(get_optional_user),
     category: str | None = Query(default=None),
     page: str | None = Query(default=None),
     page_size: str | None = Query(default=None),
@@ -224,7 +258,14 @@ def list_posts(
     parsed_page = parse_page(page)
     parsed_size = parse_page_size(page_size)
     parsed_category = parse_optional_category(category)
-    return _list_posts(db, page=parsed_page, page_size=parsed_size, category=parsed_category, author_id=None)
+    return _list_posts(
+        db,
+        page=parsed_page,
+        page_size=parsed_size,
+        category=parsed_category,
+        author_id=None,
+        viewer=viewer,
+    )
 
 
 @router.get("/posts/{post_id}/comments")
@@ -384,6 +425,47 @@ def promote_post(
     return JSONResponse(status_code=201, content=_detail(post))
 
 
+@router.post("/posts/{post_id}/likes")
+def like_post(
+    post_id: str,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    post = _published_post(db, parse_uuid(post_id))
+    if post.category != "forum":
+        raise validation_error(
+            [{"field": "category", "message": "Likes are only available on forum posts."}]
+        )
+    try:
+        created = add_like(db, user_id=user.id, post_id=post.id)
+        count = count_likes(db, post.id)
+    except StorageError:
+        raise ApiError(503, "storage_unavailable", "Could not save the like. Try again in a moment.") from None
+    return JSONResponse(
+        status_code=201 if created else 200,
+        content=LikeState(like_count=count, liked=True).model_dump(),
+    )
+
+
+@router.delete("/posts/{post_id}/likes")
+def unlike_post(
+    post_id: str,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    post = _published_post(db, parse_uuid(post_id))
+    if post.category != "forum":
+        raise validation_error(
+            [{"field": "category", "message": "Likes are only available on forum posts."}]
+        )
+    try:
+        remove_like(db, user_id=user.id, post_id=post.id)
+        count = count_likes(db, post.id)
+    except StorageError:
+        raise ApiError(503, "storage_unavailable", "Could not save the like. Try again in a moment.") from None
+    return LikeState(like_count=count, liked=False).model_dump()
+
+
 @router.post("/posts/{post_id}/images")
 async def upload_post_image(
     post_id: str,
@@ -424,8 +506,19 @@ async def upload_post_image(
 
 
 @router.get("/posts/{post_id}")
-def get_post(post_id: str, db: Session = Depends(get_db)):
-    return _detail(_published_post(db, parse_uuid(post_id)))
+def get_post(
+    post_id: str,
+    db: Session = Depends(get_db),
+    viewer: User | None = Depends(get_optional_user),
+):
+    post = _published_post(db, parse_uuid(post_id))
+    like_count = count_likes(db, post.id) if post.category == "forum" else 0
+    liked = (
+        user_liked(db, user_id=viewer.id, post_id=post.id)
+        if viewer and post.category == "forum"
+        else False
+    )
+    return _detail(post, like_count=like_count, liked=liked)
 
 
 def _image_field_errors(category: str, uploads: list[tuple[str, bytes]]) -> list[dict[str, str]]:
@@ -530,10 +623,29 @@ def my_posts(
 ):
     parsed_page = parse_page(page)
     parsed_size = parse_page_size(page_size)
-    return _list_posts(db, page=parsed_page, page_size=parsed_size, category=None, author_id=user.id)
+    return _list_posts(
+        db,
+        page=parsed_page,
+        page_size=parsed_size,
+        category=None,
+        author_id=user.id,
+        viewer=user,
+    )
 
 
-@router.api_route("/posts/{post_id}", methods=["PATCH", "DELETE"])
+@router.delete("/posts/{post_id}", status_code=204)
+def delete_post(
+    post_id: str,
+    _: User = Depends(get_admin_user),
+    db: Session = Depends(get_db),
+):
+    post_id = parse_uuid(post_id)
+    post = _published_post(db, post_id)
+    delete_post_graph(db, post)
+    delete_post_images(post_id)
+
+
+@router.api_route("/posts/{post_id}", methods=["PATCH"])
 def posts_mutating_not_allowed(post_id: str):
     raise StarletteHTTPException(status_code=405)
 

@@ -2,7 +2,7 @@
 
 依据：`docs/PRD.md` Must Have 与 Entity Flow。本文件同时约束前端 Mock 与后端实现。不包含业务代码。
 
-第一版 **无公开审计查询接口**（M10 仅服务端落库）。不包含编辑 / 删除帖或评论 / 检索（Should）。包含 Forum 评论（楼中楼）、角色与精选复制。
+第一版 **无公开审计查询接口**（M10 仅服务端落库）。作者不能改删自己的帖或评论。`admin` 可整帖删除，并可封禁账号。包含 Forum 评论（楼中楼）、角色与精选复制。
 
 ---
 
@@ -66,7 +66,8 @@ Content-Type: application/json
 | 400 | `bad_request` | 分页参数非法等无法归到字段校验的请求错误 |
 | 401 | `unauthenticated` | 无会话或会话无效 |
 | 401 | `invalid_credentials` | 登录邮箱或密码不对（不区分「用户不存在」与「密码错误」） |
-| 403 | `forbidden` | 已登录但无权（学生发校报栏目、非编辑精选、非管理员改角色） |
+| 403 | `forbidden` | 已登录但无权（学生发校报栏目、非编辑精选、非管理员改角色 / 删帖 / 封禁） |
+| 403 | `account_banned` | 密码正确但账号已封禁；或封禁后仍带着旧会话调用需登录接口 |
 | 404 | `not_found` | 帖子、评论父楼或用户不存在 |
 | 409 | `email_taken` | 注册邮箱已被占用 |
 | 422 | `validation_error` | 缺必填、超长、非法栏目、非法配图 |
@@ -104,6 +105,7 @@ Content-Type: application/json
 | `display_name` | string | |
 | `role` | string | `student` \| `editor` \| `admin` |
 | `avatar` | string | 同 AuthorPublic |
+| `banned` | boolean | 是否封禁。注册默认为 `false` |
 | `created_at` | string | |
 
 **PostSummary**（列表：首页、栏目、我的帖子）
@@ -119,8 +121,10 @@ Content-Type: application/json
 | `updated_at` | string | 创建时与 `created_at` 相同 |
 | `author` | AuthorPublic | |
 | `reply_count` | integer | 楼层数。校报栏目与无 `category` 的列表为 `0` |
-| `reply_preview` | ReplyPreview[] | Forum 最多 4 条楼层（无楼中楼）。其他列表为 `[]` |
+| `reply_preview` | ReplyPreview[] | Forum 最多 4 条楼层（无楼中楼）。其他列表为 `[]`。Forum **列表 UI 不展示**此字段 |
 | `images` | string[] | Forum 配图，同源路径 `/uploads/posts/{post_id}/{file}`，最多 4 张。校报栏目与无 `category` 的列表为 `[]` |
+| `like_count` | integer | Forum 主帖赞数。校报栏目与无 `category` 的列表为 `0` |
+| `liked` | boolean | 当前会话是否已赞该帖；无会话或校报列表为 `false` |
 
 **ReplyPreview**（Forum 卡片用）
 
@@ -201,6 +205,7 @@ Content-Type: application/json
 
 - `200` + `UserPrivate`；`Set-Cookie: scoop_session=...`
 - `401` `invalid_credentials`（邮箱不存在或密码错误，同一文案）
+- `403` `account_banned`（邮箱与密码正确，但账号已封禁；不建立会话）
 - `422` `validation_error`
 - `503` `storage_unavailable`（读存储失败时）
 
@@ -290,6 +295,8 @@ Content-Type: application/json
 - `422` `validation_error`（`category` 有值但不在枚举内）
 - `503` `storage_unavailable`
 
+停留页面时客户端可重复请求本接口（建议间隔 ≥ 4 秒；页签隐藏时暂停），用同一 JSON 合并列表。不新增 query、不另开 WebSocket / SSE。
+
 ---
 
 #### `GET /api/v1/posts/{post_id}`
@@ -340,6 +347,21 @@ Content-Type: application/json
 - `503` `storage_unavailable`（帖子、审计或配图任一写入失败则整笔失败，不返回 201）
 
 无图时 `images` 为 `[]`。之后可用下面的上传接口补图。
+
+#### `DELETE /api/v1/posts/{post_id}`
+
+- **鉴权：** 是（须 `admin`）
+- **职责：** 删除已发布帖，并在同一事务去掉其评论、点赞、该帖审计记录；配图文件一并删除。
+
+**Response**
+
+- `204` 无 body
+- `401` `unauthenticated`
+- `403` `forbidden`（不是 `admin`）
+- `404` `not_found`
+- `503` `storage_unavailable`
+
+`PATCH /api/v1/posts/{post_id}` 仍不提供，误调用 `405`。
 
 ---
 
@@ -392,6 +414,8 @@ Content-Type: application/json
 - `422` `validation_error`（帖存在但不是 Forum）
 - `503` `storage_unavailable`
 
+Forum 详情停留时可重复请求本接口（间隔与列表相同），合并已见楼层并追加新楼。形状不变。
+
 #### `POST /api/v1/posts/{post_id}/comments`
 
 - **鉴权：** 是
@@ -436,6 +460,37 @@ Content-Type: application/json
 - `422` `validation_error`（源帖不是 Forum、栏目非法）
 - `503` `storage_unavailable`
 
+#### `POST /api/v1/posts/{post_id}/likes`
+
+- **鉴权：** 是
+- **职责：** 为 Forum 主帖点赞。同一用户同一帖已赞再 POST **不加倍**。
+
+**Request：** 无 body。
+
+**Response**
+
+- `201` `{ "like_count": integer, "liked": true }`（新赞）
+- `200` `{ "like_count": integer, "liked": true }`（已经赞过）
+- `401` `unauthenticated`
+- `404` `not_found`
+- `422` `validation_error`（非 Forum 帖，`fields[].field` 为 `category`）
+- `503` `storage_unavailable`
+
+#### `DELETE /api/v1/posts/{post_id}/likes`
+
+- **鉴权：** 是
+- **职责：** 取消点赞。未赞过再 DELETE **不报错**。
+
+**Request：** 无 body。
+
+**Response**
+
+- `200` `{ "like_count": integer, "liked": false }`
+- `401` `unauthenticated`
+- `404` `not_found`
+- `422` `validation_error`（非 Forum 帖）
+- `503` `storage_unavailable`
+
 ### 1.5 Admin users
 
 #### `GET /api/v1/admin/users`
@@ -456,21 +511,22 @@ Content-Type: application/json
 #### `PATCH /api/v1/admin/users/{user_id}`
 
 - **鉴权：** 是（须 `admin`）
-- **职责：** 将目标用户设为 `editor` 或 `student`。
+- **职责：** 将目标用户设为 `editor` 或 `student`，和 / 或封禁、解封。
 
 **Request body**
 
 | 字段 | 类型 | 必填 | 约束 |
 | --- | --- | --- | --- |
-| `role` | string | 是 | 仅 `student` \| `editor` |
+| `role` | string | 否 | 若出现：仅 `student` \| `editor` |
+| `banned` | boolean | 否 | `true` 封禁并作废该用户全部会话；`false` 解封。与 `role` 至少出现一个 |
 
 **Response**
 
 - `200` + 更新后的 `UserPrivate`
 - `401` `unauthenticated`
-- `403` `forbidden`（调用者不是 `admin`；或目标已是 `admin`；或试图写成 `admin`）
+- `403` `forbidden`（调用者不是 `admin`；或目标已是 `admin`；或试图写成 `admin`；或封禁自己）
 - `404` `not_found`
-- `422` `validation_error`（`role` 非法）
+- `422` `validation_error`（`role` 非法，或 `role` 与 `banned` 都缺）
 - `503` `storage_unavailable`
 
 `ADMIN_EMAIL`（环境变量，小写邮箱）在注册或登录时把该用户升为 `admin`。不要把真实邮箱写进仓库。
@@ -479,8 +535,9 @@ Content-Type: application/json
 
 | 方法 | 路径 | 说明 |
 | --- | --- | --- |
-| `PATCH` / `DELETE` | `/api/v1/posts/{post_id}` | Should（S2）。若误调用：`405`。PRD AC12 在本版通过「无改删接口」满足。 |
-| `PATCH` / `DELETE` | `/api/v1/posts/{post_id}/comments/{comment_id}` | 本版不能改删评论。若误调用：`405`。 |
+| `PATCH` | `/api/v1/posts/{post_id}` | 作者改帖仍不做。若误调用：`405`。 |
+| `DELETE` | `/api/v1/posts/{post_id}` | 见上文：仅 `admin`。 |
+| `PATCH` / `DELETE` | `/api/v1/posts/{post_id}/comments/{comment_id}` | 本版不能改删单条评论。若误调用：`405`。 |
 | `GET` | `/api/v1/audit-events` | Should（S5）。审计只写不读。 |
 
 ---
@@ -509,6 +566,8 @@ Content-Type: application/json
   "email": "jordan.hale@example.com",
   "display_name": "Jordan Hale",
   "role": "student",
+  "avatar": "preset:oak",
+  "banned": false,
   "created_at": "2026-09-10T11:02:18Z"
 }
 ```
@@ -539,6 +598,8 @@ Content-Type: application/json
   "email": "priya.nair@example.com",
   "display_name": "Priya Nair",
   "role": "editor",
+  "avatar": "preset:oak",
+  "banned": false,
   "created_at": "2026-08-21T09:10:00Z"
 }
 ```
@@ -587,6 +648,8 @@ Content-Type: application/json
   "email": "jordan.hale@example.com",
   "display_name": "Jordan Hale",
   "role": "student",
+  "avatar": "preset:oak",
+  "banned": false,
   "created_at": "2026-09-10T11:02:18Z"
 }
 ```

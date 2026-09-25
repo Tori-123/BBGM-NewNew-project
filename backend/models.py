@@ -1,6 +1,6 @@
 from datetime import datetime, timezone
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, String, Text, create_engine
+from sqlalchemy import Boolean, DateTime, ForeignKey, String, Text, UniqueConstraint, create_engine
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship, sessionmaker
 
 
@@ -27,11 +27,13 @@ class User(Base):
     display_name: Mapped[str] = mapped_column(String(40), nullable=False)
     role: Mapped[str] = mapped_column(String(16), nullable=False, default="student")
     avatar: Mapped[str] = mapped_column(String(160), nullable=False, default="preset:oak")
+    banned: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
 
     posts: Mapped[list["Post"]] = relationship(back_populates="author")
     sessions: Mapped[list["SessionRecord"]] = relationship(back_populates="user")
     comments: Mapped[list["Comment"]] = relationship(back_populates="author")
+    likes: Mapped[list["PostLike"]] = relationship(back_populates="user")
 
 
 class SessionRecord(Base):
@@ -65,6 +67,7 @@ class Post(Base):
 
     author: Mapped[User] = relationship(back_populates="posts")
     comments: Mapped[list["Comment"]] = relationship(back_populates="post")
+    likes: Mapped[list["PostLike"]] = relationship(back_populates="post")
 
 
 class Comment(Base):
@@ -79,6 +82,19 @@ class Comment(Base):
 
     post: Mapped[Post] = relationship(back_populates="comments")
     author: Mapped[User] = relationship(back_populates="comments")
+
+
+class PostLike(Base):
+    __tablename__ = "post_likes"
+    __table_args__ = (UniqueConstraint("user_id", "post_id", name="uq_post_likes_user_post"),)
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id"), nullable=False)
+    post_id: Mapped[str] = mapped_column(ForeignKey("posts.id"), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+    user: Mapped[User] = relationship(back_populates="likes")
+    post: Mapped[Post] = relationship(back_populates="likes")
 
 
 class AuditEvent(Base):
@@ -113,6 +129,10 @@ def migrate_schema(engine) -> None:
             if cols and "avatar" not in cols:
                 conn.exec_driver_sql(
                     "ALTER TABLE users ADD COLUMN avatar VARCHAR(160) NOT NULL DEFAULT 'preset:oak'"
+                )
+            if cols and "banned" not in cols:
+                conn.exec_driver_sql(
+                    "ALTER TABLE users ADD COLUMN banned INTEGER NOT NULL DEFAULT 0"
                 )
             post_cols = {row[1] for row in conn.exec_driver_sql("PRAGMA table_info(posts)").fetchall()}
             if post_cols and "images" not in post_cols:

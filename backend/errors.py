@@ -43,6 +43,10 @@ def unauthenticated() -> ApiError:
     return ApiError(401, "unauthenticated", "Please sign in to continue.")
 
 
+def account_banned() -> ApiError:
+    return ApiError(403, "account_banned", "This account is banned.")
+
+
 def forbidden(message: str = "You do not have permission to do that.") -> ApiError:
     return ApiError(403, "forbidden", message)
 

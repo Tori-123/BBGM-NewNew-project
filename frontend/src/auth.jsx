@@ -48,7 +48,8 @@ export function AuthProvider({ children }) {
     if (
       location.pathname === "/me/posts" ||
       location.pathname === "/me/avatar" ||
-      location.pathname === "/admin/users"
+      location.pathname === "/admin/users" ||
+      location.pathname === "/paper"
     ) {
       navigate("/");
     }

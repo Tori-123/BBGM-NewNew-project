@@ -31,6 +31,7 @@ def _user_private(user: User) -> dict:
         display_name=user.display_name,
         role=user.role,
         avatar=normalize_avatar(user.avatar),
+        banned=bool(user.banned),
         created_at=to_iso(user.created_at),
     ).model_dump()
 
@@ -108,6 +109,8 @@ def login(body: LoginBody, request: Request, db: Session = Depends(get_db)):
 
     if user is None or not verify_password(body.password, user.password_hash):
         raise ApiError(401, "invalid_credentials", "Email or password is incorrect.")
+    if user.banned:
+        raise ApiError(403, "account_banned", "This account is banned.")
 
     try:
         apply_admin_email(user, request.app.state.settings.admin_email)

@@ -8,6 +8,7 @@ import Category, { StaticCategory } from "./pages/Category";
 import Contact from "./pages/Contact";
 import Home from "./pages/Home";
 import MyPosts from "./pages/MyPosts";
+import Paper from "./pages/Paper";
 import PostDetail from "./pages/PostDetail";
 import Register from "./pages/Register";
 import SignIn from "./pages/SignIn";
@@ -32,6 +33,7 @@ export default function App() {
             <Route path="/me/posts" element={<MyPosts />} />
             <Route path="/me/avatar" element={<AvatarSettings />} />
             <Route path="/admin/users" element={<AdminUsers />} />
+            <Route path="/paper" element={<Paper />} />
             <Route path="/sign-in" element={<SignIn />} />
             <Route path="/register" element={<Register />} />
             <Route path="/about" element={<About />} />

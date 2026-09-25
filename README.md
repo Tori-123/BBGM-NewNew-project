@@ -109,6 +109,7 @@ Windows 激活虚拟环境请改用 `.venv\Scripts\activate`。
 
 ## 参考
 
+- 运行环境（端口、`.env`、本地与生产布局）：`docs/RUNTIME_REQUIREMENT.md`
 - 产品参照：知乎式发帖（学生自己发帖、按话题阅读）；栏目为 News / Sports / Forum
 - 页面稿中出现、第一版不绑定的外部能力：Spotify 嵌入（Track of the Day）
 - 规范文档、学校官网、正式竞品名单：尚未提供

@@ -48,6 +48,7 @@ class UserPrivate(BaseModel):
     display_name: str
     role: str
     avatar: str
+    banned: bool
     created_at: str
 
 
@@ -76,7 +77,8 @@ class PromoteBody(BaseModel):
 class PatchUserRoleBody(BaseModel):
     model_config = ConfigDict(extra="ignore")
 
-    role: str
+    role: str | None = None
+    banned: bool | None = None
 
 
 class CommentReply(BaseModel):
@@ -123,10 +125,17 @@ class PostSummary(BaseModel):
     reply_count: int
     reply_preview: list[ReplyPreview]
     images: list[str]
+    like_count: int
+    liked: bool
 
 
 class PostDetail(PostSummary):
     body: str
+
+
+class LikeState(BaseModel):
+    like_count: int
+    liked: bool
 
 
 class PostList(BaseModel):

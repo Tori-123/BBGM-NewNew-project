@@ -13,14 +13,15 @@
 | `/` | 首页（截图版式） | 公开 | `GET /api/v1/posts?page=1&page_size=20` |
 | `/news` | 栏目 News | 公开 | `GET /api/v1/posts?category=news` |
 | `/sports` | 栏目 Sports | 公开 | `GET /api/v1/posts?category=sports` |
-| `/forum` | Forum 卡片列表 | 公开 | `GET /api/v1/posts?category=forum`；绑 `author.avatar` `title` `author.display_name` `images[0]` `reply_preview` `reply_count` |
+| `/forum` | Forum 卡片列表 | 公开 | `GET /api/v1/posts?category=forum`；绑 `author.avatar` `title` `author.display_name` `excerpt` `created_at` `images[0]` `reply_count` `like_count` `liked`。气泡进详情；拇指赞/取消 |
 | `/opinion` | 栏目占位 | 公开 | **不请求** `category=opinion`（枚举外会 422）。固定空态。 |
 | `/community` `/submit` | 旧路径 | — | 重定向到 `/forum` |
 | `/dorm-life` `/events` `/photo` | 旧路径 | — | 重定向到 `/` |
 | `/posts/:postId` | 帖子详情 | 公开 | `GET /api/v1/posts/{post_id}`；Forum 另 `GET .../comments` |
 | `/me/posts` | 我的帖子 | 需登录 | `GET /api/v1/me/posts` |
 | `/me/avatar` | 选/上传头像 | 需登录 | `PUT` / `POST /api/v1/me/avatar` |
-| `/admin/users` | 用户与角色 | 需 `admin` | `GET /api/v1/admin/users`；`PATCH` 改 `role` |
+| `/admin/users` | 用户与角色 | 需 `admin` | `GET /api/v1/admin/users`；`PATCH` 改 `role` 或 `banned` |
+| `/paper` | 精选到校报 | 需 `editor` 或 `admin` | `GET /api/v1/posts?category=forum`；选中后 `POST /api/v1/posts/{id}/promote` |
 | `/sign-in` | 登录 | 访客 | `POST /api/v1/auth/login` |
 | `/register` | 注册 | 访客 | `POST /api/v1/auth/register` |
 | `/about` `/contact` | 静态稿（截图顶栏） | 公开 | 无 API |
@@ -28,7 +29,7 @@
 **全局壳 `PaperShell`**
 
 - 顶栏左：`ABOUT` `CONTACT`（静态页）。顶栏右：账号区 + 本地日期文案 `Today: {formatted local date}`（不是 schema 字段）。
-- 账号：启动时 `GET /api/v1/me`。`401` = 访客，显示 `SIGN IN`（去 `/sign-in`）。`200` = 已登录，显示头像（`avatar`）、`display_name`、`AVATAR`（`/me/avatar`）、`MY POSTS`（`/me/posts`）、`SIGN OUT`。`role===admin` 另显示 `USERS`（`/admin/users`）。
+- 账号：启动时 `GET /api/v1/me`。`401` = 访客，显示 `SIGN IN`（去 `/sign-in`）。`200` = 已登录，显示头像（`avatar`）、`display_name`、`AVATAR`（`/me/avatar`）、`MY POSTS`（`/me/posts`）、`SIGN OUT`。`role` 为 `editor` 或 `admin` 时显示 `PAPER`（`/paper`）。`role===admin` 另显示 `USERS`（`/admin/users`）。
 - 报头：左搜索框（外形保留；提交不调接口，在报头下出一条静态说明）。中：斜体衬线字标 `Elegram` 链回 `/`。右：静态「COMMUNITY HOSTED / Independent campus forum」。
 - 标语静态：`YOUR CAMPUS. YOUR STORIES. YOUR VOICE.`
 - 导航：`NEWS` `SPORTS` `FORUM` `OPINION`。当前路由下划黑线。无 `SUBMIT`。发帖在对应栏目页内。
@@ -67,7 +68,7 @@
 
 **形态**
 
-- 圆角：0 或最多 2px（`Publish` 按钮）
+- 圆角：校报 0 或最多 2px（`Publish` 按钮）。**Forum 列表卡**可用大圆角模块底（`rounded-2xl`），不悬浮、无关注/分享/关闭。
 - 按钮：黑底白字，小 caps；链接按钮无填充
 - 密度：印刷空白；卡片不悬浮、不 hover 抬起
 - 输入：底边一条黑线或 1px 黑框，不要 iOS 大圆角
@@ -86,7 +87,7 @@
 | 状态 | 表现 |
 | --- | --- |
 | 加载 | 报头先出。图框已是 `#D6DEEE`；标题位一条 2px `bg-neutral-200` 横线。不挡报头转圈。 |
-| 成功 | 将 `items` 按 `created_at` 已排序使用（服务端降序）。槽位按下表取 **互不重复的下标**；缺槽显示该槽空态，不循环填充。 |
+| 成功 | 将 `items` 按 `created_at` 已排序使用（服务端降序）。槽位按下表取 **互不重复的下标**；缺槽显示该槽空态，不循环填充。停留时约每 4 秒再请求 `page=1`（页签隐藏暂停），用新的 `items` 填槽；不转圈。后台失败保持当前槽，不盖错误条。 |
 | 空 | `total === 0`：FEATURED 图框仍在，其下 “No stories on campus yet.”；学生链到 `/forum`，编辑提示到对应栏目发。 |
 | 错误 | `503` / 其他：主栏顶 `ErrorBanner` ← `error.message`（如 Could not save… 类存储文案以响应为准）。不造假列表。 |
 
@@ -114,9 +115,10 @@ Photo of the Day / Track of the Day / Student Art：静态标题+空图框+固�
 | --- | --- |
 | 加载 | 栏目大标题+黑线先出；下列三行图框+横线。 |
 | 成功 | 校报 `items[]` 逐行：`category` `title` `excerpt`。`total > page * page_size` 时底栏 `Older stories` 请求 `page+1`。 |
-| Forum | **不用 StoryRow**。每条卡片：`author.avatar`、`title`（链详情）、`author.display_name`、有则 `images[0]`、`reply_preview[0..3]` 的作者与正文；`reply_count`。点标题进详情。 |
+| Forum | **不用 StoryRow**。每条独立模块卡：`author.avatar`、`author.display_name`、`created_at`、`title`（链详情）、`excerpt`、有则 `images[0]`。底栏：气泡图标 + `reply_count`（链 `/posts/{id}`）；拇指图标 + `like_count`（已登录切换赞；游客去 `/sign-in?next=/forum`）。**不**展示 `reply_preview`。 |
 | 发帖 | News / Sports：有编辑权限显示 `Write`，点开本页展开表单，`category` 锁当前栏目。学生进校报不显示按钮。Forum：右下角固定蓝色圆形加号。已登录点开浮层表单；未登录加号去 `/sign-in?next=/forum`。`opinion` 无发帖。 |
 | 空 | `items.length === 0`：图框保留，“No stories in {栏目名} yet.” 不链独立发帖页。 |
+| 停留 | 约每 4 秒再请求当前栏目 `page=1`（页签隐藏暂停）。新帖按 `created_at` 出现在已有列表顶部；已点过的 Older 页保留。Forum 卡上的 `reply_count` / `like_count` / `liked` 随这次响应更新。不转圈；后台失败不盖错误条。首次加载失败后若拉到数据则清错误。 |
 | 错误 | 栏目名下 `ErrorBanner` ← `error.message`。`opinion` 不发请求，直接空态句。 |
 
 ### 3.3 详情 `/posts/:postId`
@@ -125,7 +127,8 @@ Photo of the Day / Track of the Day / Student Art：静态标题+空图框+固�
 | --- | --- |
 | 加载 | 图框+标题横线。 |
 | 成功 | kicker←`category`；标题←`title`；byline←`author.display_name`、`created_at`；正文←`body`。 |
-| Forum | `category===forum` 时正文下请求 `GET /comments`。楼主与每楼显示 `author.avatar`。有 `images[]` 则在正文下展示实图，不用校报占位图框。楼层显示 `floor`、`author.display_name`、`body`、`replies[]`。已登录显示跟帖框；未登录显示去登录。`editor`/`admin` 另显示精选表。校报详情**不**请求评论，图框仍是 CSS 占位。 |
+| Forum | `category===forum` 时正文下请求 `GET /comments`。楼主与每楼显示 `author.avatar`。有 `images[]` 则在正文下展示实图，不用校报占位图框。楼层显示 `floor`、`author.display_name`、`body`、`replies[]`。已登录显示跟帖框；未登录显示去登录。校报详情**不**请求评论，图框仍是 CSS 占位。停留时约每 4 秒再请求详情与已加载的评论页；有新楼则追加。输入框内容不丢。后台失败不盖错误条。精选表不在本页。 |
+| 删帖 | 仅 `role===admin` 显示 `Delete`。确认后 `DELETE /api/v1/posts/{id}`，成功回到该帖栏目（`/forum` `/news` `/sports`）。`403` 用 `ErrorBanner`。 |
 | 空 / 404 | `error.code === not_found`：衬线 “Story not found.” 无假文。 |
 | 错误 | `503`/`400`：`ErrorBanner` ← `error.message`。 |
 
@@ -170,8 +173,20 @@ Photo of the Day / Track of the Day / Student Art：静态标题+空图框+固�
 
 | 状态 | 表现 |
 | --- | --- |
-| 成功 | 行：`display_name` `email` `role`。`student` 显示授予编辑；`editor` 显示取消编辑；`admin` 只读。 |
+| 成功 | 行：`display_name` `email` `role`。`student` 显示授予编辑；`editor` 显示取消编辑。非 `admin` 且不是当前用户时显示 `Ban` 或 `Unban`（看 `banned`）。`admin` 行不提供封禁。 |
+| 封禁 | `PATCH` body `{ "banned": true }`。成功行更新。被封禁者下次登录见 `account_banned` 的 `error.message`。 |
 | 错误 | `ErrorBanner` ← `error.message`。 |
+
+### 3.8 精选 `/paper`
+
+未登录去 `/sign-in?next=/paper`。`student` 去 `/`。`editor` / `admin` 留下。
+
+| 状态 | 表现 |
+| --- | --- |
+| 列表 | `GET /api/v1/posts?category=forum`。每行标题，点选一条。 |
+| 表单 | 选中后才出现 Section / Title / Body / `Publish copy`。初始标题与正文来自该帖。栏目必选 `news` 或 `sports`。 |
+| 成功 | `POST /api/v1/posts/{id}/promote` 后去新帖 `/posts/{id}`。 |
+| 失败 | `403` / `422`：`ErrorBanner` 或字段下 `error.fields[]`。 |
 
 不要用断网假数据充当错误处理。
 
@@ -186,7 +201,7 @@ Photo of the Day / Track of the Day / Student Art：静态标题+空图框+固�
     - 链 About / Contact
     - `<AccountNav>`
       - 访客：SIGN IN
-      - 登录：`display_name` ← `GET /me`；MY POSTS；`role===admin` 时 USERS；SIGN OUT
+      - 登录：`display_name` ← `GET /me`；MY POSTS；`editor` 或 `admin` 时 PAPER；`role===admin` 时 USERS；SIGN OUT
     - `<TodayLabel>` 本地日期（非 API）
   - `<Masthead>`
     - `<SearchStub>` 静态
@@ -227,7 +242,7 @@ Photo of the Day / Track of the Day / Student Art：静态标题+空图框+固�
   - Forum：右下角蓝色圆形 `<ComposeFab>`；打开后浮层 `<ComposeForm>`；未登录加号去登录
   - News / Sports：`<WriteToggle>` 有编辑权限时；展开后 `<ComposeForm>`
   - `<ErrorBanner>` ← `error.message`
-  - Forum：`<CommunityCard>` ← `items[]`
+  - Forum：`<CommunityCard>` ← `items[]`：头像、名、时间、标题、excerpt、图、底栏气泡与拇指
   - 校报：`<StoryRowList>` ← `items[]`
     - `<StoryRow>`
       - `<ImageWell>`
@@ -248,7 +263,12 @@ Photo of the Day / Track of the Day / Student Art：静态标题+空图框+固�
     - `<Body>` ← `body`
     - 不展示 `status`、`email`、`excerpt`（详情以 `body` 为准）
     - Forum 时 `<CommentThread>` ← `GET .../comments` 的 `items[]`（`floor` `body` `author` `replies`）
-    - Forum 且编辑时 `<PromoteForm>` Request `category` `title` `body`（仅 `news` / `sports`）
+    - `admin` 时 `<DeletePost>` → `DELETE /api/v1/posts/{id}`
+
+- `<Page: Paper>`
+  - `<SectionRule>` PAPER
+  - Forum 帖列表 ← `GET /posts?category=forum` 的 `title`
+  - 选中后 `<PromoteForm>` Request `category` `title` `body`（仅 `news` / `sports`）
 
 - `<Page: MyPosts>`
   - `<SectionRule>` MY POSTS
@@ -270,7 +290,7 @@ Photo of the Day / Track of the Day / Student Art：静态标题+空图框+固�
 - `<Page: AdminUsers>`
   - `<SectionRule>` USERS
   - `<ErrorBanner>` ← `error.message`
-  - 行 ← `items[]` 的 `display_name` `email` `role`
+  - 行 ← `items[]` 的 `display_name` `email` `role` `banned`
 
 `StoryTile` / `StoryRow` / `FeaturedLead` 共用绑定：`id` `title` `excerpt` `category` `created_at` `author.id` `author.display_name`。列表不绑 `body`。
 
@@ -289,8 +309,11 @@ Photo of the Day / Track of the Day / Student Art：静态标题+空图框+固�
 | 打开详情 | `GET /api/v1/posts/{post_id}` | 绑 `PostDetail` | `404` 文案；`503` 错误条 |
 | Forum 详情 | `GET /api/v1/posts/{id}/comments` | 楼层与楼中楼 | `422` 不在校报页出现 |
 | 跟帖 | `POST .../comments` | 追加楼或楼中楼 | 401 去登录；422 字段下 |
-| 精选 | `POST .../promote` | 去新帖 `/posts/{id}` | 403 / 422 错误条 |
-| Forum 未登录点加号 | — | 去 `/sign-in?next=/forum` | — |
+| 精选 | 在 `/paper` 选帖后 `POST .../promote` | 去新帖 `/posts/{id}` | 403 / 422 错误条 |
+| 管理员删帖 | `DELETE /api/v1/posts/{id}` | 回该帖栏目 | 403 错误条 |
+| 封禁 / 解封 | `PATCH /api/v1/admin/users/{id}` body `banned` | 行上 `banned` 更新 | 403 错误条 |
+| Forum 列表点气泡 | — | 去 `/posts/{id}` | — |
+| Forum 列表点赞 | `POST` 或 `DELETE .../likes` | 该卡更新 `like_count` `liked` | 401 去 `/sign-in?next=/forum`；422/503 不改数 |
 | Forum 已登录点加号 | — | 右下加号打开浮层表单 | 点关闭或遮罩收起 |
 | 校报 Write | — | 本页展开锁栏目表单 | 学生在校报无按钮 |
 | Sign in 提交 | `POST /api/v1/auth/login` body `email` `password` | 去 `next` 或 `/` | 表单上沿 `error.message`；字段错 `fields[]` |
