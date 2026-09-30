@@ -70,7 +70,13 @@ uvicorn 工作目录为 `backend/`。systemd（或等价）以非特权用户跑
 | `DATABASE_URL` | 是 | `sqlite:///./scoop.db` | SQLAlchemy 连接。从 `backend/` 启动时，相对路径落在 `backend/scoop.db`。 |
 | `SESSION_SECRET` | 是 | `dev-only-change-me` | 签发 / 校验 Cookie `scoop_session`。换密钥会使已有会话全部失效。生产必须换成高强度随机串，不要用模板值。 |
 | `FRONTEND_ORIGIN` | 否 | `http://localhost:5173` | CORS 唯一允许源。缺省即本地 Vite。生产改为浏览器实际 origin。 |
-| `ADMIN_EMAIL` | 否 | 空 | 小写邮箱。该地址在注册或登录时升为 `admin`。留空则无人被自动提拔。不要把真实地址写进仓库。 |
+| `ADMIN_EMAIL` | 否 | 空 | 小写邮箱，须为 `@basischina.com`。该地址在注册或登录时升为 `super_admin`。留空则无人被自动提拔。不要把真实地址写进仓库。 |
+| `MAIL_BACKEND` | 否 | `smtp` | `smtp` 走 SMTP；`console` 只把验证码打到进程日志（仅本地/测试）。生产用 `smtp`。 |
+| `SMTP_HOST` | `smtp` 时是 | 空 | 发信邮局的主机名，不是本站地址，也不是 `localhost`。代码用 STARTTLS 连接 `SMTP_PORT`。填学校或邮箱服务商给出的 SMTP 主机。跑 Elegram 的机器只有在本机已经开着同等 SMTP 时才能填它。缺主机时发码接口 `503`。 |
+| `SMTP_PORT` | 否 | `587` | SMTP 端口。 |
+| `SMTP_USER` | 否 | 空 | SMTP 用户名。 |
+| `SMTP_PASSWORD` | 否 | 空 | SMTP 密码。只写 `.env`。 |
+| `SMTP_FROM` | 否 | 空 | 发件人地址。缺省则用 `SMTP_USER`。 |
 
 前端构建期（`frontend/.env`，改完须重新 `npm run build` / `npm run dev`）：
 

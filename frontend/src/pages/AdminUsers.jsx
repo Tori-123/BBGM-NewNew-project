@@ -4,6 +4,12 @@ import { ApiError, api } from "../api";
 import { useAuth } from "../auth";
 import { ErrorBanner, FrontPageLink, SectionRule } from "../components/ui";
 
+const ROLES = [
+  { value: "student", label: "Student" },
+  { value: "editor", label: "Editor" },
+  { value: "admin", label: "Admin" },
+];
+
 export default function AdminUsers() {
   const { user, ready, setUser } = useAuth();
   const navigate = useNavigate();
@@ -17,13 +23,13 @@ export default function AdminUsers() {
       navigate("/sign-in?next=/admin/users", { replace: true });
       return;
     }
-    if (user.role !== "admin") {
+    if (user.role !== "super_admin") {
       navigate("/", { replace: true });
     }
   }, [ready, user, navigate]);
 
   useEffect(() => {
-    if (!user || user.role !== "admin") return;
+    if (!user || user.role !== "super_admin") return;
     let cancelled = false;
     setLoading(true);
     api
@@ -54,27 +60,40 @@ export default function AdminUsers() {
     };
   }, [user, navigate, setUser]);
 
-  async function setBanned(target, banned) {
-    setError(null);
-    try {
-      const updated = await api.setUserBanned(target.id, banned);
-      setItems((current) => current.map((item) => (item.id === updated.id ? updated : item)));
-    } catch (err) {
-      setError(err);
-    }
+  function replaceItem(updated) {
+    setItems((current) => current.map((item) => (item.id === updated.id ? updated : item)));
   }
 
   async function setRole(target, role) {
     setError(null);
     try {
-      const updated = await api.patchUserRole(target.id, role);
-      setItems((current) => current.map((item) => (item.id === updated.id ? updated : item)));
+      replaceItem(await api.patchUserRole(target.id, role));
     } catch (err) {
       setError(err);
     }
   }
 
-  if (!ready || !user || user.role !== "admin") return null;
+  async function setMuted(target, muted) {
+    setError(null);
+    try {
+      replaceItem(await api.setUserMuted(target.id, muted));
+    } catch (err) {
+      setError(err);
+    }
+  }
+
+  async function removeUser(target) {
+    if (!window.confirm(`Delete ${target.display_name}? Their posts will be removed.`)) return;
+    setError(null);
+    try {
+      await api.deleteUser(target.id);
+      setItems((current) => current.filter((item) => item.id !== target.id));
+    } catch (err) {
+      setError(err);
+    }
+  }
+
+  if (!ready || !user || user.role !== "super_admin") return null;
 
   return (
     <div className="mt-8">
@@ -94,42 +113,46 @@ export default function AdminUsers() {
             </tr>
           </thead>
           <tbody>
-            {items.map((item) => (
-              <tr key={item.id} className="border-b border-neutral-200">
-                <td className="py-3">{item.display_name}</td>
-                <td className="py-3">{item.email}</td>
-                <td className="py-3 uppercase tracking-[0.08em]">{item.role}</td>
-                <td className="py-3 text-right">
-                  {item.role === "student" ? (
-                    <button
-                      type="button"
-                      onClick={() => setRole(item, "editor")}
-                      className="uppercase tracking-[0.12em] text-[#1A4FBF]"
-                    >
-                      Grant editor
-                    </button>
-                  ) : null}
-                  {item.role === "editor" ? (
-                    <button
-                      type="button"
-                      onClick={() => setRole(item, "student")}
-                      className="mr-4 uppercase tracking-[0.12em] text-[#1A4FBF]"
-                    >
-                      Remove editor
-                    </button>
-                  ) : null}
-                  {item.role !== "admin" && item.id !== user.id ? (
-                    <button
-                      type="button"
-                      onClick={() => setBanned(item, !item.banned)}
-                      className="uppercase tracking-[0.12em] text-[#1A4FBF]"
-                    >
-                      {item.banned ? "Unban" : "Ban"}
-                    </button>
-                  ) : null}
-                </td>
-              </tr>
-            ))}
+            {items.map((item) => {
+              const locked = item.role === "super_admin" || item.id === user.id;
+              return (
+                <tr key={item.id} className="border-b border-neutral-200 align-top">
+                  <td className="py-3">{item.display_name}</td>
+                  <td className="py-3">{item.email}</td>
+                  <td className="py-3 uppercase tracking-[0.08em]">{item.role}</td>
+                  <td className="py-3 text-right">
+                    {locked ? null : (
+                      <div className="flex flex-wrap justify-end gap-x-4 gap-y-2">
+                        {ROLES.filter((role) => role.value !== item.role).map((role) => (
+                          <button
+                            key={role.value}
+                            type="button"
+                            onClick={() => setRole(item, role.value)}
+                            className="uppercase tracking-[0.12em] text-[#1A4FBF]"
+                          >
+                            {role.label}
+                          </button>
+                        ))}
+                        <button
+                          type="button"
+                          onClick={() => setMuted(item, !item.muted)}
+                          className="uppercase tracking-[0.12em] text-[#1A4FBF]"
+                        >
+                          {item.muted ? "Unmute" : "Mute"}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => removeUser(item)}
+                          className="uppercase tracking-[0.12em] text-red-700"
+                        >
+                          Delete user
+                        </button>
+                      </div>
+                    )}
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       )}

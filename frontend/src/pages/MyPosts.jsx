@@ -4,7 +4,7 @@ import { ApiError, api } from "../api";
 import { useAuth } from "../auth";
 import { StoryRow, StoryRowSkeleton } from "../components/StoryRow";
 import { ErrorBanner, FrontPageLink, SectionRule } from "../components/ui";
-import { canEditPaper } from "../format";
+import { canEditNews } from "../format";
 
 export default function MyPosts() {
   const { user, ready, setUser } = useAuth();
@@ -65,8 +65,10 @@ export default function MyPosts() {
         <div className="mt-6">
           <p className="font-serif text-2xl">You have not published yet.</p>
           <p className="mt-2 font-sans text-sm">
-            {canEditPaper(user) ? (
-              <span className="text-neutral-500">Publish from the section you want to update.</span>
+            {canEditNews(user) ? (
+              <Link to="/news/drafts" className="text-[#1A4FBF]">
+                Edit News drafts
+              </Link>
             ) : (
               <Link to="/forum" className="text-[#1A4FBF]">
                 Write in Forum

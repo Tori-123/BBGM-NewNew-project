@@ -14,6 +14,12 @@ class Settings:
     session_secret: str
     frontend_origin: str
     admin_email: str
+    mail_backend: str
+    smtp_host: str
+    smtp_port: int
+    smtp_user: str
+    smtp_password: str
+    smtp_from: str
 
 
 def _load_env_file(path: Path) -> None:
@@ -37,9 +43,25 @@ def load_settings() -> Settings:
 
     frontend_origin = (os.environ.get("FRONTEND_ORIGIN") or "http://localhost:5173").strip()
     admin_email = (os.environ.get("ADMIN_EMAIL") or "").strip().lower()
+    mail_backend = (os.environ.get("MAIL_BACKEND") or "smtp").strip().lower()
+    if mail_backend not in ("smtp", "console"):
+        mail_backend = "smtp"
+    smtp_port_raw = (os.environ.get("SMTP_PORT") or "587").strip()
+    try:
+        smtp_port = int(smtp_port_raw)
+    except ValueError:
+        smtp_port = 587
+    smtp_user = (os.environ.get("SMTP_USER") or "").strip()
+    smtp_from = (os.environ.get("SMTP_FROM") or smtp_user).strip()
     return Settings(
         database_url=database_url,
         session_secret=session_secret,
         frontend_origin=frontend_origin,
         admin_email=admin_email,
+        mail_backend=mail_backend,
+        smtp_host=(os.environ.get("SMTP_HOST") or "").strip(),
+        smtp_port=smtp_port,
+        smtp_user=smtp_user,
+        smtp_password=os.environ.get("SMTP_PASSWORD") or "",
+        smtp_from=smtp_from,
     )

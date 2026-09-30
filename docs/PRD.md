@@ -4,9 +4,9 @@
 
 默认决策（可被后续 1.2 推翻）：
 
-- 账号：站点自建注册 / 登录（邮箱 + 密码）；不接校园 SSO。
-- 角色：注册默认为 `student`；`ADMIN_EMAIL` 匹配的账号为 `admin`；`admin` 可把已注册用户设为 / 取消 `editor`。
-- 发帖：身份绑定，发布即公开，不先审后发。`student` 只能在 Forum 发主帖与跟帖；`editor` / `admin` 可发 News / Sports，并可将 Forum 帖复制精选到这两栏。
+- 账号：站点自建注册 / 登录；仅 `@basischina.com`。注册须邮箱验证码通过后才建账号。登录用邮箱 + 密码。忘记密码用同一套验证码重置。不接校园 SSO、不发短信。
+- 角色：注册默认为 `student`；`ADMIN_EMAIL` 匹配的账号为 `super_admin`。超级管理员可授予或取消 `editor` 与 `admin`，不能再造一个 `super_admin`。
+- 发帖：Forum 发布即公开。News 以分板块草稿存在，超级管理员同意的板块才出现在 News 上。没有 Sports 栏目，也没有把 Forum 帖直接复制上 News 的精选。
 - 无活动帖：帖子不带开始时间与地点字段。
 
 ---
@@ -20,8 +20,8 @@
 **成功标准（可观察）：**
 
 - 一名学生完成注册并登录后，能在 Forum 发布主帖；另一未登录会话打开 Forum 与详情，能看到同一条内容，并能阅读楼层与楼中楼。
-- 一名编辑（或管理员）能向 News / Sports 发帖；学生向校报栏目发帖被拒绝。
-- 编辑可将一条 Forum 帖复制为 News 或 Sports 新帖；原帖仍在 Forum。
+- 一名编辑能写 News 草稿并按板块提交；超级管理员同意后，同学在 News 里只读到已同意的板块。
+- 管理员能删除已发布帖；作者在 System 里看到一条不可回复的通知。
 - 服务进程重启后，上述账号、帖与评论仍在，不依赖浏览器本地缓存作为唯一存储。
 - 未登录用户不能发帖或跟帖；错误密码、缺字段、无权限操作均有明确失败结果，且不写出脏数据。
 
@@ -45,50 +45,52 @@
 
 ### P2 校园读者
 
-想知道校园新闻和体育正在发生什么，不一定发帖。
+想知道校园新闻正在发生什么，不一定发帖。
 
 - **P2-US1：** 作为访客或学生，我想不登录就浏览首页、校报栏目、Forum 列表及帖子详情与楼中楼，以便先读到内容。
 - **P2-US2：** 作为读者，我想从导航进入某一栏目只看该栏目帖子，以便把校报栏目和 Forum 讨论分开找。
 
 ### P3 学生编辑
 
-须由管理员授予 `editor`（或本人是 `admin`）。与 P1 同一账号体系。
+须由超级管理员授予 `editor`。与 P1 同一账号体系。
 
-- **P3-US1：** 作为编辑，我想向 News 或 Sports 发普通稿，以便同学在对应栏目里读到。
-- **P3-US2：** 作为编辑，我想把一条 Forum 讨论复制成校报稿（可改标题、正文、栏目），以便校报露出精选内容而原帖仍在 Forum。
-- **P3-US3：** 作为管理员，我想在用户列表里授予或取消他人的编辑身份，以便控制谁能发校报栏目。
+- **P3-US1：** 作为编辑，我想按板块写 News 草稿并分别提交，以便超级管理员可以只把其中一些板块放到 News 上。
+- **P3-US2：** 作为超级管理员，我想同意或退回单个板块，以便未完成的改动留在草稿里，已同意的部分已经能被同学读到。
+- **P3-US3：** 作为超级管理员，我想授予 `editor` 或 `admin`、禁言或删除用户，以便管理谁能写稿、谁能删帖。
 
 ---
 
 ## 3. Key Features（MoSCoW）
 
-Must 服务主故事 P1-US1（Forum 发帖被看见）以及角色、跟帖、校报编辑发帖与精选所必需的部分。
+Must 服务主故事 P1-US1（Forum 发帖被看见）以及角色、跟帖、News 分板块审稿所必需的部分。
 
 ### Must Have
 
 | ID | 能力 | 说明 |
 | --- | --- | --- |
-| M1 | 注册、登录、退出 | 邮箱 + 密码；会话可跨请求识别当前用户。发帖回路离开登录不成立。 |
-| M2 | 鉴权与权限 | 未登录可读已发布内容与 Forum 评论；仅登录用户可发帖 / 跟帖；`student` 不能发校报栏目；用户不能改删帖或评论。 |
-| M3 | 多页面 | 至少：首页、News / Sports 列表、Forum、帖子详情（Forum 含楼中楼）、登录/注册、我的帖子、管理员用户列表。发帖在对应栏目页内，无独立 Submit 页。 |
-| M4 | 发帖 | 标题、正文、栏目必填；发布后状态为 `published`，作者绑定当前用户。`student` 栏目只能是 `forum`。Forum 可在同一次请求附带最多 4 张图。 |
-| M6 | 按栏目阅读 | 栏目页只列出该栏目已发布帖；详情页展示全文、作者展示名、时间、栏目。 |
-| M7 | 首页露出 | 首页能进入各栏目，并展示近期 **News / Sports** 已发布帖，不含未精选的 Forum 帖。 |
+| M1 | 注册、登录、退出 | 仅 `@basischina.com`。注册先发邮箱验证码，码通过后才建账号；登录用邮箱 + 密码。会话可跨请求识别当前用户。发帖回路离开登录不成立。 |
+| M23 | 找回密码 | 登录页可走忘记密码。校内邮箱收验证码后设新密码，再用登录接口进站。非 `@basischina.com` 当场拒绝，不发信。 |
+| M2 | 鉴权与权限 | 未登录可读已发布内容与 Forum 评论；仅登录用户可发帖 / 跟帖；直接发 News 被拒绝；用户不能改删自己的帖或评论。被禁言者仍可登录阅读。 |
+| M3 | 多页面 | 至少：News（`/` 报头版式，不再单列 News 列表页）、Forum、帖子详情（Forum 含楼中楼）、登录/注册/找回密码、我的帖子、News 草稿、System 通知、超级管理员用户列表。Forum 发帖在栏目页内，无独立 Submit 页。 |
+| M4 | 发帖 | Forum：标题、正文必填，发布后 `published`，作者绑定当前用户，可附带最多 4 张图。News 不经此接口公开。 |
+| M6 | 按栏目阅读 | 栏目页只列出该栏目已发布帖。News 详情只展示已同意板块。 |
+| M7 | News 露出 | `/` 的报头版式展示近期已发布 **News**，不含 Forum，不含尚无已同意板块的草稿。导航第一项是 News，没有单独的 News 列表页。 |
 | M8 | 持久化 | 用户（含角色）、会话、帖子、评论、Forum 主帖点赞写入应用存储；重启后仍可登录并读到已发帖、评论与赞数。 |
 | M9 | 关键错误处理 | 密码错误、未登录发帖/跟帖、缺必填、非法栏目、非法配图、无权限、存储失败：均返回明确失败，不创建半截已发布帖或评论。 |
-| M10 | 写操作留痕 | 发帖或精选复制成功时记录 `author_id`、`created_at`；服务端另写一条审计记录（谁、何时、创建了哪篇帖）。 |
-| M11 | Forum | 与 News / Sports 平级的单一讨论区；一个列表，不是用户自建多吧。 |
+| M10 | 写操作留痕 | Forum 发帖或创建 News 草稿成功时记录 `author_id`、`created_at`；服务端另写一条审计记录（谁、何时、创建了哪篇帖）。 |
+| M11 | Forum | 与 News 平级的单一讨论区；一个列表，不是用户自建多吧。 |
 | M12 | 楼层与楼中楼 | 仅 Forum 详情：楼层 + 一层楼中楼。未登录可读；登录可写。校报详情不加评论。 |
-| M13 | 角色 | `student` / `editor` / `admin`。`ADMIN_EMAIL` 在注册或登录时升为 `admin`。 |
-| M14 | 精选复制 | `editor` / `admin` 在 `/paper` 将 Forum 帖复制为 News 或 Sports 新帖，可改标题/正文/栏目；源帖不变。Forum 详情与 `/forum` 列表不放该表单。 |
-| M15 | 管理员用户列表 | `admin` 查看用户并授予或取消 `editor`，并可封禁或解封。不能提拔、改动或封禁 `admin`，也不能封禁自己。 |
+| M13 | 角色 | `student` / `editor` / `admin` / `super_admin`。`ADMIN_EMAIL` 在注册或登录时升为 `super_admin`。 |
+| M14 | News 分板块草稿 | `editor` 与 `super_admin` 在 `/news/drafts` 新建稿并按板块保存、提交。`super_admin` 可同意或退回单个板块。公开 News 只含已同意板块。已上线板块再改，仍须再次同意后才替换线上正文。 |
+| M15 | 超级管理员用户列表 | 仅 `super_admin` 查看用户，并可设为 `student` / `editor` / `admin`、禁言或解除、删除用户。不能改、禁言或删除自己，也不能动另一个 `super_admin`，不能授予 `super_admin`。 |
 | M16 | 头像 | 自带预设（`preset:oak` 等）或上传一张图；出现在顶栏、Forum 帖/楼、栏目内发帖表。校报栏目没有封面图字段。 |
 | M17 | Forum 卡片 | `/forum` 每条为独立模块卡：头像、展示名、时间、标题、`excerpt`、有则 `images[0]`；底栏气泡（`reply_count`，点进详情）与拇指（`like_count`）。列表不展开楼层预览。校报列表仍用原印刷行。 |
-| M18 | Forum 配图 | Forum 主帖作者可在发帖时或之后上传最多 4 张 jpeg/png/webp（每张 ≤2MB），存在 `images[]`。校报帖与精选复制出的新帖 `images` 恒为 `[]`。跟帖不传图。 |
+| M18 | Forum 配图 | Forum 主帖作者可在发帖时或之后上传最多 4 张 jpeg/png/webp（每张 ≤2MB），存在 `images[]`。News 的 `images` 恒为 `[]`。跟帖不传图。 |
 | M19 | Forum 点赞 | 仅 Forum 主帖。登录可赞/取消（同一用户同一帖不加倍）；未登录只读数量，点赞去登录。校报帖不可赞。 |
-| M20 | 停留时看到新帖 | 首页、News / Sports / Forum 打开后重复请求已有公开列表；他人新发的帖进入当前列表，无需整页刷新。Forum 详情同样拉新楼层。后台拉失败不打断当前阅读、不盖错误条。不另开推送通道或新字段。 |
-| M21 | 管理员删帖 | 仅 `admin` 可删除已发布帖。帖、其评论、点赞、配图与该帖审计一并去掉。作者与 `editor` 仍不能改删。 |
-| M22 | 封禁账号 | 仅 `admin` 可封禁或解封。被封禁者不能登录、发帖、跟帖、点赞、改头像或精选；已发帖与评论仍公开。封禁时作废其会话。 |
+| M20 | 停留时看到新帖 | News（`/`）与 Forum 打开后重复请求已有公开列表；他人新发的帖进入当前列表，无需整页刷新。Forum 详情同样拉新楼层。后台拉失败不打断当前阅读、不盖错误条。不另开推送通道或新字段。 |
+| M21 | 删帖与 System 通知 | `admin` 与 `super_admin` 可删除帖子。删之前给作者写一条 System 通知（标题已被移除）。帖、其评论、点赞、配图、板块与该帖审计一并去掉。作者、`editor` 与学生不能删。System 页不可回复。 |
+| M22 | 禁言 | 仅 `super_admin` 可禁言或解除。被禁言者可以登录和阅读，不能发帖、跟帖、点赞、创建或提交草稿。不废除其会话。已发帖仍公开。 |
+| M24 | 删除用户 | 仅 `super_admin` 可删除用户。作废其会话，并删除其帖子、评论、点赞与草稿。不给被删用户发 System 通知。 |
 
 ### Should Have
 
@@ -96,7 +98,6 @@ Must 服务主故事 P1-US1（Forum 发帖被看见）以及角色、跟帖、�
 | --- | --- | --- |
 | S1 | 标题关键词检索 | 提升「被看见」，但主路径用栏目浏览即可走通。 |
 | S2 | 编辑 / 删除自己的帖或评论 | 纠错；删除后详情与列表不再作为已发布出现。 |
-| S4 | 找回密码 | 降低锁死账号概率，不是发帖最小闭环所必需。 |
 | S5 | 审计记录可查询 | 受信任运营者按时间查看发帖审计；无此 UI 时数据仍在 M10。 |
 | S6 | 下架已发布帖 | 处理明显违规；第一版默认发布即公开，下架可稍后由受信任角色执行。 |
 
@@ -107,9 +108,9 @@ Must 服务主故事 P1-US1（Forum 发帖被看见）以及角色、跟帖、�
 | C1 | Featured / 头条精选、Submit 编辑流 | 学生媒体校报形态，不阻塞普通发帖。 |
 | C2 | Opinion、Photo of the Day、Student Art | 页面稿或静态壳，非主故事必需。本版无独立 Photo / Events / Dorm Life 栏目。 |
 | C3 | Track of the Day / Spotify 嵌入 | 第三方点缀；无此主站仍成立。 |
-| C4 | 草稿、关注、推荐信息流 | 社交增强。Forum 主帖点赞已在 M19。 |
+| C4 | 关注、推荐信息流 | 社交增强。News 分板块草稿已在 M14。Forum 主帖点赞已在 M19。 |
 | C5 | 校园 SSO / 学号目录同步 | 开放问题，第一版不阻塞自建账号。 |
-| C6 | 先审后发工作流 | 与「学生有权限自己发帖」的默认冲突，留待政策确定。 |
+| C6 | Forum 先审后发 | 学生在 Forum 仍发布即公开。News 审稿已在 M14。 |
 
 ### Won't Have（本版本）
 
@@ -121,8 +122,8 @@ Must 服务主故事 P1-US1（Forum 发帖被看见）以及角色、跟帖、�
 | W4 | 未评估的 AI 写作或审核模型 | README 明确不默认上线。 |
 | W5 | 向量库、微服务拆分、指定云厂商 | 未评估，不写入本版承诺。 |
 | W6 | 用户自建吧、校报帖下评论、三层以上嵌套 | Forum 只有一个吧；楼中楼两层。 |
-| W7 | 单条删评、下架状态、完整审核后台 | 管理员可删整帖（M21）与封禁账号（M22）。不能只删一楼，没有 `hidden` 状态。 |
-| W8 | 活动时间地点、Dorm Life / Events / Photo 栏目 | 本版只保留 News、Sports、Forum；Opinion 为静态空栏。 |
+| W7 | 单条删评、下架状态、完整审核后台 | 管理员可删整帖（M21）。不能只删一楼，没有 `hidden` 状态。News 审稿只按板块同意或退回。 |
+| W8 | 活动时间地点、Sports、Dorm Life / Events / Photo 栏目 | 本版只保留 News 与 Forum；Opinion 为静态空栏。`/sports` 回到首页。 |
 
 登录、数据库、多页面路由、测试均不在 Won't 中。它们按主故事需要出现在 Must 或工程实践中。
 
@@ -134,11 +135,11 @@ Must 服务主故事 P1-US1（Forum 发帖被看见）以及角色、跟帖、�
 
 ### 4.1 主路径成功（P1-US1 + P2 看见 + P3 发稿）
 
-1. 给定未注册访客在注册页，当填写未被占用的邮箱与符合规则的密码并提交，则创建用户且可立即用该邮箱密码登录。
-2. 给定已注册用户在登录页，当提交正确邮箱与密码，则进入已登录态，并可以在 Forum 直接写帖发布。
+1. 给定未注册访客在注册页，当填写未被占用的 `@basischina.com` 邮箱、收到验证码并与符合规则的密码一并提交，则创建用户且可立即用该邮箱密码登录。非该后缀则拒绝且不发信。
+2. 给定已注册用户在登录页，当提交正确校内邮箱与密码，则进入已登录态，并可以在 Forum 直接写帖发布。非 `@basischina.com` 登录失败（字段错误，不建立会话）。
 3. 给定已登录学生在 Forum，当填写标题、正文并发布，则该帖 `published`，`category=forum`，作者为当前用户，并进入该帖详情。
 4. 给定 3 中刚发布的帖，当另一未登录会话打开 Forum，则列表中出现该标题；打开详情则正文一致；首页无 `category` 的列表**不**出现该 Forum 帖。
-5. 给定编辑或管理员，当向 News 或 Sports 填写标题与正文并发布，则该栏目列表与详情展示该稿。
+5. 给定编辑或超级管理员创建一篇 News 草稿并提交两个板块，当超级管理员只同意其中一块，则 News 列表与详情只出现已同意的那一块。
 6. 给定已发布帖已写入存储，当重启应用进程后再次打开详情 URL 并用原账号登录，则帖仍在且原账号仍能登录。
 7. 给定已登录用户，当打开「我的帖子」，则能看到自己已发布的标题并进入详情。
 
@@ -147,19 +148,22 @@ Must 服务主故事 P1-US1（Forum 发帖被看见）以及角色、跟帖、�
 8. 给定登录页，当邮箱不存在或密码错误，则登录失败、不建立已登录会话，并提示凭据无效（不提示「仅密码错误」与「仅用户不存在」的区别亦可，但不得登录成功）。
 9. 给定未登录访客，当直接请求发帖或提交发帖接口，则拒绝创建帖子，并要求登录（跳转登录或等价错误）。
 10. 给定已登录用户，当标题为空、正文为空、未选栏目、或栏目不在允许集合内，则拒绝发布，停留在可编辑状态，已有输入不丢（刷新导致丢失除外），存储中不出现该条 `published` 帖。
-12. 给定用户 A 的已发布帖，当另一名非 `admin` 用户尝试修改或删除该帖，则失败且帖内容不变。`admin` 删除见第 27 条。
+12. 给定用户 A 的已发布帖，当另一名既不是 `admin` 也不是 `super_admin` 的用户尝试修改或删除该帖，则失败且帖内容不变。删除见第 27 条。
 13. 给定发帖请求已通过校验，当存储写入失败，则向用户返回失败、不展示「发布成功」，且列表中不出现该帖。
-18. 给定已登录学生，当向 `news` / `sports` 发帖，则 `403 forbidden`，存储中不出现该帖。
+18. 给定已登录用户，当用发帖接口提交 `category=news`，则 `403 forbidden`，公开列表不出现该稿。`category` 不在 `news` / `forum` 内则 `422`。
 19. 给定 Forum 帖，当未登录读取评论则成功；当未登录跟帖则 `401`，不落评论。
 20. 给定已登录用户在 Forum 详情，当发表楼层或回复某一楼，则该帖下可见；回复不能再套一层。
-21. 给定编辑或管理员在 `/paper` 选中一条 Forum 帖，当精选到 News 或 Sports，则可改标题/正文/栏目并得到新帖 URL；源帖仍在 Forum。Forum 详情不展示该表单。
-22. 给定管理员打开用户列表，当把一名学生设为编辑或取消编辑，则对方角色更新；学生调用管理员接口则 `403`。
+21. 给定编辑提交一个 News 板块，当超级管理员退回，则公开详情不出现该板块的新正文；编辑仍可修改并再次提交。
+22. 给定超级管理员打开用户列表，当把一名学生设为 `editor` 或 `admin`，则对方角色更新。`admin`、`editor` 或学生调用该接口则 `403`。不能把人写成 `super_admin`。
 23. 给定校报详情页，当请求该帖的评论接口，则 `422`，页面不展示楼中楼。
 24. 给定已登录学生在 Forum 发帖并附上合法图片，当发布成功，则详情与 Forum 卡片能读到同一组 `images`；非法图片或向校报帖配图则失败且不落半截帖，校报 `images` 仍为 `[]`。
 25. 给定已登录用户在 Forum 列表，当点赞一帖再取消，则 `like_count` 与 `liked` 随之变化且刷新后仍对；再点一次已赞不加倍。未登录点赞不写入，去登录。校报帖点赞失败。
-26. 给定会话 A 停在 Forum 列表（不整页刷新），当会话 B 发布一条 Forum 帖，则数秒内 A 的列表顶部出现该标题。首页与 News / Sports 对校报新稿同样成立。Forum 详情对他人新楼层同样成立。拉新失败时 A 仍看得到已有内容。
-27. 给定管理员，当删除一条已发布帖，则该帖详情为 `404`，列表中不再出现，其评论与配图一并消失。学生或编辑调用删除则 `403`，帖仍在。
-28. 给定管理员封禁一名学生，当该学生再登录或发帖，则拒绝且不建立可用会话；其已发帖仍可被他人读到。解封后可用原密码登录。学生不能封禁他人；不能封禁 `admin` 或自己。
+26. 给定会话 A 停在 Forum 列表（不整页刷新），当会话 B 发布一条 Forum 帖，则数秒内 A 的列表顶部出现该标题。停在 `/` 时，对新公开的 News 稿同样成立。Forum 详情对他人新楼层同样成立。拉新失败时 A 仍看得到已有内容。
+27. 给定 `admin` 或 `super_admin`，当删除一条已发布帖，则该帖详情为 `404`，列表中不再出现，其评论与配图一并消失，作者的 System 列表出现一条含该标题的通知。学生或编辑调用删除则 `403`，帖仍在。System 页没有回复框。
+28. 给定超级管理员禁言一名学生，当该学生再登录则成功；当发帖、跟帖或点赞则 `403`，且不写入。解除后可用原账号发帖。不能禁言自己或 `super_admin`。`admin` 不能禁言他人。
+30. 给定超级管理员删除一名学生，则该用户不能再登录，其已发帖从公开列表消失。不能删除自己或 `super_admin`。
+31. 给定一篇已有一块已同意内容的 News，当编辑修改该块并提交、超级管理员尚未同意，则公开详情仍是同意前的正文；同意后才换成新正文。
+29. 给定已注册校内邮箱用户在找回密码页，当用该邮箱收到验证码并提交新密码，则旧密码不能再登录、新密码可以。非 `@basischina.com` 或不存在的账号：前者当场拒绝不发信；后者发码接口仍回成功、重置失败不泄露该邮箱是否已注册。
 
 ### 4.3 关键非功能（可测、且为本产品需要）
 
@@ -186,22 +190,25 @@ Elegram 应用（Web 页面 + 服务端）
 应用存储（用户、会话或等价凭证、帖子、评论、审计记录）
 ```
 
-第一版 **无必须第三方**。Spotify 等不在边界内。学校 SSO / 邮箱网关未对接。
+第一版 **无必须第三方产品 API**。发验证码走通用 SMTP（环境变量），不绑定某一云厂商。学校 SSO 未对接。
 
 ### 5.2 核心实体
 
 | 实体 | 关键字段 | 生命周期 |
 | --- | --- | --- |
-| User | id, email, password_hash, display_name, role, avatar, banned, created_at | 注册为 `student`，`banned` 默认 false；封禁后不能登录写操作，帖仍在 |
-| Session | 可校验的登录凭证，绑定 user_id，可失效 | 登录创建 → 退出或过期销毁 |
-| Post | id, author_id, title, body, category, status, images, created_at, updated_at | 校验通过后直接 `published`；Forum 可有 `images`。`admin` 可整帖删除。作者自删与 `hidden` 仍属 Should |
+| User | id, email, password_hash, display_name, role, avatar, muted, created_at | 邮箱须 `@basischina.com`；验证码通过后注册为 `student`，`muted` 默认 false；禁言后仍可登录，不能写帖 |
+| EmailCode | email, purpose, code_hash, expires_at, attempt_count | 注册或找回密码发码；明文不入库；过期或用过后失效 |
+| Session | 可校验的登录凭证，绑定 user_id，可失效 | 登录创建 → 退出、删除用户或过期销毁。禁言不废除会话 |
+| Post | id, author_id, title, body, category, status, images, created_at, updated_at | Forum 校验通过后 `published`。News 在至少一块被同意前为 `draft`，公开接口不返回。`admin` / `super_admin` 可整帖删除 |
+| NewsBlock | id, post_id, position, heading, published_heading, draft_body, published_body, review_status | `editing` / `pending` / `published`。同意把草稿写入已发布字段。公开详情只用已发布字段 |
+| SystemNotice | id, user_id, body, created_at | 删帖时写给作者；只读，无回复 |
 | PostLike | user_id, post_id, created_at | 仅 Forum 主帖；同一用户同一帖唯一；取消则删行 |
 | Comment | id, post_id, author_id, parent_id, body, created_at | 仅 Forum；`parent_id` 空为楼层，非空为该楼的楼中楼 |
-| AuditEvent | id, actor_id, action, post_id, at | 发帖或精选复制成功时追加；只增不改 |
+| AuditEvent | id, actor_id, action, post_id, at | Forum 发帖或创建 News 草稿成功时追加；只增不改 |
 
-`category` 枚举：`news`、`sports`、`forum`。无 `category` 的列表只含前两栏。
+`category` 枚举：`news`、`forum`。无 `category` 的列表只含 `news`。
 
-`status` 第一版：`published`。Should 增加 `hidden`。
+`status`：`published` 或 News 草稿的 `draft`。Should 增加 `hidden`。
 
 ### 5.3 读写关系
 
@@ -210,7 +217,9 @@ User 1 ─── * Post
 User 1 ─── * Session
 User 1 ─── * Comment
 User 1 ─── * PostLike
+User 1 ─── * SystemNotice
 User 1 ─── * AuditEvent（作为 actor）
+Post 1 ─── * NewsBlock
 Post 1 ─── * Comment
 Post 1 ─── * PostLike
 Post 1 ─── * AuditEvent
@@ -220,19 +229,23 @@ Comment 1 ─── * Comment（楼中楼，parent 必须是楼层）
 | 动作 | 读 | 写 |
 | --- | --- | --- |
 | 注册 | User（查邮箱唯一） | User |
-| 登录 | User | Session（匹配 `ADMIN_EMAIL` 时升 `admin`） |
+| 登录 | User | Session（匹配 `ADMIN_EMAIL` 时升 `super_admin`）。禁言不拒绝登录 |
 | 退出 | Session | 删除或作废 Session |
-| 浏览首页 / 校报 / Forum / 详情 | Post（`published`）；Forum 详情另读 Comment；Forum 列表读点赞计数 | 无 |
-| 点赞 / 取消赞 | User、Post（须 Forum） | PostLike |
-| 学生发帖 | User（当前会话） | Post（仅 `forum`）、AuditEvent |
-| 编辑发校报 / 精选 | User | Post、AuditEvent |
-| 跟帖 | User、Post（须 Forum） | Comment |
-| 我的帖子 | Post where author = 当前用户 | 无 |
-| 管理员改角色 / 封禁 | User 列表 | User.role（`student` / `editor`）或 `banned`；封禁时作废该用户 Session |
-| 管理员删帖 | Post | 删除 Post 及其 Comment、PostLike、配图与该帖 AuditEvent |
+| 浏览首页 / News / Forum / 详情 | Post（`published`）；News 详情另读已同意 NewsBlock；Forum 详情另读 Comment | 无 |
+| 点赞 / 取消赞 | User、Post（须 Forum，且未禁言） | PostLike |
+| 学生发帖 | User（当前会话，未禁言） | Post（仅 `forum`）、AuditEvent |
+| 写 News 草稿 | User（`editor` 或 `super_admin`，未禁言） | Post（`draft` 直至有已同意板块）、NewsBlock、AuditEvent |
+| 同意 / 退回板块 | User（须 `super_admin`） | NewsBlock 的已发布字段与 `review_status`；有已同意板块则 Post 为 `published` |
+| 跟帖 | User、Post（须 Forum，且未禁言） | Comment |
+| 我的帖子 | Post where author = 当前用户且 `published` | 无 |
+| System | SystemNotice where user = 当前用户 | 无（删帖时由服务端写入） |
+| 超级管理员改角色 / 禁言 | User 列表 | User.role（`student` / `editor` / `admin`）或 `muted`。禁言不废除会话 |
+| 超级管理员删用户 | User | 删除 User、Session、其 Post、Comment、PostLike、NewsBlock |
+| 删帖 | Post | 先写 SystemNotice 给作者，再删除 Post 及其 Comment、NewsBlock、PostLike、配图与该帖 AuditEvent |
 
 未登录：只读 `published` Post 与 Forum 评论与赞数。  
 `student`：写 Forum 帖、评论与主帖点赞。  
-`editor` / `admin`：另写校报帖与精选复制。  
-`admin`：另改他人 `editor` 身份、封禁或解封、删除已发布帖。  
+`editor`：另写 News 草稿并提交板块。  
+`admin`：删除帖子。  
+`super_admin`：另改角色、禁言、删除用户、写草稿、同意或退回板块、删除帖子。  
 存储失败时：上述写动作整笔失败，不出现「有详情 URL 但库中无行」或「有行无审计」的半成功（审计与帖子同一事务，或等价回滚）。

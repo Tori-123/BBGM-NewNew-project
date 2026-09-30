@@ -1,6 +1,6 @@
 import { Link } from "react-router-dom";
 import { useAuth } from "../auth";
-import { canEditPaper } from "../format";
+import { canEditNews } from "../format";
 import { Dek, Headline, ImageWell, Kicker, SectionRule, StoryTile, TitleLine } from "./ui";
 
 const PLACEHOLDER = {
@@ -17,8 +17,8 @@ const PLACEHOLDER = {
     title: "A smaller story with a different rhythm",
   },
   sports: {
-    kicker: "SPORTS",
-    title: "Sports headline with a wider text treatment",
+    kicker: "NEWS",
+    title: "Another campus story with a wider text treatment",
     dek: "A short summary can appear here when the story needs more context.",
   },
 };
@@ -116,8 +116,12 @@ function EmptyFeatured({ user }) {
   if (!user) return null;
   return (
     <div className="mt-6">
-      {canEditPaper(user) ? (
-        <p className="font-sans text-sm text-neutral-500">Publish from the section you want to update.</p>
+      {canEditNews(user) ? (
+        <p className="font-sans text-sm">
+          <Link to="/news/drafts" className="text-[#1A4FBF]">
+            Edit News drafts
+          </Link>
+        </p>
       ) : (
         <p className="font-sans text-sm">
           <Link to="/forum" className="text-[#1A4FBF]">

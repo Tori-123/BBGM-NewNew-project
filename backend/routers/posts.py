@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session, joinedload
 from starlette.datastructures import UploadFile as StarletteUploadFile
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
-from deps import get_admin_user, get_current_user, get_db, get_optional_user
+from deps import get_current_user, get_db, get_moderator, get_optional_user, require_not_muted
 from errors import ApiError, StorageError, forbidden, validation_error
 from avatars import (
     ALLOWED_TYPES,
@@ -18,12 +18,11 @@ from avatars import (
     parse_images,
     save_post_image,
 )
-from models import Comment, Post, User, to_iso
+from models import Comment, NewsBlock, Post, User, to_iso
 from schemas import (
     CATEGORIES,
     CATEGORY_MESSAGE,
     NEWSPAPER_CATEGORIES,
-    STAFF_ROLES,
     AuthorPublic,
     CommentFloor,
     CommentList,
@@ -34,11 +33,12 @@ from schemas import (
     PostDetail,
     PostList,
     PostSummary,
-    PromoteBody,
+    PublishedBlock,
     ReplyPreview,
 )
 from store import (
     add_like,
+    add_system_notice,
     count_likes,
     create_comment,
     create_post_with_audit,
@@ -88,7 +88,33 @@ def _summary(
     )
 
 
-def _detail(post: Post, *, like_count: int = 0, liked: bool = False) -> dict:
+def _published_blocks(db: Session, post: Post) -> list[PublishedBlock]:
+    if post.category != "news":
+        return []
+    rows = db.scalars(
+        select(NewsBlock)
+        .where(NewsBlock.post_id == post.id, NewsBlock.published_body.is_not(None))
+        .order_by(NewsBlock.position.asc())
+    ).all()
+    return [
+        PublishedBlock(
+            id=row.id,
+            heading=row.published_heading or row.heading,
+            body=row.published_body or "",
+            position=row.position,
+        )
+        for row in rows
+        if row.published_heading
+    ]
+
+
+def _detail(
+    post: Post,
+    *,
+    blocks: list[PublishedBlock] | None = None,
+    like_count: int = 0,
+    liked: bool = False,
+) -> dict:
     return PostDetail(
         **_summary(
             post,
@@ -97,7 +123,18 @@ def _detail(post: Post, *, like_count: int = 0, liked: bool = False) -> dict:
             liked=liked,
         ).model_dump(),
         body=post.body,
+        blocks=blocks or [],
     ).model_dump()
+
+
+def _any_post(db: Session, post_id: str) -> Post:
+    try:
+        post = db.scalar(select(Post).options(joinedload(Post.author)).where(Post.id == post_id))
+    except SQLAlchemyError as exc:
+        raise StorageError() from exc
+    if post is None:
+        raise ApiError(404, "not_found", "Post not found.")
+    return post
 
 
 def _published_post(db: Session, post_id: str) -> Post:
@@ -323,6 +360,7 @@ def create_post_comment(
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+    require_not_muted(user)
     post_id = parse_uuid(post_id)
     post = _published_post(db, post_id)
     _require_forum(post)
@@ -374,63 +412,13 @@ def create_post_comment(
     return JSONResponse(status_code=201, content=_floor_payload(comment, floor_total, []))
 
 
-@router.post("/posts/{post_id}/promote", status_code=201)
-def promote_post(
-    post_id: str,
-    body: PromoteBody,
-    user: User = Depends(get_current_user),
-    db: Session = Depends(get_db),
-):
-    if user.role not in STAFF_ROLES:
-        raise forbidden()
-
-    post_id = parse_uuid(post_id)
-    source = _published_post(db, post_id)
-    if source.category != "forum":
-        raise validation_error(
-            [{"field": "category", "message": "Only forum posts can be promoted."}]
-        )
-
-    title = (body.title if body.title is not None else source.title).strip()
-    text = (body.body if body.body is not None else source.body).strip()
-    fields: list[dict[str, str]] = []
-    if not title or len(title) > 120:
-        fields.append({"field": "title", "message": "Title must be 1–120 characters."})
-    if not text or len(text) > 20000:
-        fields.append({"field": "body", "message": "Body must be 1–20000 characters."})
-    if body.category not in NEWSPAPER_CATEGORIES:
-        fields.append(
-            {
-                "field": "category",
-                "message": "Must be one of: news, sports.",
-            }
-        )
-    if fields:
-        raise validation_error(fields)
-
-    try:
-        post = create_post_with_audit(
-            db,
-            author=user,
-            title=title,
-            body=text,
-            category=body.category,
-        )
-    except StorageError:
-        raise ApiError(
-            503,
-            "storage_unavailable",
-            "Could not save the post. Try again in a moment.",
-        ) from None
-    return JSONResponse(status_code=201, content=_detail(post))
-
-
 @router.post("/posts/{post_id}/likes")
 def like_post(
     post_id: str,
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+    require_not_muted(user)
     post = _published_post(db, parse_uuid(post_id))
     if post.category != "forum":
         raise validation_error(
@@ -453,6 +441,7 @@ def unlike_post(
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+    require_not_muted(user)
     post = _published_post(db, parse_uuid(post_id))
     if post.category != "forum":
         raise validation_error(
@@ -473,6 +462,7 @@ async def upload_post_image(
     db: Session = Depends(get_db),
     file: UploadFile = File(...),
 ):
+    require_not_muted(user)
     post = _published_post(db, parse_uuid(post_id))
     if post.author_id != user.id:
         raise forbidden()
@@ -512,13 +502,14 @@ def get_post(
     viewer: User | None = Depends(get_optional_user),
 ):
     post = _published_post(db, parse_uuid(post_id))
+    blocks = _published_blocks(db, post)
     like_count = count_likes(db, post.id) if post.category == "forum" else 0
     liked = (
         user_liked(db, user_id=viewer.id, post_id=post.id)
         if viewer and post.category == "forum"
         else False
     )
-    return _detail(post, like_count=like_count, liked=liked)
+    return _detail(post, blocks=blocks, like_count=like_count, liked=liked)
 
 
 def _image_field_errors(category: str, uploads: list[tuple[str, bytes]]) -> list[dict[str, str]]:
@@ -576,12 +567,13 @@ async def create_post(
     else:
         raise validation_error([{"field": "title", "message": "Title must be 1–120 characters."}])
 
+    require_not_muted(user)
     fields = _post_field_errors(body)
     fields.extend(_image_field_errors(body.category, uploads))
     if fields:
         raise validation_error(fields)
-    if user.role not in STAFF_ROLES and body.category != "forum":
-        raise forbidden("Students can only publish in forum.")
+    if body.category != "forum":
+        raise forbidden("News is published from approved drafts.")
 
     try:
         post = create_post_with_audit(
@@ -636,13 +628,19 @@ def my_posts(
 @router.delete("/posts/{post_id}", status_code=204)
 def delete_post(
     post_id: str,
-    _: User = Depends(get_admin_user),
+    _: User = Depends(get_moderator),
     db: Session = Depends(get_db),
 ):
     post_id = parse_uuid(post_id)
-    post = _published_post(db, post_id)
+    post = _any_post(db, post_id)
+    add_system_notice(db, user_id=post.author_id, body=f'Your post "{post.title}" was removed.')
     delete_post_graph(db, post)
     delete_post_images(post_id)
+
+
+@router.api_route("/posts/{post_id}/promote", methods=["POST"])
+def promote_removed(post_id: str):
+    raise StarletteHTTPException(status_code=405)
 
 
 @router.api_route("/posts/{post_id}", methods=["PATCH"])

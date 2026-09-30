@@ -1,12 +1,14 @@
 from pydantic import BaseModel, ConfigDict
 
 
-NEWSPAPER_CATEGORIES = ("news", "sports")
+NEWSPAPER_CATEGORIES = ("news",)
 CATEGORIES = (*NEWSPAPER_CATEGORIES, "forum")
-CATEGORY_MESSAGE = "Must be one of: news, sports, forum."
-ROLES = ("student", "editor", "admin")
-STAFF_ROLES = ("editor", "admin")
-ASSIGNABLE_ROLES = ("student", "editor")
+CATEGORY_MESSAGE = "Must be one of: news, forum."
+ROLES = ("student", "editor", "admin", "super_admin")
+NEWSROOM_ROLES = ("editor", "super_admin")
+MODERATOR_ROLES = ("admin", "super_admin")
+ASSIGNABLE_ROLES = ("student", "editor", "admin")
+REVIEW_STATUSES = ("editing", "pending", "published")
 AVATAR_PRESETS = ("oak", "gym", "book", "dorm", "bus", "night")
 DEFAULT_AVATAR = "preset:oak"
 
@@ -15,10 +17,22 @@ class RegisterBody(BaseModel):
     email: str
     password: str
     display_name: str
+    code: str
 
 
 class LoginBody(BaseModel):
     email: str
+    password: str
+
+
+class EmailCodeBody(BaseModel):
+    email: str
+    purpose: str
+
+
+class PasswordResetBody(BaseModel):
+    email: str
+    code: str
     password: str
 
 
@@ -48,7 +62,7 @@ class UserPrivate(BaseModel):
     display_name: str
     role: str
     avatar: str
-    banned: bool
+    muted: bool
     created_at: str
 
 
@@ -66,19 +80,32 @@ class CreateCommentBody(BaseModel):
     parent_id: str | None = None
 
 
-class PromoteBody(BaseModel):
-    model_config = ConfigDict(extra="ignore")
-
-    category: str
-    title: str | None = None
-    body: str | None = None
-
-
 class PatchUserRoleBody(BaseModel):
     model_config = ConfigDict(extra="ignore")
 
     role: str | None = None
-    banned: bool | None = None
+    muted: bool | None = None
+
+
+class CreateDraftBody(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    title: str
+
+
+class CreateBlockBody(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    heading: str
+    body: str
+    position: int | None = None
+
+
+class PatchBlockBody(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    heading: str | None = None
+    body: str | None = None
 
 
 class CommentReply(BaseModel):
@@ -129,8 +156,56 @@ class PostSummary(BaseModel):
     liked: bool
 
 
+class PublishedBlock(BaseModel):
+    id: str
+    heading: str
+    body: str
+    position: int
+
+
 class PostDetail(PostSummary):
     body: str
+    blocks: list[PublishedBlock] = []
+
+
+class Notice(BaseModel):
+    id: str
+    body: str
+    created_at: str
+
+
+class NoticeList(BaseModel):
+    items: list[Notice]
+
+
+class NewsBlockStaff(BaseModel):
+    id: str
+    position: int
+    heading: str
+    draft_body: str
+    published_heading: str | None
+    published_body: str | None
+    review_status: str
+
+
+class NewsDraftSummary(BaseModel):
+    id: str
+    title: str
+    status: str
+    created_at: str
+    updated_at: str
+    author: AuthorPublic
+
+
+class NewsDraftDetail(NewsDraftSummary):
+    blocks: list[NewsBlockStaff]
+
+
+class NewsDraftList(BaseModel):
+    items: list[NewsDraftSummary]
+    page: int
+    page_size: int
+    total: int
 
 
 class LikeState(BaseModel):

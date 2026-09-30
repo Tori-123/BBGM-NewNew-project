@@ -1,6 +1,7 @@
 from datetime import datetime, timezone
+from uuid import uuid4
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, String, Text, UniqueConstraint, create_engine
+from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, Text, UniqueConstraint, create_engine
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship, sessionmaker
 
 
@@ -27,7 +28,7 @@ class User(Base):
     display_name: Mapped[str] = mapped_column(String(40), nullable=False)
     role: Mapped[str] = mapped_column(String(16), nullable=False, default="student")
     avatar: Mapped[str] = mapped_column(String(160), nullable=False, default="preset:oak")
-    banned: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    muted: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
 
     posts: Mapped[list["Post"]] = relationship(back_populates="author")
@@ -68,6 +69,33 @@ class Post(Base):
     author: Mapped[User] = relationship(back_populates="posts")
     comments: Mapped[list["Comment"]] = relationship(back_populates="post")
     likes: Mapped[list["PostLike"]] = relationship(back_populates="post")
+    blocks: Mapped[list["NewsBlock"]] = relationship(back_populates="post")
+
+
+class NewsBlock(Base):
+    __tablename__ = "news_blocks"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    post_id: Mapped[str] = mapped_column(ForeignKey("posts.id"), nullable=False)
+    position: Mapped[int] = mapped_column(Integer, nullable=False)
+    heading: Mapped[str] = mapped_column(String(120), nullable=False)
+    published_heading: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    draft_body: Mapped[str] = mapped_column(Text, nullable=False)
+    published_body: Mapped[str | None] = mapped_column(Text, nullable=True)
+    review_status: Mapped[str] = mapped_column(String(16), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+    post: Mapped[Post] = relationship(back_populates="blocks")
+
+
+class SystemNotice(Base):
+    __tablename__ = "system_notices"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id"), nullable=False)
+    body: Mapped[str] = mapped_column(Text, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
 
 
 class Comment(Base):
@@ -107,6 +135,18 @@ class AuditEvent(Base):
     at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
 
 
+class EmailCode(Base):
+    __tablename__ = "email_codes"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    email: Mapped[str] = mapped_column(String(320), nullable=False)
+    purpose: Mapped[str] = mapped_column(String(16), nullable=False)
+    code_hash: Mapped[str] = mapped_column(Text, nullable=False)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    attempt_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+
 def make_engine(database_url: str):
     connect_args = {}
     if database_url.startswith("sqlite"):
@@ -116,6 +156,42 @@ def make_engine(database_url: str):
 
 def make_session_factory(engine):
     return sessionmaker(bind=engine, expire_on_commit=False)
+
+
+def _drop_sports_and_backfill_blocks(conn) -> None:
+    sports_ids = [
+        row[0] for row in conn.exec_driver_sql("SELECT id FROM posts WHERE category='sports'").fetchall()
+    ]
+    if sports_ids:
+        marks = ",".join("?" for _ in sports_ids)
+        for sql in (
+            f"DELETE FROM comments WHERE post_id IN ({marks})",
+            f"DELETE FROM post_likes WHERE post_id IN ({marks})",
+            f"DELETE FROM audit_events WHERE post_id IN ({marks})",
+            f"DELETE FROM news_blocks WHERE post_id IN ({marks})",
+            f"DELETE FROM posts WHERE id IN ({marks})",
+        ):
+            conn.exec_driver_sql(sql, sports_ids)
+    rows = conn.exec_driver_sql(
+        """
+        SELECT p.id, p.title, p.body, p.created_at
+        FROM posts p
+        WHERE p.category = 'news'
+          AND NOT EXISTS (SELECT 1 FROM news_blocks b WHERE b.post_id = p.id)
+        """
+    ).fetchall()
+    for post_id, title, body, created_at in rows:
+        heading = ((title or "Story").strip() or "Story")[:120]
+        text = body or ""
+        conn.exec_driver_sql(
+            """
+            INSERT INTO news_blocks (
+                id, post_id, position, heading, published_heading,
+                draft_body, published_body, review_status, created_at, updated_at
+            ) VALUES (?, ?, 1, ?, ?, ?, ?, 'published', ?, ?)
+            """,
+            (str(uuid4()), post_id, heading, heading, text, text, created_at, created_at),
+        )
 
 
 def migrate_schema(engine) -> None:
@@ -134,6 +210,12 @@ def migrate_schema(engine) -> None:
                 conn.exec_driver_sql(
                     "ALTER TABLE users ADD COLUMN banned INTEGER NOT NULL DEFAULT 0"
                 )
+            if cols and "muted" not in cols:
+                conn.exec_driver_sql(
+                    "ALTER TABLE users ADD COLUMN muted INTEGER NOT NULL DEFAULT 0"
+                )
+                if "banned" in cols:
+                    conn.exec_driver_sql("UPDATE users SET muted = banned")
             post_cols = {row[1] for row in conn.exec_driver_sql("PRAGMA table_info(posts)").fetchall()}
             if post_cols and "images" not in post_cols:
                 conn.exec_driver_sql(
@@ -151,11 +233,12 @@ def migrate_schema(engine) -> None:
             if "posts" in tables:
                 conn.exec_driver_sql("UPDATE posts SET category='forum' WHERE category='community'")
                 conn.exec_driver_sql("UPDATE posts SET category='news' WHERE category='dorm_life'")
-                conn.exec_driver_sql("UPDATE posts SET category='sports' WHERE category='events'")
+                conn.exec_driver_sql("UPDATE posts SET category='news' WHERE category='events'")
                 conn.exec_driver_sql(
                     "UPDATE posts SET is_activity=0, starts_at=NULL, location=NULL "
                     "WHERE is_activity != 0 OR starts_at IS NOT NULL OR location IS NOT NULL"
                 )
+                _drop_sports_and_backfill_blocks(conn)
 
 
 def init_db(engine) -> None:

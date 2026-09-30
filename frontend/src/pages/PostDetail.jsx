@@ -5,7 +5,7 @@ import { useAuth } from "../auth";
 import { uploadSrc } from "../avatar";
 import { Avatar } from "../components/Avatar";
 import { ErrorBanner, FieldError, FrontPageLink, Headline, ImageWell, Kicker, TitleLine } from "../components/ui";
-import { formatDateline } from "../format";
+import { canDeletePosts, formatDateline } from "../format";
 import { mergeLiveFloors, useLiveRefresh } from "../live";
 
 export default function PostDetail() {
@@ -99,7 +99,7 @@ export default function PostDetail() {
     setError(null);
     try {
       await api.deletePost(postId);
-      const back = post.category === "news" || post.category === "sports" ? `/${post.category}` : "/forum";
+      const back = post.category === "news" ? "/" : "/forum";
       navigate(back);
     } catch (err) {
       if (err instanceof ApiError && err.status === 401) {
@@ -194,11 +194,24 @@ export default function PostDetail() {
           ) : (
             <ImageWell className="mt-6 h-64" />
           )}
-          <div className="mt-8 whitespace-pre-wrap font-sans text-[16px] leading-7 text-neutral-900">
-            {post.body}
-          </div>
+          {post.category === "news" && post.blocks?.length ? (
+            <div className="mt-8 space-y-8">
+              {post.blocks.map((block) => (
+                <section key={block.id}>
+                  <h2 className="font-serif text-2xl">{block.heading}</h2>
+                  <div className="mt-3 whitespace-pre-wrap font-sans text-[16px] leading-7 text-neutral-900">
+                    {block.body}
+                  </div>
+                </section>
+              ))}
+            </div>
+          ) : (
+            <div className="mt-8 whitespace-pre-wrap font-sans text-[16px] leading-7 text-neutral-900">
+              {post.body}
+            </div>
+          )}
 
-          {user?.role === "admin" ? (
+          {canDeletePosts(user) ? (
             <button
               type="button"
               onClick={onDelete}

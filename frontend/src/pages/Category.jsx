@@ -6,7 +6,6 @@ import { CommunityCard, CommunityCardSkeleton } from "../components/CommunityCar
 import ComposeForm from "../components/ComposeForm";
 import { EmptyCategory, StoryRow, StoryRowSkeleton } from "../components/StoryRow";
 import { ErrorBanner, FrontPageLink, SectionRule } from "../components/ui";
-import { canEditPaper } from "../format";
 import { mergeLivePosts, useLiveRefresh } from "../live";
 
 function ComposeFab({ to, onClick }) {
@@ -39,7 +38,7 @@ export default function Category({ category, title }) {
   const [ready, setReady] = useState(false);
 
   const isForum = category === "forum";
-  const canWrite = isForum ? Boolean(user) : canEditPaper(user);
+  const canWrite = isForum && Boolean(user);
 
   useEffect(() => {
     let cancelled = false;
@@ -123,19 +122,6 @@ export default function Category({ category, title }) {
     <div className="mt-8">
       <FrontPageLink />
       <SectionRule>{title}</SectionRule>
-      {canWrite && !isForum ? (
-        writing ? (
-          <ComposeForm category={category} onPublished={onPublished} />
-        ) : (
-          <button
-            type="button"
-            onClick={() => setWriting(true)}
-            className="mb-6 font-sans text-[11px] uppercase tracking-[0.18em] text-[#1A4FBF]"
-          >
-            Write
-          </button>
-        )
-      ) : null}
       <ErrorBanner error={error} />
       {loading ? (
         isForum ? (

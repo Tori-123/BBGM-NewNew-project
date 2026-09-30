@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Link, NavLink, Outlet } from "react-router-dom";
 import { useAuth } from "../auth";
 import { Avatar } from "./Avatar";
-import { CATEGORY_ROUTES, formatToday } from "../format";
+import { canEditNews, CATEGORY_ROUTES, formatToday } from "../format";
 
 function navClass({ isActive }) {
   return `font-sans text-[12px] font-medium uppercase tracking-[0.18em] ${
@@ -54,6 +54,7 @@ export default function PaperShell() {
           <nav className="flex items-center gap-7 uppercase">
             <Link to="/about">About</Link>
             <Link to="/contact">Contact</Link>
+            <Link to="/system">System</Link>
             {user ? (
               <>
                 <Link to="/me/avatar" className="flex items-center gap-2.5 normal-case tracking-normal text-[#111111]">
@@ -62,8 +63,7 @@ export default function PaperShell() {
                 </Link>
                 <Link to="/me/avatar">Avatar</Link>
                 <Link to="/me/posts">My Posts</Link>
-                {user.role === "editor" || user.role === "admin" ? <Link to="/paper">Paper</Link> : null}
-                {user.role === "admin" ? <Link to="/admin/users">Users</Link> : null}
+                {user.role === "super_admin" ? <Link to="/admin/users">Users</Link> : null}
                 <button type="button" onClick={onSignOut} className="uppercase">
                   Sign Out
                 </button>
@@ -92,7 +92,7 @@ export default function PaperShell() {
 
           <Link
             to="/"
-            aria-label="Elegram home"
+            aria-label="Elegram"
             className="relative z-10 flex cursor-pointer items-center justify-center whitespace-nowrap no-underline"
           >
             <span className="font-wordmark-elegram text-[52px] sm:text-[68px]">Elegram</span>
@@ -116,8 +116,13 @@ export default function PaperShell() {
 
         <nav className="flex flex-wrap items-center justify-center gap-x-10 gap-y-2 border-b-[2.5px] border-black pb-[14px]">
           <NavLink to="/" end className={navClass}>
-            Home
+            News
           </NavLink>
+          {canEditNews(user) ? (
+            <NavLink to="/news/drafts" className={navClass}>
+              Drafts
+            </NavLink>
+          ) : null}
           {CATEGORY_ROUTES.map((item) => (
             <NavLink key={item.to} to={item.to} className={navClass}>
               {item.label}

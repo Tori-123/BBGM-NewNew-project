@@ -1,27 +1,23 @@
 import { useState } from "react";
-import { Link, useNavigate, useSearchParams } from "react-router-dom";
-import { api, fieldMessage, safeNext } from "../api";
-import { useAuth } from "../auth";
+import { Link } from "react-router-dom";
+import { api, fieldMessage } from "../api";
 import { ErrorBanner, FieldError, FrontPageLink, SectionRule } from "../components/ui";
 
-export default function Register() {
-  const { signIn } = useAuth();
-  const navigate = useNavigate();
-  const [params] = useSearchParams();
+export default function ResetPassword() {
   const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [displayName, setDisplayName] = useState("");
   const [code, setCode] = useState("");
+  const [password, setPassword] = useState("");
   const [error, setError] = useState(null);
   const [submitting, setSubmitting] = useState(false);
   const [sendingCode, setSendingCode] = useState(false);
   const [codeSent, setCodeSent] = useState(false);
+  const [done, setDone] = useState(false);
 
   async function onSendCode() {
     setSendingCode(true);
     setError(null);
     try {
-      await api.sendEmailCode({ email, purpose: "register" });
+      await api.sendEmailCode({ email, purpose: "reset" });
       setCodeSent(true);
     } catch (err) {
       setCodeSent(false);
@@ -36,14 +32,8 @@ export default function Register() {
     setSubmitting(true);
     setError(null);
     try {
-      const profile = await api.register({
-        email,
-        password,
-        display_name: displayName,
-        code,
-      });
-      signIn(profile);
-      navigate(safeNext(params.get("next")));
+      await api.resetPassword({ email, code, password });
+      setDone(true);
     } catch (err) {
       setError(err);
     } finally {
@@ -51,29 +41,29 @@ export default function Register() {
     }
   }
 
-  const emailError =
-    fieldMessage(error, "email") || (error?.code === "email_taken" ? error.message : "");
-  const banner = error && error.code !== "email_taken" && !error.fields?.length ? error : null;
-  const nextQuery = params.get("next") ? `?next=${encodeURIComponent(params.get("next"))}` : "";
+  const banner = error && !error.fields?.length ? error : null;
+
+  if (done) {
+    return (
+      <div className="mx-auto mt-10 max-w-md">
+        <FrontPageLink />
+        <SectionRule>Reset password</SectionRule>
+        <p className="font-sans text-sm text-neutral-700">Your password was updated.</p>
+        <p className="mt-4 font-sans text-sm">
+          <Link to="/sign-in" className="text-[#1A4FBF]">
+            Sign in
+          </Link>
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className="mx-auto mt-10 max-w-md">
       <FrontPageLink />
-      <SectionRule>Register</SectionRule>
+      <SectionRule>Reset password</SectionRule>
       <ErrorBanner error={banner} />
       <form onSubmit={onSubmit} className="space-y-5">
-        <div>
-          <label className="block font-sans text-[11px] uppercase tracking-[0.16em] text-[#1A4FBF]" htmlFor="display_name">
-            Display name
-          </label>
-          <input
-            id="display_name"
-            value={displayName}
-            onChange={(event) => setDisplayName(event.target.value)}
-            className="mt-2 w-full border-0 border-b border-black py-2 font-sans text-sm outline-none"
-          />
-          <FieldError message={fieldMessage(error, "display_name")} />
-        </div>
         <div>
           <label className="block font-sans text-[11px] uppercase tracking-[0.16em] text-[#1A4FBF]" htmlFor="email">
             School email
@@ -88,20 +78,7 @@ export default function Register() {
             }}
             className="mt-2 w-full border-0 border-b border-black py-2 font-sans text-sm outline-none"
           />
-          <FieldError message={emailError} />
-        </div>
-        <div>
-          <label className="block font-sans text-[11px] uppercase tracking-[0.16em] text-[#1A4FBF]" htmlFor="password">
-            Password
-          </label>
-          <input
-            id="password"
-            type="password"
-            value={password}
-            onChange={(event) => setPassword(event.target.value)}
-            className="mt-2 w-full border-0 border-b border-black py-2 font-sans text-sm outline-none"
-          />
-          <FieldError message={fieldMessage(error, "password")} />
+          <FieldError message={fieldMessage(error, "email")} />
         </div>
         <div>
           <label className="block font-sans text-[11px] uppercase tracking-[0.16em] text-[#1A4FBF]" htmlFor="code">
@@ -126,22 +103,34 @@ export default function Register() {
             </button>
           </div>
           <FieldError message={fieldMessage(error, "code")} />
-          {codeSent && !fieldMessage(error, "code") && !emailError ? (
-            <p className="mt-2 font-sans text-sm text-neutral-500">A code was sent to that school email.</p>
+          {codeSent && !fieldMessage(error, "code") && !fieldMessage(error, "email") ? (
+            <p className="mt-2 font-sans text-sm text-neutral-500">If that school email has an account, a code was sent.</p>
           ) : null}
+        </div>
+        <div>
+          <label className="block font-sans text-[11px] uppercase tracking-[0.16em] text-[#1A4FBF]" htmlFor="password">
+            New password
+          </label>
+          <input
+            id="password"
+            type="password"
+            value={password}
+            onChange={(event) => setPassword(event.target.value)}
+            className="mt-2 w-full border-0 border-b border-black py-2 font-sans text-sm outline-none"
+          />
+          <FieldError message={fieldMessage(error, "password")} />
         </div>
         <button
           type="submit"
           disabled={submitting}
           className="rounded-[2px] bg-black px-5 py-2 font-sans text-[11px] uppercase tracking-[0.18em] text-white"
         >
-          Create account
+          Update password
         </button>
       </form>
       <p className="mt-6 font-sans text-sm text-neutral-500">
-        Already have an account?{" "}
-        <Link to={`/sign-in${nextQuery}`} className="text-[#1A4FBF]">
-          Sign in
+        <Link to="/sign-in" className="text-[#1A4FBF]">
+          Back to sign in
         </Link>
       </p>
     </div>

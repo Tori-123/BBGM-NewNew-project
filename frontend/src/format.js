@@ -1,23 +1,19 @@
 export const CATEGORY_LABELS = {
   news: "NEWS",
-  sports: "SPORTS",
   forum: "FORUM",
 };
 
 export const CATEGORY_ROUTES = [
-  { to: "/news", label: "NEWS", category: "news" },
-  { to: "/sports", label: "SPORTS", category: "sports" },
   { to: "/forum", label: "FORUM", category: "forum" },
   { to: "/opinion", label: "OPINION", category: null },
 ];
 
-export const NEWSPAPER_OPTIONS = [
-  { value: "news", label: "News" },
-  { value: "sports", label: "Sports" },
-];
+export function canEditNews(user) {
+  return user?.role === "editor" || user?.role === "super_admin";
+}
 
-export function canEditPaper(user) {
-  return user?.role === "editor" || user?.role === "admin";
+export function canDeletePosts(user) {
+  return user?.role === "admin" || user?.role === "super_admin";
 }
 
 export function categoryLabel(category) {

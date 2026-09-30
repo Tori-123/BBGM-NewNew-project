@@ -2,8 +2,9 @@ from fastapi import Depends, Request
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
-from errors import StorageError, account_banned, forbidden, unauthenticated
+from errors import StorageError, account_muted, forbidden, unauthenticated
 from models import User
+from schemas import MODERATOR_ROLES, NEWSROOM_ROLES
 from security import COOKIE_NAME, unsign_cookie_value
 from store import get_session_by_token
 
@@ -34,13 +35,14 @@ def get_current_user(request: Request, db: Session = Depends(get_db)) -> User:
     if not token:
         raise unauthenticated()
     record = get_session_by_token(db, token)
-    if record is None:
-        raise unauthenticated()
-    if record.user.banned:
-        raise account_banned()
-    if record.revoked_at is not None:
+    if record is None or record.revoked_at is not None:
         raise unauthenticated()
     return record.user
+
+
+def require_not_muted(user: User) -> None:
+    if user.muted:
+        raise account_muted()
 
 
 def get_optional_user(request: Request, db: Session = Depends(get_db)) -> User | None:
@@ -51,12 +53,24 @@ def get_optional_user(request: Request, db: Session = Depends(get_db)) -> User |
     if not token:
         return None
     record = get_session_by_token(db, token)
-    if record is None or record.revoked_at is not None or record.user.banned:
+    if record is None or record.revoked_at is not None:
         return None
     return record.user
 
 
-def get_admin_user(user: User = Depends(get_current_user)) -> User:
-    if user.role != "admin":
+def get_super_admin(user: User = Depends(get_current_user)) -> User:
+    if user.role != "super_admin":
+        raise forbidden()
+    return user
+
+
+def get_moderator(user: User = Depends(get_current_user)) -> User:
+    if user.role not in MODERATOR_ROLES:
+        raise forbidden()
+    return user
+
+
+def get_newsroom_user(user: User = Depends(get_current_user)) -> User:
+    if user.role not in NEWSROOM_ROLES:
         raise forbidden()
     return user

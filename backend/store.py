@@ -5,8 +5,21 @@ from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import Session, joinedload
 
 from errors import StorageError
-from models import AuditEvent, Comment, Post, PostLike, SessionRecord, User, utc_now
-from security import hash_token, new_session_token
+from datetime import timedelta, timezone
+
+from models import (
+    AuditEvent,
+    Comment,
+    EmailCode,
+    NewsBlock,
+    Post,
+    PostLike,
+    SessionRecord,
+    SystemNotice,
+    User,
+    utc_now,
+)
+from security import hash_token, new_session_token, verify_password, hash_password
 
 
 def make_excerpt(body: str) -> str:
@@ -196,8 +209,110 @@ def remove_like(db: Session, *, user_id: str, post_id: str) -> None:
 
 
 def apply_admin_email(user: User, admin_email: str) -> None:
-    if admin_email and user.email == admin_email and user.role != "admin":
-        user.role = "admin"
+    if admin_email and user.email == admin_email and user.role != "super_admin":
+        user.role = "super_admin"
+
+
+def create_news_draft(db: Session, *, author: User, title: str) -> Post:
+    now = utc_now()
+    post = Post(
+        id=str(uuid4()),
+        author_id=author.id,
+        title=title,
+        body="",
+        excerpt="",
+        category="news",
+        is_activity=False,
+        starts_at=None,
+        location=None,
+        status="draft",
+        images="[]",
+        created_at=now,
+        updated_at=now,
+    )
+    audit = AuditEvent(
+        id=str(uuid4()),
+        actor_id=author.id,
+        action="create_post",
+        post_id=post.id,
+        at=now,
+    )
+    try:
+        db.add(post)
+        db.flush()
+        db.add(audit)
+        db.flush()
+    except SQLAlchemyError as exc:
+        db.rollback()
+        raise StorageError("Could not save the post. Try again in a moment.") from exc
+    post.author = author
+    return post
+
+
+def refresh_news_publication(db: Session, post: Post) -> None:
+    blocks = db.scalars(
+        select(NewsBlock).where(NewsBlock.post_id == post.id).order_by(NewsBlock.position.asc())
+    ).all()
+    live = [block for block in blocks if block.published_body is not None and block.published_heading]
+    if not live:
+        post.status = "draft"
+        post.body = ""
+        post.excerpt = ""
+    else:
+        parts = [f"{block.published_heading}\n\n{block.published_body}".strip() for block in live]
+        post.body = "\n\n".join(parts)
+        post.excerpt = make_excerpt(live[0].published_body or live[0].published_heading or "")
+        post.status = "published"
+    post.updated_at = utc_now()
+    db.flush()
+
+
+def add_system_notice(db: Session, *, user_id: str, body: str) -> None:
+    db.add(
+        SystemNotice(
+            id=str(uuid4()),
+            user_id=user_id,
+            body=body,
+            created_at=utc_now(),
+        )
+    )
+    db.flush()
+
+
+def list_system_notices(db: Session, user_id: str) -> list[SystemNotice]:
+    return list(
+        db.scalars(
+            select(SystemNotice)
+            .where(SystemNotice.user_id == user_id)
+            .order_by(SystemNotice.created_at.desc())
+        ).all()
+    )
+
+
+def delete_user_account(db: Session, user: User) -> list[str]:
+    user_id = user.id
+    post_ids = list(db.scalars(select(Post.id).where(Post.author_id == user_id)).all())
+    try:
+        db.execute(delete(SystemNotice).where(SystemNotice.user_id == user_id))
+        for post in db.scalars(select(Post).where(Post.author_id == user_id)).all():
+            delete_post_graph(db, post)
+        db.execute(delete(Comment).where(Comment.author_id == user_id, Comment.parent_id.is_not(None)))
+        floor_ids = list(
+            db.scalars(
+                select(Comment.id).where(Comment.author_id == user_id, Comment.parent_id.is_(None))
+            ).all()
+        )
+        if floor_ids:
+            db.execute(delete(Comment).where(Comment.parent_id.in_(floor_ids)))
+            db.execute(delete(Comment).where(Comment.id.in_(floor_ids)))
+        db.execute(delete(PostLike).where(PostLike.user_id == user_id))
+        db.execute(delete(AuditEvent).where(AuditEvent.actor_id == user_id))
+        db.execute(delete(SessionRecord).where(SessionRecord.user_id == user_id))
+        db.delete(user)
+        db.flush()
+    except SQLAlchemyError as exc:
+        raise StorageError() from exc
+    return post_ids
 
 
 def revoke_user_sessions(db: Session, user_id: str) -> None:
@@ -212,6 +327,70 @@ def revoke_user_sessions(db: Session, user_id: str) -> None:
         row.revoked_at = now
 
 
+CODE_TTL_MINUTES = 10
+CODE_RESEND_SECONDS = 60
+CODE_MAX_ATTEMPTS = 5
+
+
+def _as_utc(dt):
+    if dt.tzinfo is None:
+        return dt.replace(tzinfo=timezone.utc)
+    return dt.astimezone(timezone.utc)
+
+
+def issue_email_code(db: Session, email: str, purpose: str) -> str:
+    now = utc_now()
+    latest = db.scalar(
+        select(EmailCode)
+        .where(EmailCode.email == email, EmailCode.purpose == purpose)
+        .order_by(EmailCode.created_at.desc())
+    )
+    if latest is not None:
+        elapsed = (_as_utc(now) - _as_utc(latest.created_at)).total_seconds()
+        if elapsed < CODE_RESEND_SECONDS:
+            from errors import validation_error
+
+            raise validation_error([{"field": "email", "message": "Please wait before requesting another code."}])
+        db.execute(delete(EmailCode).where(EmailCode.email == email, EmailCode.purpose == purpose))
+
+    from secrets import randbelow
+
+    code = f"{randbelow(1_000_000):06d}"
+    record = EmailCode(
+        id=str(uuid4()),
+        email=email,
+        purpose=purpose,
+        code_hash=hash_password(code),
+        expires_at=now + timedelta(minutes=CODE_TTL_MINUTES),
+        attempt_count=0,
+        created_at=now,
+    )
+    db.add(record)
+    db.flush()
+    return code
+
+
+def consume_email_code(db: Session, email: str, purpose: str, code: str) -> bool:
+    from errors import validation_error
+
+    now = _as_utc(utc_now())
+    latest = db.scalar(
+        select(EmailCode)
+        .where(EmailCode.email == email, EmailCode.purpose == purpose)
+        .order_by(EmailCode.created_at.desc())
+    )
+    invalid = [{"field": "code", "message": "Enter the 6-digit code sent to your email."}]
+    if latest is None or _as_utc(latest.expires_at) <= now or latest.attempt_count >= CODE_MAX_ATTEMPTS:
+        raise validation_error(invalid)
+    if not verify_password(code.strip(), latest.code_hash):
+        latest.attempt_count += 1
+        db.flush()
+        raise validation_error(invalid)
+    db.delete(latest)
+    db.flush()
+    return True
+
+
 def delete_post_graph(db: Session, post: Post) -> None:
     post_id = post.id
     try:
@@ -219,6 +398,7 @@ def delete_post_graph(db: Session, post: Post) -> None:
         db.execute(delete(Comment).where(Comment.post_id == post_id))
         db.execute(delete(PostLike).where(PostLike.post_id == post_id))
         db.execute(delete(AuditEvent).where(AuditEvent.post_id == post_id))
+        db.execute(delete(NewsBlock).where(NewsBlock.post_id == post_id))
         db.delete(post)
         db.flush()
     except SQLAlchemyError as exc:

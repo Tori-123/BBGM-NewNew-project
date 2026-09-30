@@ -88,6 +88,8 @@ export const api = {
   uploadAvatar: (file) => uploadFile("/me/avatar", file),
   login: (body) => request("/auth/login", { method: "POST", body: JSON.stringify(body) }),
   register: (body) => request("/auth/register", { method: "POST", body: JSON.stringify(body) }),
+  sendEmailCode: (body) => request("/auth/email-codes", { method: "POST", body: JSON.stringify(body) }),
+  resetPassword: (body) => request("/auth/password-reset", { method: "POST", body: JSON.stringify(body) }),
   logout: () => request("/auth/logout", { method: "POST" }),
   listPosts: ({ category, page = 1, pageSize = 20 } = {}) => {
     const query = new URLSearchParams({
@@ -129,10 +131,42 @@ export const api = {
       method: "POST",
       body: JSON.stringify(body),
     }),
-  promotePost: (postId, body) =>
-    request(`/posts/${encodeURIComponent(postId)}/promote`, {
+  notices: () => request("/me/notices"),
+  listDrafts: ({ page = 1, pageSize = 20 } = {}) => {
+    const query = new URLSearchParams({
+      page: String(page),
+      page_size: String(pageSize),
+    });
+    return request(`/news/drafts?${query}`);
+  },
+  createDraft: (title) =>
+    request("/news/drafts", { method: "POST", body: JSON.stringify({ title }) }),
+  getDraft: (id) => request(`/news/drafts/${encodeURIComponent(id)}`),
+  addBlock: (draftId, { heading, body, position }) =>
+    request(`/news/drafts/${encodeURIComponent(draftId)}/blocks`, {
       method: "POST",
+      body: JSON.stringify({
+        heading,
+        body,
+        ...(position == null ? {} : { position }),
+      }),
+    }),
+  patchBlock: (draftId, blockId, body) =>
+    request(`/news/drafts/${encodeURIComponent(draftId)}/blocks/${encodeURIComponent(blockId)}`, {
+      method: "PATCH",
       body: JSON.stringify(body),
+    }),
+  submitBlock: (draftId, blockId) =>
+    request(`/news/drafts/${encodeURIComponent(draftId)}/blocks/${encodeURIComponent(blockId)}/submit`, {
+      method: "POST",
+    }),
+  approveBlock: (draftId, blockId) =>
+    request(`/news/drafts/${encodeURIComponent(draftId)}/blocks/${encodeURIComponent(blockId)}/approve`, {
+      method: "POST",
+    }),
+  rejectBlock: (draftId, blockId) =>
+    request(`/news/drafts/${encodeURIComponent(draftId)}/blocks/${encodeURIComponent(blockId)}/reject`, {
+      method: "POST",
     }),
   listUsers: ({ page = 1, pageSize = 20 } = {}) => {
     const query = new URLSearchParams({
@@ -146,11 +180,12 @@ export const api = {
       method: "PATCH",
       body: JSON.stringify({ role }),
     }),
-  setUserBanned: (userId, banned) =>
+  setUserMuted: (userId, muted) =>
     request(`/admin/users/${encodeURIComponent(userId)}`, {
       method: "PATCH",
-      body: JSON.stringify({ banned }),
+      body: JSON.stringify({ muted }),
     }),
+  deleteUser: (userId) => request(`/admin/users/${encodeURIComponent(userId)}`, { method: "DELETE" }),
   deletePost: (postId) => request(`/posts/${encodeURIComponent(postId)}`, { method: "DELETE" }),
   likePost: (postId) => request(`/posts/${encodeURIComponent(postId)}/likes`, { method: "POST" }),
   unlikePost: (postId) => request(`/posts/${encodeURIComponent(postId)}/likes`, { method: "DELETE" }),

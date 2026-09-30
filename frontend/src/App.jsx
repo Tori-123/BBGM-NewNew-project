@@ -8,9 +8,11 @@ import Category, { StaticCategory } from "./pages/Category";
 import Contact from "./pages/Contact";
 import Home from "./pages/Home";
 import MyPosts from "./pages/MyPosts";
-import Paper from "./pages/Paper";
+import NewsDrafts from "./pages/NewsDrafts";
 import PostDetail from "./pages/PostDetail";
+import SystemNotices from "./pages/SystemNotices";
 import Register from "./pages/Register";
+import ResetPassword from "./pages/ResetPassword";
 import SignIn from "./pages/SignIn";
 
 export default function App() {
@@ -20,8 +22,9 @@ export default function App() {
         <Routes>
           <Route element={<PaperShell />}>
             <Route path="/" element={<Home />} />
-            <Route path="/news" element={<Category category="news" title="News" />} />
-            <Route path="/sports" element={<Category category="sports" title="Sports" />} />
+            <Route path="/news/drafts" element={<NewsDrafts />} />
+            <Route path="/news" element={<Navigate to="/" replace />} />
+            <Route path="/sports" element={<Navigate to="/" replace />} />
             <Route path="/forum" element={<Category category="forum" title="Forum" />} />
             <Route path="/opinion" element={<StaticCategory title="Opinion" />} />
             <Route path="/community" element={<Navigate to="/forum" replace />} />
@@ -33,9 +36,11 @@ export default function App() {
             <Route path="/me/posts" element={<MyPosts />} />
             <Route path="/me/avatar" element={<AvatarSettings />} />
             <Route path="/admin/users" element={<AdminUsers />} />
-            <Route path="/paper" element={<Paper />} />
+            <Route path="/paper" element={<Navigate to="/" replace />} />
+            <Route path="/system" element={<SystemNotices />} />
             <Route path="/sign-in" element={<SignIn />} />
             <Route path="/register" element={<Register />} />
+            <Route path="/reset-password" element={<ResetPassword />} />
             <Route path="/about" element={<About />} />
             <Route path="/contact" element={<Contact />} />
             <Route path="*" element={<Navigate to="/" replace />} />

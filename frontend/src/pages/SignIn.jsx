@@ -77,6 +77,10 @@ export default function SignIn() {
           Create an account
         </Link>
         {" · "}
+        <Link to="/reset-password" className="text-[#1A4FBF]">
+          Forgot password
+        </Link>
+        {" · "}
         <Link to="/" className="text-[#1A4FBF]">
           Front page
         </Link>

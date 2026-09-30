@@ -5,6 +5,12 @@ from errors import ApiError, validation_error
 from schemas import CATEGORIES, CATEGORY_MESSAGE
 
 EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+CODE_RE = re.compile(r"^\d{6}$")
+SCHOOL_EMAIL_SUFFIX = "@basischina.com"
+SCHOOL_EMAIL_MESSAGE = "Use your school email ending in @basischina.com."
+CODE_MESSAGE = "Enter the 6-digit code sent to your email."
+EMAIL_CODE_PURPOSES = ("register", "reset")
+PURPOSE_MESSAGE = "Must be one of: register, reset."
 
 
 def parse_page(value: str | None) -> int:
@@ -45,25 +51,70 @@ def normalize_email(value: str) -> str:
     return value.strip().lower()
 
 
-def register_field_errors(email: str, password: str, display_name: str) -> list[dict[str, str]]:
-    fields: list[dict[str, str]] = []
+def email_field_error(email: str, *, required: bool = True) -> dict[str, str] | None:
+    raw = email.strip()
+    if not raw:
+        if required:
+            return {"field": "email", "message": "Email is required."}
+        return {"field": "email", "message": "Enter a valid email address."}
     normalized = normalize_email(email)
-    if not normalized or not EMAIL_RE.match(normalized):
-        fields.append({"field": "email", "message": "Enter a valid email address."})
+    if not EMAIL_RE.match(normalized):
+        return {"field": "email", "message": "Enter a valid email address."}
+    if not normalized.endswith(SCHOOL_EMAIL_SUFFIX):
+        return {"field": "email", "message": SCHOOL_EMAIL_MESSAGE}
+    return None
+
+
+def code_field_error(code: str) -> dict[str, str] | None:
+    if not CODE_RE.match((code or "").strip()):
+        return {"field": "code", "message": CODE_MESSAGE}
+    return None
+
+
+def register_field_errors(email: str, password: str, display_name: str, code: str) -> list[dict[str, str]]:
+    fields: list[dict[str, str]] = []
+    email_error = email_field_error(email)
+    if email_error:
+        fields.append(email_error)
     if len(password) < 8 or len(password) > 128:
         fields.append({"field": "password", "message": "Password must be 8–128 characters."})
     name = display_name.strip()
     if not name or len(name) > 40:
         fields.append({"field": "display_name", "message": "Display name must be 1–40 characters."})
+    code_error = code_field_error(code)
+    if code_error:
+        fields.append(code_error)
     return fields
 
 
 def login_field_errors(email: str, password: str) -> list[dict[str, str]]:
     fields: list[dict[str, str]] = []
-    if not email.strip():
-        fields.append({"field": "email", "message": "Email is required."})
-    elif not EMAIL_RE.match(normalize_email(email)):
-        fields.append({"field": "email", "message": "Enter a valid email address."})
+    email_error = email_field_error(email)
+    if email_error:
+        fields.append(email_error)
     if not password:
         fields.append({"field": "password", "message": "Password is required."})
+    return fields
+
+
+def email_code_field_errors(email: str, purpose: str) -> list[dict[str, str]]:
+    fields: list[dict[str, str]] = []
+    email_error = email_field_error(email)
+    if email_error:
+        fields.append(email_error)
+    if purpose not in EMAIL_CODE_PURPOSES:
+        fields.append({"field": "purpose", "message": PURPOSE_MESSAGE})
+    return fields
+
+
+def password_reset_field_errors(email: str, code: str, password: str) -> list[dict[str, str]]:
+    fields: list[dict[str, str]] = []
+    email_error = email_field_error(email)
+    if email_error:
+        fields.append(email_error)
+    code_error = code_field_error(code)
+    if code_error:
+        fields.append(code_error)
+    if len(password) < 8 or len(password) > 128:
+        fields.append({"field": "password", "message": "Password must be 8–128 characters."})
     return fields

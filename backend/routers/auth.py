@@ -16,10 +16,35 @@ from avatars import (
 from deps import get_current_user, get_db
 from errors import ApiError, StorageError, unauthenticated, validation_error
 from models import User, to_iso, utc_now
-from schemas import AVATAR_PRESETS, LoginBody, RegisterBody, SetAvatarPresetBody, UserPrivate
+from mail import send_verification_email
+from schemas import (
+    AVATAR_PRESETS,
+    EmailCodeBody,
+    LoginBody,
+    Notice,
+    NoticeList,
+    PasswordResetBody,
+    RegisterBody,
+    SetAvatarPresetBody,
+    UserPrivate,
+)
 from security import COOKIE_NAME, hash_password, sign_cookie_value, unsign_cookie_value, verify_password
-from store import apply_admin_email, create_session, get_active_session, get_user_by_email
-from validate import login_field_errors, normalize_email, register_field_errors
+from store import (
+    apply_admin_email,
+    consume_email_code,
+    create_session,
+    get_active_session,
+    get_user_by_email,
+    issue_email_code,
+    list_system_notices,
+)
+from validate import (
+    email_code_field_errors,
+    login_field_errors,
+    normalize_email,
+    password_reset_field_errors,
+    register_field_errors,
+)
 
 router = APIRouter()
 
@@ -31,7 +56,7 @@ def _user_private(user: User) -> dict:
         display_name=user.display_name,
         role=user.role,
         avatar=normalize_avatar(user.avatar),
-        banned=bool(user.banned),
+        muted=bool(user.muted),
         created_at=to_iso(user.created_at),
     ).model_dump()
 
@@ -50,13 +75,45 @@ def _clear_session_cookie(response: Response) -> None:
     response.delete_cookie(key=COOKIE_NAME, path="/", samesite="lax")
 
 
-@router.post("/auth/register")
-def register(body: RegisterBody, request: Request, db: Session = Depends(get_db)):
-    fields = register_field_errors(body.email, body.password, body.display_name)
+@router.post("/auth/email-codes", status_code=204)
+def request_email_code(body: EmailCodeBody, request: Request, db: Session = Depends(get_db)) -> None:
+    fields = email_code_field_errors(body.email, body.purpose)
     if fields:
         raise validation_error(fields)
 
     email = normalize_email(body.email)
+    purpose = body.purpose
+    try:
+        user = get_user_by_email(db, email)
+        if purpose == "register":
+            if user is not None:
+                raise ApiError(
+                    409,
+                    "email_taken",
+                    "An account with this email already exists.",
+                    [{"field": "email", "message": "This email is already registered."}],
+                )
+            code = issue_email_code(db, email, purpose)
+            send_verification_email(request.app.state.settings, email, code, purpose)
+            return
+        if user is not None:
+            code = issue_email_code(db, email, purpose)
+            send_verification_email(request.app.state.settings, email, code, purpose)
+    except ApiError:
+        raise
+    except SQLAlchemyError as exc:
+        db.rollback()
+        raise StorageError() from exc
+
+
+@router.post("/auth/register")
+def register(body: RegisterBody, request: Request, db: Session = Depends(get_db)):
+    fields = register_field_errors(body.email, body.password, body.display_name, body.code)
+    if fields:
+        raise validation_error(fields)
+
+    email = normalize_email(body.email)
+    consume_email_code(db, email, "register", body.code)
     if get_user_by_email(db, email) is not None:
         raise ApiError(
             409,
@@ -71,7 +128,8 @@ def register(body: RegisterBody, request: Request, db: Session = Depends(get_db)
         email=email,
         password_hash=hash_password(body.password),
         display_name=body.display_name.strip(),
-        role="admin" if admin_email and email == admin_email else "student",
+        role="super_admin" if admin_email and email == admin_email else "student",
+        muted=False,
         avatar=DEFAULT_AVATAR,
         created_at=utc_now(),
     )
@@ -96,6 +154,29 @@ def register(body: RegisterBody, request: Request, db: Session = Depends(get_db)
     return response
 
 
+@router.post("/auth/password-reset", status_code=204)
+def reset_password(body: PasswordResetBody, db: Session = Depends(get_db)) -> None:
+    fields = password_reset_field_errors(body.email, body.code, body.password)
+    if fields:
+        raise validation_error(fields)
+
+    email = normalize_email(body.email)
+    consume_email_code(db, email, "reset", body.code)
+    try:
+        user = get_user_by_email(db, email)
+        if user is None:
+            raise validation_error(
+                [{"field": "code", "message": "Enter the 6-digit code sent to your email."}]
+            )
+        user.password_hash = hash_password(body.password)
+        db.flush()
+    except ApiError:
+        raise
+    except SQLAlchemyError as exc:
+        db.rollback()
+        raise StorageError() from exc
+
+
 @router.post("/auth/login")
 def login(body: LoginBody, request: Request, db: Session = Depends(get_db)):
     fields = login_field_errors(body.email, body.password)
@@ -109,8 +190,6 @@ def login(body: LoginBody, request: Request, db: Session = Depends(get_db)):
 
     if user is None or not verify_password(body.password, user.password_hash):
         raise ApiError(401, "invalid_credentials", "Email or password is incorrect.")
-    if user.banned:
-        raise ApiError(403, "account_banned", "This account is banned.")
 
     try:
         apply_admin_email(user, request.app.state.settings.admin_email)
@@ -160,6 +239,17 @@ def set_avatar_preset(
     except SQLAlchemyError as exc:
         raise StorageError() from exc
     return _user_private(user)
+
+
+@router.get("/me/notices")
+def my_notices(user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    try:
+        rows = list_system_notices(db, user.id)
+    except SQLAlchemyError as exc:
+        raise StorageError() from exc
+    return NoticeList(
+        items=[Notice(id=row.id, body=row.body, created_at=to_iso(row.created_at)) for row in rows]
+    ).model_dump()
 
 
 @router.post("/me/avatar")

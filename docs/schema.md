@@ -2,7 +2,7 @@
 
 依据：`docs/PRD.md` Must Have 与 Entity Flow。本文件同时约束前端 Mock 与后端实现。不包含业务代码。
 
-第一版 **无公开审计查询接口**（M10 仅服务端落库）。作者不能改删自己的帖或评论。`admin` 可整帖删除，并可封禁账号。包含 Forum 评论（楼中楼）、角色与精选复制。
+第一版 **无公开审计查询接口**（M10 仅服务端落库）。作者不能改删自己的帖或评论。`admin` 与 `super_admin` 可整帖删除，并给作者一条 System 通知。仅 `super_admin` 可禁言或删除用户。包含 Forum 评论（楼中楼）、角色与 News 分板块草稿。
 
 ---
 
@@ -66,11 +66,11 @@ Content-Type: application/json
 | 400 | `bad_request` | 分页参数非法等无法归到字段校验的请求错误 |
 | 401 | `unauthenticated` | 无会话或会话无效 |
 | 401 | `invalid_credentials` | 登录邮箱或密码不对（不区分「用户不存在」与「密码错误」） |
-| 403 | `forbidden` | 已登录但无权（学生发校报栏目、非编辑精选、非管理员改角色 / 删帖 / 封禁） |
-| 403 | `account_banned` | 密码正确但账号已封禁；或封禁后仍带着旧会话调用需登录接口 |
+| 403 | `forbidden` | 已登录但无权（直接发 News、非编辑写草稿、非超级管理员改角色 / 禁言 / 删用户 / 同意板块、非 `admin` 且非 `super_admin` 删帖） |
+| 403 | `account_muted` | 已登录但被禁言，仍调用发帖、跟帖、点赞、创建或提交草稿 |
 | 404 | `not_found` | 帖子、评论父楼或用户不存在 |
 | 409 | `email_taken` | 注册邮箱已被占用 |
-| 422 | `validation_error` | 缺必填、超长、非法栏目、非法配图 |
+| 422 | `validation_error` | 缺必填、超长、非法栏目、非法配图、非校内邮箱后缀、验证码无效或过期 |
 | 503 | `storage_unavailable` | 存储写入失败；不得返回成功或半截资源 |
 
 成功响应不包 `{ "data": ... }` 中间层：对象或列表字段直接放在 JSON 根上。
@@ -103,9 +103,9 @@ Content-Type: application/json
 | `id` | string | |
 | `email` | string | |
 | `display_name` | string | |
-| `role` | string | `student` \| `editor` \| `admin` |
+| `role` | string | `student` \| `editor` \| `admin` \| `super_admin` |
 | `avatar` | string | 同 AuthorPublic |
-| `banned` | boolean | 是否封禁。注册默认为 `false` |
+| `muted` | boolean | 是否禁言。注册默认为 `false`。禁言后仍可登录 |
 | `created_at` | string | |
 
 **PostSummary**（列表：首页、栏目、我的帖子）
@@ -115,8 +115,8 @@ Content-Type: application/json
 | `id` | string | |
 | `title` | string | |
 | `excerpt` | string | 由 `body` 截断，最多 160 字，供卡片绑定；不是另一份正文 |
-| `category` | string | `news` \| `sports` \| `forum` |
-| `status` | string | 本版恒为 `published` |
+| `category` | string | `news` \| `forum` |
+| `status` | string | 公开列表恒为 `published`。News 草稿在草稿接口里可以是 `draft` |
 | `created_at` | string | |
 | `updated_at` | string | 创建时与 `created_at` 相同 |
 | `author` | AuthorPublic | |
@@ -135,7 +135,52 @@ Content-Type: application/json
 | `created_at` | string | |
 | `author` | AuthorPublic | |
 
-**PostDetail** = PostSummary 的全部字段 + `body`（string，完整正文，自由文本）。
+**PublishedBlock**（News 详情里已同意的板块）
+
+| 字段 | 类型 | 说明 |
+| --- | --- | --- |
+| `id` | string | |
+| `heading` | string | 已同意的板块标题 |
+| `body` | string | 已同意的板块正文 |
+| `position` | integer | 从 1 起，升序 |
+
+**PostDetail** = PostSummary 的全部字段 + `body` + `blocks`。
+
+- Forum：`body` 是全文，`blocks` 为 `[]`。
+- News：`blocks` 只含已同意板块。`body` 是这些板块按顺序拼成的全文，供仍读 `body` 的客户端使用。没有已同意板块的稿不在本接口出现（`404`）。
+
+**Notice**
+
+| 字段 | 类型 | 说明 |
+| --- | --- | --- |
+| `id` | string | |
+| `body` | string | 给当前用户的一句说明，例如帖子标题已被移除 |
+| `created_at` | string | |
+
+**NewsBlockStaff**（草稿接口，含未公开正文）
+
+| 字段 | 类型 | 说明 |
+| --- | --- | --- |
+| `id` | string | |
+| `position` | integer | 从 1 起 |
+| `heading` | string | 草稿标题 |
+| `draft_body` | string | 草稿正文 |
+| `published_heading` | string \| null | 已同意标题；从未同意则为 `null` |
+| `published_body` | string \| null | 已同意正文；从未同意则为 `null` |
+| `review_status` | string | `editing` \| `pending` \| `published` |
+
+**NewsDraftSummary**
+
+| 字段 | 类型 | 说明 |
+| --- | --- | --- |
+| `id` | string | 与公开帖 id 相同 |
+| `title` | string | |
+| `status` | string | `draft`（尚无已同意板块）或 `published` |
+| `created_at` | string | |
+| `updated_at` | string | |
+| `author` | AuthorPublic | |
+
+**NewsDraftDetail** = NewsDraftSummary + `blocks`（`NewsBlockStaff[]`，按 `position` 升序）。
 
 **CommentReply**（楼中楼，挂在某一楼层下）
 
@@ -167,24 +212,67 @@ Content-Type: application/json
 
 ### 1.1 Auth
 
-#### `POST /api/v1/auth/register`
+#### `POST /api/v1/auth/email-codes`
 
 - **鉴权：** 否
-- **职责：** 注册学生账号；成功则创建用户、建立会话并 `Set-Cookie`。
+- **职责：** 向校内邮箱发送 6 位验证码。`purpose=register` 用于注册；`purpose=reset` 用于找回密码。非 `@basischina.com` **不写库、不发信**。
 
 **Request body**
 
 | 字段 | 类型 | 必填 | 约束 |
 | --- | --- | --- | --- |
-| `email` | string | 是 | 有效邮箱，大小写不敏感，存储前规范化为小写 |
+| `email` | string | 是 | 有效邮箱，大小写不敏感，存储前规范化为小写；必须是 `@basischina.com` |
+| `purpose` | string | 是 | `register` 或 `reset` |
+
+**Response**
+
+- `204` 无 body。不回验证码。`reset` 无论该邮箱是否已注册都回 `204`（防枚举）。
+- `409` `email_taken`（仅 `purpose=register` 且邮箱已被占用）
+- `422` `validation_error`（缺字段、邮箱非法、非校内后缀、`purpose` 非法、同一邮箱 60 秒内再发）
+- `503` `storage_unavailable`（存储或发信失败）
+
+---
+
+#### `POST /api/v1/auth/register`
+
+- **鉴权：** 否
+- **职责：** 校验校内邮箱与验证码后注册学生账号；成功则创建用户、建立会话并 `Set-Cookie`。校验顺序：后缀 → 码有效 → 再建用户。
+
+**Request body**
+
+| 字段 | 类型 | 必填 | 约束 |
+| --- | --- | --- | --- |
+| `email` | string | 是 | 有效邮箱，大小写不敏感，存储前规范化为小写；必须是 `@basischina.com` |
 | `password` | string | 是 | 8–128 字符 |
 | `display_name` | string | 是 | 去掉首尾空白后 1–40 字符 |
+| `code` | string | 是 | 6 位数字；须与该邮箱最近一次 `purpose=register` 的未过期码一致 |
 
 **Response**
 
 - `201` + `UserPrivate`；`Set-Cookie: scoop_session=...`
 - `409` `email_taken`
-- `422` `validation_error`（缺字段、邮箱非法、密码过短、展示名为空）
+- `422` `validation_error`（缺字段、邮箱非法、非校内后缀、密码过短、展示名为空、验证码无效或过期）
+- `503` `storage_unavailable`
+
+---
+
+#### `POST /api/v1/auth/password-reset`
+
+- **鉴权：** 否
+- **职责：** 用校内邮箱验证码设置新密码。成功不建立会话；用户再走 `POST /api/v1/auth/login`。
+
+**Request body**
+
+| 字段 | 类型 | 必填 | 约束 |
+| --- | --- | --- | --- |
+| `email` | string | 是 | 有效邮箱，必须是 `@basischina.com`，规范化为小写 |
+| `code` | string | 是 | 6 位数字；须与该邮箱最近一次 `purpose=reset` 的未过期码一致 |
+| `password` | string | 是 | 8–128 字符 |
+
+**Response**
+
+- `204` 无 body
+- `422` `validation_error`（非校内后缀、缺字段、密码过短、验证码无效或过期；账号不存在时与码错同一 `code` 字段，不泄露是否已注册）
 - `503` `storage_unavailable`
 
 ---
@@ -192,21 +280,21 @@ Content-Type: application/json
 #### `POST /api/v1/auth/login`
 
 - **鉴权：** 否
-- **职责：** 校验邮箱密码，建立会话。
+- **职责：** 校验邮箱密码，建立会话。非 `@basischina.com` 不查库比对密码。
 
 **Request body**
 
 | 字段 | 类型 | 必填 | 约束 |
 | --- | --- | --- | --- |
-| `email` | string | 是 | 邮箱 |
+| `email` | string | 是 | 有效邮箱，必须是 `@basischina.com` |
 | `password` | string | 是 | 非空 |
 
 **Response**
 
 - `200` + `UserPrivate`；`Set-Cookie: scoop_session=...`
 - `401` `invalid_credentials`（邮箱不存在或密码错误，同一文案）
-- `403` `account_banned`（邮箱与密码正确，但账号已封禁；不建立会话）
-- `422` `validation_error`
+禁言账号密码正确时仍 `200` 并建立会话。写操作另见 `account_muted`。
+- `422` `validation_error`（缺字段、邮箱非法、非校内后缀）
 - `503` `storage_unavailable`（读存储失败时）
 
 ---
@@ -278,13 +366,13 @@ Content-Type: application/json
 #### `GET /api/v1/posts`
 
 - **鉴权：** 否
-- **职责：** 列出已发布帖。无 `category` 时供首页近期露出，**只含校报栏目**（`news` `sports`），不含 Forum。有 `category` 时只返回该栏目（含 `forum`）。
+- **职责：** 列出已发布帖。无 `category` 时供首页近期露出，**只含** `news`，不含 Forum，不含尚无已同意板块的 News 草稿。有 `category` 时只返回该栏目。
 
 **Query**
 
 | 参数 | 类型 | 必填 | 约束 |
 | --- | --- | --- | --- |
-| `category` | string | 否 | 若出现必须是 `news` \| `sports` \| `forum` |
+| `category` | string | 否 | 若出现必须是 `news` \| `forum` |
 | `page` | integer | 否 | ≥ 1，默认 1 |
 | `page_size` | integer | 否 | 1–50，默认 20 |
 
@@ -302,7 +390,7 @@ Content-Type: application/json
 #### `GET /api/v1/posts/{post_id}`
 
 - **鉴权：** 否
-- **职责：** 已发布帖详情（含完整 `body`）。
+- **职责：** 已发布帖详情（含完整 `body` 与 `blocks`）。News 草稿返回 `404`。
 
 **路径参数**
 
@@ -322,7 +410,7 @@ Content-Type: application/json
 #### `POST /api/v1/posts`
 
 - **鉴权：** 是
-- **职责：** 当前用户发布帖子，状态直接为 `published`；服务端同时写审计（不在响应中返回）。`student` 只能发 `forum`。`editor` / `admin` 可发校报栏目或 Forum。Forum 可在同一次请求附带最多 4 张图；非法文件则**不落帖行**。
+- **职责：** 当前用户发布 Forum 帖，状态直接为 `published`；服务端同时写审计（不在响应中返回）。`category` 必须是 `forum`。可在同一次请求附带最多 4 张图；非法文件则**不落帖行**。News 不走本接口。
 
 **Request（JSON）** `Content-Type: application/json`
 
@@ -330,11 +418,11 @@ Content-Type: application/json
 | --- | --- | --- | --- |
 | `title` | string | 是 | 去掉首尾空白后 1–120 字符 |
 | `body` | string | 是 | 去掉首尾空白后 1–20000 字符 |
-| `category` | string | 是 | `news` \| `sports` \| `forum` |
+| `category` | string | 是 | 必须是 `forum`。`news` 返回 `403`。其他值 `422` |
 
 **Request（multipart）** `Content-Type: multipart/form-data`
 
-同样三个文本字段，外加重复文件字段 `images`（0–4，jpeg / png / webp，每张 ≤2MB）。**仅 `forum`** 可带图；校报栏目带 `images` → `422` 且不落帖。
+同样三个文本字段，外加重复文件字段 `images`（0–4，jpeg / png / webp，每张 ≤2MB）。仅 `forum` 可带图。
 
 作者取当前会话用户，客户端不可传 `author_id` / `status`。
 
@@ -342,22 +430,23 @@ Content-Type: application/json
 
 - `201` + `PostDetail`（含服务端生成的 `id`、`excerpt`、`created_at`、`updated_at`、`author`、`status=published`；Forum 若带图则 `images` 已填）
 - `401` `unauthenticated`
-- `403` `forbidden`（`student` 发校报栏目）
-- `422` `validation_error`（缺标题/正文/栏目、非法栏目、非法或过多配图、非 Forum 带图）
+- `403` `forbidden`（`category` 为 `news`）
+- `403` `account_muted`（账号已禁言）
+- `422` `validation_error`（缺标题/正文/栏目、栏目不是 `forum` 也不是会触发 `403` 的 `news`、非法或过多配图）
 - `503` `storage_unavailable`（帖子、审计或配图任一写入失败则整笔失败，不返回 201）
 
 无图时 `images` 为 `[]`。之后可用下面的上传接口补图。
 
 #### `DELETE /api/v1/posts/{post_id}`
 
-- **鉴权：** 是（须 `admin`）
-- **职责：** 删除已发布帖，并在同一事务去掉其评论、点赞、该帖审计记录；配图文件一并删除。
+- **鉴权：** 是（须 `admin` 或 `super_admin`）
+- **职责：** 删除帖子。先给作者写入一条 System 通知，再在同一事务去掉其评论、板块、点赞与该帖审计记录；配图文件一并删除。
 
 **Response**
 
 - `204` 无 body
 - `401` `unauthenticated`
-- `403` `forbidden`（不是 `admin`）
+- `403` `forbidden`（不是 `admin` 或 `super_admin`）
 - `404` `not_found`
 - `503` `storage_unavailable`
 
@@ -386,7 +475,7 @@ Content-Type: application/json
 - **鉴权：** 是
 - **职责：** 当前用户自己发过的帖（P1-US2），含已发布内容。
 
-**Query：** 与列表相同的 `page`、`page_size`（无 `category` 过滤；「我的帖子」含 Forum 与校报栏目）。
+**Query：** 与列表相同的 `page`、`page_size`（无 `category` 过滤；含该用户已发布的 Forum 与 News，不含尚无已同意板块的草稿）。
 
 **Response**
 
@@ -432,33 +521,128 @@ Forum 详情停留时可重复请求本接口（间隔与列表相同），合�
 
 - `201` + 所创建的 `CommentFloor`（新楼，`replies` 为 `[]`）或 `CommentReply`
 - `401` `unauthenticated`
+- `403` `account_muted`
 - `404` `not_found`（帖或 `parent_id` 楼层不存在）
 - `422` `validation_error`（非 Forum 帖、正文非法、`parent_id` 不是该帖楼层）
 - `503` `storage_unavailable`
 
-### 1.4 Promote
+### 1.4 News 草稿
 
-#### `POST /api/v1/posts/{post_id}/promote`
+`editor` 与 `super_admin` 可读写。`admin` 与 `student` 为 `403`。禁言账号的写操作（创建、改板块、提交）为 `403` `account_muted`；读取草稿仍允许。同意与退回仅 `super_admin`。
 
-- **鉴权：** 是（须 `editor` 或 `admin`）
-- **职责：** 把 Forum 帖复制成一篇校报新帖；源帖不改。作者为当前编辑。同时写审计。
+公开 `GET /posts` 不返回 `draft_body`。草稿在至少一个板块被同意之前不出现在公开列表或详情。
+
+#### `GET /api/v1/news/drafts`
+
+- **鉴权：** 是（`editor` 或 `super_admin`）
+- **职责：** 分页列出全部 News 稿（含尚未公开的 `draft` 与已有同意板块的 `published`）。按 `updated_at` 降序。
+
+**Query：** `page`、`page_size`。
+
+**Response**
+
+- `200` `{ items: NewsDraftSummary[], page, page_size, total }`
+- `401` `unauthenticated`
+- `403` `forbidden`
+- `503` `storage_unavailable`
+
+#### `POST /api/v1/news/drafts`
+
+- **鉴权：** 是（`editor` 或 `super_admin`，且未禁言）
+- **职责：** 新建一篇 News 草稿。同时写审计。此时没有板块，`status` 为 `draft`。
 
 **Request body**
 
 | 字段 | 类型 | 必填 | 约束 |
 | --- | --- | --- | --- |
-| `category` | string | 是 | `news` \| `sports`（不能是 `forum`） |
-| `title` | string | 否 | 若传：1–120 字符；不传则用源帖标题 |
-| `body` | string | 否 | 若传：1–20000 字符；不传则用源帖正文 |
+| `title` | string | 是 | 去掉首尾空白后 1–120 字符 |
 
 **Response**
 
-- `201` + 新帖 `PostDetail`（`images` 为 `[]`，不复制源帖配图）
+- `201` + `NewsDraftDetail`（`blocks` 为 `[]`）
 - `401` `unauthenticated`
-- `403` `forbidden`（`student`）
-- `404` `not_found`（源帖不存在）
-- `422` `validation_error`（源帖不是 Forum、栏目非法）
+- `403` `forbidden` 或 `account_muted`
+- `422` `validation_error`
 - `503` `storage_unavailable`
+
+#### `GET /api/v1/news/drafts/{draft_id}`
+
+- **鉴权：** 是（`editor` 或 `super_admin`）
+- **职责：** 一篇稿的全部板块，含草稿正文与已发布正文。
+
+**Response**
+
+- `200` + `NewsDraftDetail`
+- `401` `unauthenticated`
+- `403` `forbidden`
+- `404` `not_found`（不是 News 稿）
+- `503` `storage_unavailable`
+
+#### `POST /api/v1/news/drafts/{draft_id}/blocks`
+
+- **鉴权：** 是（`editor` 或 `super_admin`，且未禁言）
+- **职责：** 新增一个板块，`review_status` 为 `editing`。不改变已公开内容。传了 `position` 则放在该槽（1–16，与 News 报头槽位一一对应）；不传则加在当前最大 `position` 之后。
+
+**Request body**
+
+| 字段 | 类型 | 必填 | 约束 |
+| --- | --- | --- | --- |
+| `heading` | string | 是 | 1–120 字符 |
+| `body` | string | 是 | 1–20000 字符，写入 `draft_body` |
+| `position` | integer | 否 | 1–16。该位置已有板块则 `422`，`fields[].field` 为 `position` |
+
+**Response**
+
+- `201` + 更新后的 `NewsDraftDetail`
+- `401` / `403` `forbidden` 或 `account_muted` / `404` / `422` / `503`
+
+#### `PATCH /api/v1/news/drafts/{draft_id}/blocks/{block_id}`
+
+- **鉴权：** 是（`editor` 或 `super_admin`，且未禁言）
+- **职责：** 只改草稿标题和 / 或草稿正文。`published_heading` 与 `published_body` 不变。状态变为 `editing`（须再次提交才进入 `pending`）。
+
+**Request body：** `heading`、`body` 至少出现一个，约束同上。
+
+**Response**
+
+- `200` + `NewsDraftDetail`
+- `401` / `403` / `404` / `422`（两个字段都缺）/ `503`
+
+#### `POST /api/v1/news/drafts/{draft_id}/blocks/{block_id}/submit`
+
+- **鉴权：** 是（`editor` 或 `super_admin`，且未禁言）
+- **职责：** 把该板块标为 `pending`。已发布正文不变。
+
+**Response**
+
+- `200` + `NewsDraftDetail`
+- `401` / `403` `account_muted` 或 `forbidden` / `404` / `503`
+
+#### `POST /api/v1/news/drafts/{draft_id}/blocks/{block_id}/approve`
+
+- **鉴权：** 是（仅 `super_admin`）
+- **职责：** 仅当 `review_status` 为 `pending`。把 `heading` 写入 `published_heading`，`draft_body` 写入 `published_body`，状态改为 `published`。稿若因此有了已同意板块，则公开 `status` 变为 `published`，并出现在 News 列表。其他板块不变。
+
+**Response**
+
+- `200` + `NewsDraftDetail`
+- `401` / `403` `forbidden`（不是超级管理员）/ `404`
+- `422` `validation_error`（板块不是 `pending`，`fields[].field` 为 `review_status`）
+- `503`
+
+#### `POST /api/v1/news/drafts/{draft_id}/blocks/{block_id}/reject`
+
+- **鉴权：** 是（仅 `super_admin`）
+- **职责：** 仅当 `pending`。状态回到 `editing`。已发布标题与正文不变，公开页不改。
+
+**Response**
+
+- `200` + `NewsDraftDetail`
+- `401` / `403` / `404`
+- `422`（不是 `pending`）
+- `503`
+
+### 1.4b Likes
 
 #### `POST /api/v1/posts/{post_id}/likes`
 
@@ -472,6 +656,7 @@ Forum 详情停留时可重复请求本接口（间隔与列表相同），合�
 - `201` `{ "like_count": integer, "liked": true }`（新赞）
 - `200` `{ "like_count": integer, "liked": true }`（已经赞过）
 - `401` `unauthenticated`
+- `403` `account_muted`
 - `404` `not_found`
 - `422` `validation_error`（非 Forum 帖，`fields[].field` 为 `category`）
 - `503` `storage_unavailable`
@@ -487,6 +672,7 @@ Forum 详情停留时可重复请求本接口（间隔与列表相同），合�
 
 - `200` `{ "like_count": integer, "liked": false }`
 - `401` `unauthenticated`
+- `403` `account_muted`
 - `404` `not_found`
 - `422` `validation_error`（非 Forum 帖）
 - `503` `storage_unavailable`
@@ -495,8 +681,8 @@ Forum 详情停留时可重复请求本接口（间隔与列表相同），合�
 
 #### `GET /api/v1/admin/users`
 
-- **鉴权：** 是（须 `admin`）
-- **职责：** 分页列出用户，供授予 / 取消编辑。
+- **鉴权：** 是（须 `super_admin`）
+- **职责：** 分页列出用户，供授予角色、禁言或删除。
 
 **Query：** `page`、`page_size`。排序按 `created_at` 降序。
 
@@ -505,38 +691,63 @@ Forum 详情停留时可重复请求本接口（间隔与列表相同），合�
 - `200` `{ items: UserPrivate[], page, page_size, total }`
 - `400` `bad_request`
 - `401` `unauthenticated`
-- `403` `forbidden`（非 `admin`）
+- `403` `forbidden`（不是 `super_admin`）
 - `503` `storage_unavailable`
 
 #### `PATCH /api/v1/admin/users/{user_id}`
 
-- **鉴权：** 是（须 `admin`）
-- **职责：** 将目标用户设为 `editor` 或 `student`，和 / 或封禁、解封。
+- **鉴权：** 是（须 `super_admin`）
+- **职责：** 将目标设为 `student`、`editor` 或 `admin`，和 / 或禁言、解除。不废除会话。
 
 **Request body**
 
 | 字段 | 类型 | 必填 | 约束 |
 | --- | --- | --- | --- |
-| `role` | string | 否 | 若出现：仅 `student` \| `editor` |
-| `banned` | boolean | 否 | `true` 封禁并作废该用户全部会话；`false` 解封。与 `role` 至少出现一个 |
+| `role` | string | 否 | 若出现：仅 `student` \| `editor` \| `admin` |
+| `muted` | boolean | 否 | `true` 禁言；`false` 解除。与 `role` 至少出现一个 |
 
 **Response**
 
 - `200` + 更新后的 `UserPrivate`
 - `401` `unauthenticated`
-- `403` `forbidden`（调用者不是 `admin`；或目标已是 `admin`；或试图写成 `admin`；或封禁自己）
+- `403` `forbidden`（调用者不是 `super_admin`；或目标是 `super_admin`；或试图写成 `super_admin`；或禁言自己）
 - `404` `not_found`
-- `422` `validation_error`（`role` 非法，或 `role` 与 `banned` 都缺）
+- `422` `validation_error`（`role` 非法，或 `role` 与 `muted` 都缺）
 - `503` `storage_unavailable`
 
-`ADMIN_EMAIL`（环境变量，小写邮箱）在注册或登录时把该用户升为 `admin`。不要把真实邮箱写进仓库。
+#### `DELETE /api/v1/admin/users/{user_id}`
+
+- **鉴权：** 是（须 `super_admin`）
+- **职责：** 删除该用户及其会话、帖子、评论、点赞与草稿。不写 System 通知。
+
+**Response**
+
+- `204` 无 body
+- `401` `unauthenticated`
+- `403` `forbidden`（不是 `super_admin`；或目标是自己；或目标是 `super_admin`）
+- `404` `not_found`
+- `503` `storage_unavailable`
+
+`ADMIN_EMAIL`（环境变量，小写邮箱）在注册或登录时把该用户升为 `super_admin`。不要把真实邮箱写进仓库。
+
+#### `GET /api/v1/me/notices`
+
+- **鉴权：** 是
+- **职责：** 当前用户自己的 System 通知，按 `created_at` 降序。没有回复接口。
+
+**Response**
+
+- `200` `{ "items": Notice[] }`
+- `401` `unauthenticated`
+- `503` `storage_unavailable`
 
 ### 1.6 本版不提供的写接口（避免前后端各写一套）
 
 | 方法 | 路径 | 说明 |
 | --- | --- | --- |
 | `PATCH` | `/api/v1/posts/{post_id}` | 作者改帖仍不做。若误调用：`405`。 |
-| `DELETE` | `/api/v1/posts/{post_id}` | 见上文：仅 `admin`。 |
+| `DELETE` | `/api/v1/posts/{post_id}` | 见上文：`admin` 或 `super_admin`。 |
+| `POST` | `/api/v1/posts/{post_id}/promote` | 已移除。News 走草稿同意。误调用 `405`。 |
 | `PATCH` / `DELETE` | `/api/v1/posts/{post_id}/comments/{comment_id}` | 本版不能改删单条评论。若误调用：`405`。 |
 | `GET` | `/api/v1/audit-events` | Should（S5）。审计只写不读。 |
 
@@ -563,11 +774,11 @@ Forum 详情停留时可重复请求本接口（间隔与列表相同），合�
 ```json
 {
   "id": "8f2a1c6e-4b90-4d3a-9e1f-2c7b0d84a511",
-  "email": "jordan.hale@example.com",
+  "email": "jordan.hale@basischina.com",
   "display_name": "Jordan Hale",
   "role": "student",
   "avatar": "preset:oak",
-  "banned": false,
+  "muted": false,
   "created_at": "2026-09-10T11:02:18Z"
 }
 ```
@@ -595,11 +806,11 @@ Forum 详情停留时可重复请求本接口（间隔与列表相同），合�
 ```json
 {
   "id": "c3d9e0a4-1f27-4b8c-a056-9e4d2b71c880",
-  "email": "priya.nair@example.com",
+  "email": "priya.nair@basischina.com",
   "display_name": "Priya Nair",
   "role": "editor",
   "avatar": "preset:oak",
-  "banned": false,
+  "muted": false,
   "created_at": "2026-08-21T09:10:00Z"
 }
 ```
@@ -645,11 +856,11 @@ Forum 详情停留时可重复请求本接口（间隔与列表相同），合�
 ```json
 {
   "id": "8f2a1c6e-4b90-4d3a-9e1f-2c7b0d84a511",
-  "email": "jordan.hale@example.com",
+  "email": "jordan.hale@basischina.com",
   "display_name": "Jordan Hale",
   "role": "student",
   "avatar": "preset:oak",
-  "banned": false,
+  "muted": false,
   "created_at": "2026-09-10T11:02:18Z"
 }
 ```
@@ -692,7 +903,7 @@ Forum 详情停留时可重复请求本接口（间隔与列表相同），合�
       "id": "b7a02f19-3c54-4e8d-91aa-6d2c0e8f3310",
       "title": "Intramural basketball finals — Saturday at the old gym",
       "excerpt": "East Hall plays the faculty pick-up team for the dorm cup. Doors open at 16:30; bring student ID. We still need two table scorers.",
-      "category": "sports",
+      "category": "news",
       "status": "published",
       "created_at": "2026-09-10T14:05:44Z",
       "updated_at": "2026-09-10T14:05:44Z",
@@ -742,7 +953,7 @@ Forum 详情停留时可重复请求本接口（间隔与列表相同），合�
     "code": "validation_error",
     "message": "One or more fields are invalid.",
     "fields": [
-      { "field": "category", "message": "Must be one of: news, sports, forum." }
+      { "field": "category", "message": "Must be one of: news, forum." }
     ]
   }
 }
@@ -750,7 +961,7 @@ Forum 详情停留时可重复请求本接口（间隔与列表相同），合�
 
 ---
 
-### 2.6 `GET /api/v1/posts?category=sports`
+### 2.6 `GET /api/v1/posts?category=news`
 
 **成功 `200`**
 
@@ -761,7 +972,7 @@ Forum 详情停留时可重复请求本接口（间隔与列表相同），合�
       "id": "91c4d2e8-0a17-4b5f-8e33-7c1a9d04b226",
       "title": "Back-to-hall mixer: all East and West residents",
       "excerpt": "RA council is hosting the first mixer of term. No ticket, but you need a dorm lanyard at the door. Playlist sign-up on the whiteboard.",
-      "category": "sports",
+      "category": "news",
       "status": "published",
       "created_at": "2026-09-08T19:22:10Z",
       "updated_at": "2026-09-08T19:22:10Z",
@@ -779,7 +990,7 @@ Forum 详情停留时可重复请求本接口（间隔与列表相同），合�
 
 **错误 `400`（分页非法）**
 
-`GET /api/v1/posts?category=sports&page=0`
+`GET /api/v1/posts?category=news&page=0`
 
 ```json
 {
@@ -803,6 +1014,14 @@ Forum 详情停留时可重复请求本接口（间隔与列表相同），合�
   "title": "East Hall laundry room will close Friday night",
   "excerpt": "Facilities posted a handwritten note on the basement door: the dryers are being replaced this weekend. Bring quarters to West Hall if you still need a machine tonight.",
   "body": "Facilities posted a handwritten note on the basement door: the dryers are being replaced this weekend. Bring quarters to West Hall if you still need a machine tonight.\n\nThe note says work starts at 18:00 Friday and should finish Sunday afternoon. If you already left clothes in a machine, the RAs will bag them and leave them on the folding table.\n\nWest Hall basement is staying open. It was packed last time the East machines died, so go early.",
+  "blocks": [
+    {
+      "id": "6c1e0a44-2b18-4d77-9f30-1a8c5e2d6640",
+      "heading": "East Hall laundry",
+      "body": "Facilities posted a handwritten note on the basement door: the dryers are being replaced this weekend. Bring quarters to West Hall if you still need a machine tonight.\n\nThe note says work starts at 18:00 Friday and should finish Sunday afternoon. If you already left clothes in a machine, the RAs will bag them and leave them on the folding table.\n\nWest Hall basement is staying open. It was packed last time the East machines died, so go early.",
+      "position": 1
+    }
+  ],
   "category": "news",
   "status": "published",
   "created_at": "2026-09-10T16:40:12Z",
@@ -830,15 +1049,15 @@ Forum 详情停留时可重复请求本接口（间隔与列表相同），合�
 
 ### 2.8 `POST /api/v1/posts`
 
-**成功 `201`**（Priya 发体育稿）
+**成功 `201`**（Jordan 发 Forum 帖）
 
 请求示例（非响应，便于 Mock 对照）：
 
 ```json
 {
-  "title": "Intramural basketball finals — Saturday at the old gym",
-  "body": "East Hall plays the faculty pick-up team for the dorm cup. Doors open at 16:30; bring student ID. We still need two table scorers.\n\nCheer section is first come, first served on the bleachers. No outside horns.",
-  "category": "sports"
+  "title": "East Hall is short on quarters",
+  "body": "The laundry note is real. If you have a spare roll, leave it on the folding table.",
+  "category": "forum"
 }
 ```
 
@@ -847,10 +1066,11 @@ Forum 详情停留时可重复请求本接口（间隔与列表相同），合�
 ```json
 {
   "id": "b7a02f19-3c54-4e8d-91aa-6d2c0e8f3310",
-  "title": "Intramural basketball finals — Saturday at the old gym",
-  "excerpt": "East Hall plays the faculty pick-up team for the dorm cup. Doors open at 16:30; bring student ID. We still need two table scorers.",
-  "body": "East Hall plays the faculty pick-up team for the dorm cup. Doors open at 16:30; bring student ID. We still need two table scorers.\n\nCheer section is first come, first served on the bleachers. No outside horns.",
-  "category": "sports",
+  "title": "East Hall is short on quarters",
+  "excerpt": "The laundry note is real. If you have a spare roll, leave it on the folding table.",
+  "body": "The laundry note is real. If you have a spare roll, leave it on the folding table.",
+  "blocks": [],
+  "category": "forum",
   "status": "published",
   "created_at": "2026-09-10T14:05:44Z",
   "updated_at": "2026-09-10T14:05:44Z",
