@@ -14,9 +14,6 @@ export default function About() {
         Elegram is independent and community-hosted. It is not the registrar, not a ticket office, and not a
         recommendation engine.
       </p>
-      <p className="mt-4 font-sans text-[15px] leading-7 text-neutral-500">
-        Not associated with BASIS Bilingual Guangming.
-      </p>
     </div>
   );
 }

@@ -29,17 +29,17 @@
 | `/register` | 注册 | 访客 | `POST /api/v1/auth/email-codes`（`purpose=register`）后 `POST /api/v1/auth/register` |
 | `/reset-password` | 找回密码 | 访客 | `POST /api/v1/auth/email-codes`（`purpose=reset`）后 `POST /api/v1/auth/password-reset` |
 | `/about` `/contact` | 静态稿（截图顶栏） | 公开 | 无 API |
-| `/terms` | 用户协议 | 公开 | 无 API。默认英文，页内可切中文；语言选择记在浏览器本地，不进接口 |
+| `/terms` | 用户协议 | 公开 | 无 API。默认英文，可切中文；语言选择记在浏览器本地，不进接口。直接打开此地址是整页。站内顶栏与注册勾选不跳到本页，改为当前页浮层 |
 
 **全局壳 `PaperShell`**
 
-- 顶栏左：`ABOUT` `TERMS`（`/terms`）`CONTACT` `SYSTEM`（`/system`）。顶栏右：账号区 + 本地日期文案 `Today: {formatted local date}`（不是 schema 字段）。
+- 顶栏左：`ABOUT` `TERMS`（当前页浮层，不切路由）`CONTACT` `SYSTEM`（`/system`）。顶栏右：账号区 + 本地日期文案 `Today: {formatted local date}`（不是 schema 字段）。`TERMS` 浮层可滚动，点遮罩或关闭即收起，仍停在打开前的页面。
 - 账号：启动时 `GET /api/v1/me`。登录后同一套 live refresh（约 4 秒）再拉 `/me`，超管改 `role` / `muted` / 删号后顶栏与导航跟着变，不必整页刷新。`401` = 访客，显示 `SIGN IN`（去 `/sign-in`）。`200` = 已登录，显示头像（`avatar`）、`display_name`、`AVATAR`（`/me/avatar`）、`PASSWORD`（`/me/password`）、`MY POSTS`（`/me/posts`）、`SIGN OUT`。顶栏不放 `DRAFTS`。`role===super_admin` 另显示 `USERS`（`/admin/users`）。
 - 列表同步：首页 / Forum / 帖详情已 live refresh。`/admin/users`、`/news/drafts` 列表、`/system`、`/me/posts` 同样轮询，超管或其他人刚做的改动会进当前页。打开中的草稿编辑框不自动覆盖，以免冲掉未保存正文。
 - 报头：左搜索框（外形保留；提交不调接口，在报头下出一条静态说明）。中：斜体衬线字标 `Elegram` 链回 `/`。右：静态「COMMUNITY HOSTED / Independent campus forum」。
 - 标语静态：`YOUR CAMPUS. YOUR STORIES. YOUR VOICE.`
 - 导航：`NEWS`（`/`）`DRAFTS`（`/news/drafts`）`FORUM` `OPINION`。`DRAFTS` 只在 `role` 为 `editor` 或 `super_admin` 时出现，与 `FORUM` 同一行。当前路由下划黑线。无 `SUBMIT`，无单独的 News 列表项。Forum 发帖在栏目页内。News 稿在 `/news/drafts`。
-- 页脚声明（非 schema）：`Community-hosted. Not associated with BASIS Bilingual Guangming.`
+- 页脚声明（非 schema）：`Community-hosted.`
 
 **栏目枚举 → 导航文案（展示层，不是新字段）**
 
@@ -176,7 +176,7 @@ Photo of the Day / Track of the Day / Student Art：静态标题+空图框+固�
 
 | 状态 | 表现 |
 | --- | --- |
-| 首次 | 窄表。登录：`email` `password`，表下链 `/reset-password`（Forgot password）。注册：`display_name` `email` `password`、「发送验证码」、`code`，以及勾选同意用户协议（链 `/terms`）。未勾选不提交；勾选后 body 带 `accept_terms: true`。注册与找回密码的密码框不走系统 Strong Password / 浏览器自动生成，由用户自己输入。 |
+| 首次 | 窄表。登录：`email` `password`，表下链 `/reset-password`（Forgot password）。注册：`display_name` `email` `password`、「发送验证码」、`code`，以及勾选同意用户协议。点 “user agreement” 在当前页打开浮层，不离开注册表。浮层内 “I agree” 勾选并关闭；点关闭或遮罩则勾选不变。未勾选不提交；勾选后 body 带 `accept_terms: true`。注册与找回密码的密码框不走系统 Strong Password / 浏览器自动生成，由用户自己输入。 |
 | 422 | 字段下 ← `error.fields[]`。非 `@basischina.com` 只显示 email 错误，不进入等待验证码态。`accept_terms` 错误显示在勾选下方。 |
 | 401 `invalid_credentials` | 表单上沿 ← `error.message`（Email or password is incorrect.）。 |
 | 409 `email_taken` | `email` 下 ← `fields[].message` 或 `error.message`。 |
@@ -249,7 +249,7 @@ Photo of the Day / Track of the Day / Student Art：静态标题+空图框+固�
   - `<SectionNav>` NEWS（`/`）/ DRAFTS（仅 `editor` 或 `super_admin`，`/news/drafts`）/ FORUM / OPINION
   - `<SearchNotice>` 仅搜索提交后显示（静态文案）
   - `<Outlet>` 下列页面之一
-  - `<Disclaimer>` Community-hosted. Not associated with BASIS Bilingual Guangming.
+  - `<Disclaimer>` Community-hosted.
 
 - `<Page: Home>`
   - `<ErrorBanner>` ← `error.code` `error.message`（仅列表失败）

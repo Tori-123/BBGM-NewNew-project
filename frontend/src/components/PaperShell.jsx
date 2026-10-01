@@ -3,6 +3,7 @@ import { Link, NavLink, Outlet } from "react-router-dom";
 import { useAuth } from "../auth";
 import { Avatar } from "./Avatar";
 import { canEditNews, CATEGORY_ROUTES, formatToday } from "../format";
+import { TermsDialog } from "../pages/Terms";
 
 function navClass({ isActive }) {
   return `font-sans text-[12px] font-medium uppercase tracking-[0.18em] ${
@@ -33,6 +34,7 @@ export default function PaperShell() {
   const { user, signOut } = useAuth();
   const [query, setQuery] = useState("");
   const [searchNotice, setSearchNotice] = useState(false);
+  const [termsOpen, setTermsOpen] = useState(false);
 
   function onSearch(event) {
     event.preventDefault();
@@ -53,7 +55,9 @@ export default function PaperShell() {
         <div className="flex items-center justify-between border-b border-black py-[10px] font-sans text-[11px] font-medium tracking-[0.18em] text-[#111111]">
           <nav className="flex items-center gap-7 uppercase">
             <Link to="/about">About</Link>
-            <Link to="/terms">Terms</Link>
+            <button type="button" className="uppercase" onClick={() => setTermsOpen(true)}>
+              Terms
+            </button>
             <Link to="/contact">Contact</Link>
             <Link to="/system">System</Link>
             {user ? (
@@ -139,9 +143,10 @@ export default function PaperShell() {
         <Outlet />
 
         <p className="mt-16 border-t border-neutral-200 pt-4 font-sans text-[11px] leading-5 text-neutral-500">
-          Community-hosted. Not associated with BASIS Bilingual Guangming.
+          Community-hosted.
         </p>
       </div>
+      {termsOpen ? <TermsDialog onClose={() => setTermsOpen(false)} /> : null}
     </div>
   );
 }

@@ -3,6 +3,7 @@ import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { api, fieldMessage, safeNext } from "../api";
 import { useAuth } from "../auth";
 import { ErrorBanner, FieldError, FrontPageLink, ManualPasswordInput, SectionRule } from "../components/ui";
+import { TermsDialog } from "./Terms";
 
 export default function Register() {
   const { signIn } = useAuth();
@@ -18,6 +19,7 @@ export default function Register() {
   const [codeSent, setCodeSent] = useState(false);
   const [acceptTerms, setAcceptTerms] = useState(false);
   const [termsError, setTermsError] = useState("");
+  const [termsOpen, setTermsOpen] = useState(false);
 
   async function onSendCode() {
     setSendingCode(true);
@@ -148,9 +150,17 @@ export default function Register() {
             />
             <span>
               I agree to the{" "}
-              <Link to="/terms" className="text-[#1A4FBF]">
+              <button
+                type="button"
+                className="text-[#1A4FBF]"
+                onClick={(event) => {
+                  event.preventDefault();
+                  event.stopPropagation();
+                  setTermsOpen(true);
+                }}
+              >
                 user agreement
-              </Link>
+              </button>
               .
             </span>
           </label>
@@ -170,6 +180,16 @@ export default function Register() {
           Sign in
         </Link>
       </p>
+      {termsOpen ? (
+        <TermsDialog
+          onClose={() => setTermsOpen(false)}
+          onAgree={() => {
+            setAcceptTerms(true);
+            setTermsError("");
+            setTermsOpen(false);
+          }}
+        />
+      ) : null}
     </div>
   );
 }

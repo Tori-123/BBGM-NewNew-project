@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { FrontPageLink, SectionRule } from "../components/ui";
 
 const STORAGE_KEY = "elegram_terms_lang";
@@ -6,7 +6,7 @@ const STORAGE_KEY = "elegram_terms_lang";
 const COPY = {
   en: {
     title: "Terms",
-    lead: "Elegram is a community-hosted campus forum. It is not the registrar, not a ticket office, and not a recommendation engine. It is not associated with BASIS Bilingual Guangming. Creating an account means you accept this agreement.",
+    lead: "Elegram is a community-hosted campus forum. It is not the registrar, not a ticket office, and not a recommendation engine. Creating an account means you accept this agreement.",
     sections: [
       {
         heading: "Account and cybersecurity",
@@ -49,7 +49,7 @@ const COPY = {
   },
   zh: {
     title: "用户协议",
-    lead: "Elegram 是社区托管的校园论坛，不是教务处，不是售票处，也不是推荐引擎。与 BASIS Bilingual Guangming 无关。注册即表示接受本协议。",
+    lead: "Elegram 是社区托管的校园论坛，不是教务处，不是售票处，也不是推荐引擎。注册即表示接受本协议。",
     sections: [
       {
         heading: "账号与网络安全",
@@ -99,7 +99,7 @@ function readLang() {
   }
 }
 
-export default function Terms() {
+function TermsBody() {
   const [lang, setLang] = useState(readLang);
   const copy = COPY[lang];
 
@@ -113,8 +113,7 @@ export default function Terms() {
   }
 
   return (
-    <div className="mx-auto mt-8 max-w-2xl">
-      <FrontPageLink />
+    <>
       <div className="flex justify-end">
         <button
           type="button"
@@ -138,6 +137,60 @@ export default function Terms() {
         </section>
       ))}
       <p className="mt-8 font-sans text-[15px] leading-7 text-neutral-500">{copy.closing}</p>
+    </>
+  );
+}
+
+export function TermsDialog({ onClose, onAgree }) {
+  useEffect(() => {
+    function onKey(event) {
+      if (event.key === "Escape") onClose();
+    }
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  return (
+    <div className="fixed inset-0 z-30 flex items-start justify-center overflow-y-auto bg-black/40 px-4 py-10">
+      <button type="button" className="absolute inset-0 cursor-default" aria-label="Close" onClick={onClose} />
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="terms-dialog-title"
+        className="relative z-10 w-full max-w-2xl bg-white p-8"
+      >
+        <h2 id="terms-dialog-title" className="sr-only">
+          User agreement
+        </h2>
+        <TermsBody />
+        <div className="mt-8 flex justify-end gap-3">
+          <button
+            type="button"
+            onClick={onClose}
+            className="border border-black px-5 py-2 font-sans text-[11px] uppercase tracking-[0.18em]"
+          >
+            Close
+          </button>
+          {onAgree ? (
+            <button
+              type="button"
+              onClick={onAgree}
+              className="rounded-[2px] bg-black px-5 py-2 font-sans text-[11px] uppercase tracking-[0.18em] text-white"
+            >
+              I agree
+            </button>
+          ) : null}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export default function Terms() {
+  return (
+    <div className="mx-auto mt-8 max-w-2xl">
+      <FrontPageLink />
+      <TermsBody />
     </div>
   );
 }

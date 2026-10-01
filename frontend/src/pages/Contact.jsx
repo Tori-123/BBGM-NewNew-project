@@ -10,10 +10,6 @@ export default function Contact() {
         Tips, corrections, and section questions stay on this community-hosted site. Students write in
         Forum; editors work in News drafts.
       </p>
-      <p className="mt-4 font-sans text-[15px] leading-7 text-neutral-500">
-        This page does not send mail. It is a static masthead notice. Elegram is not associated with BASIS
-        Bilingual Guangming.
-      </p>
     </div>
   );
 }
