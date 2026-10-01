@@ -30,13 +30,15 @@ def send_verification_email(settings: Settings, email: str, code: str, purpose: 
     message["From"] = settings.smtp_from
     message["To"] = email
     message.set_content(
-        f"Your verification code is {code}. It expires in 10 minutes. If you did not request this, ignore this email."
+        f"Your verification code is:\n\n{code}\n\nIt expires in 2 minutes. If you did not request this, ignore this email."
     )
     try:
         with smtplib.SMTP(settings.smtp_host, settings.smtp_port, timeout=15) as smtp:
+            smtp.ehlo()
             smtp.starttls()
+            smtp.ehlo()
             if settings.smtp_user:
                 smtp.login(settings.smtp_user, settings.smtp_password)
             smtp.send_message(message)
-    except OSError as exc:
+    except (OSError, smtplib.SMTPException) as exc:
         raise StorageError() from exc

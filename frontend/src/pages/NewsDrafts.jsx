@@ -1,9 +1,10 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { ApiError, api, fieldMessage } from "../api";
 import { useAuth } from "../auth";
 import { ErrorBanner, FieldError, FrontPageLink, SectionRule } from "../components/ui";
 import { canEditNews } from "../format";
+import { useLiveRefresh } from "../live";
 
 const FALLBACK = {
   0: { kicker: "FEATURED", title: "The biggest story on campus goes here" },
@@ -351,17 +352,17 @@ export default function NewsDrafts() {
     if (!canEditNews(user)) navigate("/", { replace: true });
   }, [ready, user, navigate]);
 
+  const refreshDrafts = useCallback(async () => {
+    const data = await api.listDrafts();
+    setDrafts(data.items);
+    setError(null);
+  }, []);
+
   useEffect(() => {
     if (!user || !canEditNews(user)) return undefined;
     let cancelled = false;
     setLoading(true);
-    api
-      .listDrafts()
-      .then((data) => {
-        if (cancelled) return;
-        setDrafts(data.items);
-        setError(null);
-      })
+    refreshDrafts()
       .catch((err) => {
         if (cancelled) return;
         if (err instanceof ApiError && err.status === 401) {
@@ -381,7 +382,9 @@ export default function NewsDrafts() {
     return () => {
       cancelled = true;
     };
-  }, [user, navigate, setUser]);
+  }, [user, navigate, setUser, refreshDrafts]);
+
+  useLiveRefresh(Boolean(user && canEditNews(user)) && !loading, refreshDrafts);
 
   function openDraft(next) {
     setDraft(next);

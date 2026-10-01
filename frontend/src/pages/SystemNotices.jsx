@@ -1,9 +1,10 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { ApiError, api } from "../api";
 import { useAuth } from "../auth";
 import { ErrorBanner, FrontPageLink, SectionRule } from "../components/ui";
 import { formatDateline } from "../format";
+import { useLiveRefresh } from "../live";
 
 export default function SystemNotices() {
   const { user, ready, setUser } = useAuth();
@@ -19,17 +20,17 @@ export default function SystemNotices() {
     }
   }, [ready, user, navigate]);
 
+  const refreshNotices = useCallback(async () => {
+    const data = await api.notices();
+    setItems(data.items);
+    setError(null);
+  }, []);
+
   useEffect(() => {
     if (!user) return undefined;
     let cancelled = false;
     setLoading(true);
-    api
-      .notices()
-      .then((data) => {
-        if (cancelled) return;
-        setItems(data.items);
-        setError(null);
-      })
+    refreshNotices()
       .catch((err) => {
         if (cancelled) return;
         if (err instanceof ApiError && err.status === 401) {
@@ -45,7 +46,9 @@ export default function SystemNotices() {
     return () => {
       cancelled = true;
     };
-  }, [user, navigate, setUser]);
+  }, [user, navigate, setUser, refreshNotices]);
+
+  useLiveRefresh(Boolean(user) && !loading, refreshNotices);
 
   if (!ready || !user) return null;
 

@@ -19,6 +19,26 @@ export function FieldError({ message }) {
   return <p className="mt-1 text-xs text-red-700">{message}</p>;
 }
 
+export function ManualPasswordInput({ id, value, onChange }) {
+  return (
+    <input
+      id={id}
+      type="text"
+      name={`${id}-manual`}
+      autoComplete="off"
+      autoCorrect="off"
+      autoCapitalize="none"
+      spellCheck={false}
+      data-1p-ignore="true"
+      data-lpignore="true"
+      data-form-type="other"
+      value={value}
+      onChange={onChange}
+      className="mt-2 w-full border-0 border-b border-black py-2 font-sans text-sm outline-none [-webkit-text-security:disc]"
+    />
+  );
+}
+
 export function FrontPageLink() {
   return (
     <p className="mb-6 font-sans text-[11px] font-medium uppercase tracking-[0.16em]">

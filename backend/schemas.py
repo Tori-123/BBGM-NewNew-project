@@ -36,6 +36,11 @@ class PasswordResetBody(BaseModel):
     password: str
 
 
+class ChangePasswordBody(BaseModel):
+    current_password: str
+    password: str
+
+
 class CreatePostBody(BaseModel):
     model_config = ConfigDict(extra="ignore")
 

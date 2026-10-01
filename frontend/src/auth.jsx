@@ -2,8 +2,20 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { ApiError, api } from "./api";
+import { useLiveRefresh } from "./live";
 
 const AuthContext = createContext(null);
+
+function sameProfile(left, right) {
+  return (
+    left?.id === right?.id &&
+    left?.email === right?.email &&
+    left?.display_name === right?.display_name &&
+    left?.role === right?.role &&
+    left?.avatar === right?.avatar &&
+    Boolean(left?.muted) === Boolean(right?.muted)
+  );
+}
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
@@ -32,6 +44,19 @@ export function AuthProvider({ children }) {
     };
   }, []);
 
+  const refreshMe = useCallback(async () => {
+    try {
+      const profile = await api.me();
+      setUser((current) => (sameProfile(current, profile) ? current : profile));
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 401) {
+        setUser(null);
+      }
+    }
+  }, []);
+
+  useLiveRefresh(ready && Boolean(user), refreshMe);
+
   const signIn = useCallback((profile) => {
     setUser(profile);
   }, []);
@@ -48,6 +73,7 @@ export function AuthProvider({ children }) {
     if (
       location.pathname === "/me/posts" ||
       location.pathname === "/me/avatar" ||
+      location.pathname === "/me/password" ||
       location.pathname === "/admin/users" ||
       location.pathname === "/news/drafts" ||
       location.pathname === "/system"

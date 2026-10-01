@@ -70,8 +70,9 @@ Must 服务主故事 P1-US1（Forum 发帖被看见）以及角色、跟帖、Ne
 | --- | --- | --- |
 | M1 | 注册、登录、退出 | 仅 `@basischina.com`。注册先发邮箱验证码，码通过后才建账号；登录用邮箱 + 密码。会话可跨请求识别当前用户。发帖回路离开登录不成立。 |
 | M23 | 找回密码 | 登录页可走忘记密码。校内邮箱收验证码后设新密码，再用登录接口进站。非 `@basischina.com` 当场拒绝，不发信。 |
+| M24 | 登录后改密码 | 顶栏账号旁可改密码：校验当前密码后设新密码，无需再发验证码。 |
 | M2 | 鉴权与权限 | 未登录可读已发布内容与 Forum 评论；仅登录用户可发帖 / 跟帖；直接发 News 被拒绝；用户不能改删自己的帖或评论。被禁言者仍可登录阅读。 |
-| M3 | 多页面 | 至少：News（`/` 报头版式，不再单列 News 列表页）、Forum、帖子详情（Forum 含楼中楼）、登录/注册/找回密码、我的帖子、News 草稿、System 通知、超级管理员用户列表。Forum 发帖在栏目页内，无独立 Submit 页。 |
+| M3 | 多页面 | 至少：News（`/` 报头版式，不再单列 News 列表页）、Forum、帖子详情（Forum 含楼中楼）、登录/注册/找回密码、登录后改密码、我的帖子、News 草稿、System 通知、超级管理员用户列表。Forum 发帖在栏目页内，无独立 Submit 页。 |
 | M4 | 发帖 | Forum：标题、正文必填，发布后 `published`，作者绑定当前用户，可附带最多 4 张图。News 不经此接口公开。 |
 | M6 | 按栏目阅读 | 栏目页只列出该栏目已发布帖。News 详情只展示已同意板块。 |
 | M7 | News 露出 | `/` 的报头版式展示近期已发布 **News**，不含 Forum，不含尚无已同意板块的草稿。导航第一项是 News，没有单独的 News 列表页。 |
@@ -90,7 +91,7 @@ Must 服务主故事 P1-US1（Forum 发帖被看见）以及角色、跟帖、Ne
 | M20 | 停留时看到新帖 | News（`/`）与 Forum 打开后重复请求已有公开列表；他人新发的帖进入当前列表，无需整页刷新。Forum 详情同样拉新楼层。后台拉失败不打断当前阅读、不盖错误条。不另开推送通道或新字段。 |
 | M21 | 删帖与 System 通知 | `admin` 与 `super_admin` 可删除帖子。删之前给作者写一条 System 通知（标题已被移除）。帖、其评论、点赞、配图、板块与该帖审计一并去掉。作者、`editor` 与学生不能删。System 页不可回复。 |
 | M22 | 禁言 | 仅 `super_admin` 可禁言或解除。被禁言者可以登录和阅读，不能发帖、跟帖、点赞、创建或提交草稿。不废除其会话。已发帖仍公开。 |
-| M24 | 删除用户 | 仅 `super_admin` 可删除用户。作废其会话，并删除其帖子、评论、点赞与草稿。不给被删用户发 System 通知。 |
+| M25 | 删除用户 | 仅 `super_admin` 可删除用户。作废其会话，并删除其帖子、评论、点赞与草稿。不给被删用户发 System 通知。 |
 
 ### Should Have
 
@@ -197,7 +198,7 @@ Elegram 应用（Web 页面 + 服务端）
 | 实体 | 关键字段 | 生命周期 |
 | --- | --- | --- |
 | User | id, email, password_hash, display_name, role, avatar, muted, created_at | 邮箱须 `@basischina.com`；验证码通过后注册为 `student`，`muted` 默认 false；禁言后仍可登录，不能写帖 |
-| EmailCode | email, purpose, code_hash, expires_at, attempt_count | 注册或找回密码发码；明文不入库；过期或用过后失效 |
+| EmailCode | email, purpose, code_hash, expires_at, attempt_count | 注册或找回密码发码；明文不入库；发出后 2 分钟过期，或用过后失效 |
 | Session | 可校验的登录凭证，绑定 user_id，可失效 | 登录创建 → 退出、删除用户或过期销毁。禁言不废除会话 |
 | Post | id, author_id, title, body, category, status, images, created_at, updated_at | Forum 校验通过后 `published`。News 在至少一块被同意前为 `draft`，公开接口不返回。`admin` / `super_admin` 可整帖删除 |
 | NewsBlock | id, post_id, position, heading, published_heading, draft_body, published_body, review_status | `editing` / `pending` / `published`。同意把草稿写入已发布字段。公开详情只用已发布字段 |

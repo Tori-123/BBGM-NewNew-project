@@ -215,7 +215,7 @@ Content-Type: application/json
 #### `POST /api/v1/auth/email-codes`
 
 - **鉴权：** 否
-- **职责：** 向校内邮箱发送 6 位验证码。`purpose=register` 用于注册；`purpose=reset` 用于找回密码。非 `@basischina.com` **不写库、不发信**。
+- **职责：** 向校内邮箱发送 6 位验证码。`purpose=register` 用于注册；`purpose=reset` 用于找回密码。非 `@basischina.com` **不写库、不发信**。码发出后 **2 分钟**过期。
 
 **Request body**
 
@@ -245,7 +245,7 @@ Content-Type: application/json
 | `email` | string | 是 | 有效邮箱，大小写不敏感，存储前规范化为小写；必须是 `@basischina.com` |
 | `password` | string | 是 | 8–128 字符 |
 | `display_name` | string | 是 | 去掉首尾空白后 1–40 字符 |
-| `code` | string | 是 | 6 位数字；须与该邮箱最近一次 `purpose=register` 的未过期码一致 |
+| `code` | string | 是 | 6 位数字；须与该邮箱最近一次 `purpose=register` 的未过期码一致（发出后 2 分钟内） |
 
 **Response**
 
@@ -266,7 +266,7 @@ Content-Type: application/json
 | 字段 | 类型 | 必填 | 约束 |
 | --- | --- | --- | --- |
 | `email` | string | 是 | 有效邮箱，必须是 `@basischina.com`，规范化为小写 |
-| `code` | string | 是 | 6 位数字；须与该邮箱最近一次 `purpose=reset` 的未过期码一致 |
+| `code` | string | 是 | 6 位数字；须与该邮箱最近一次 `purpose=reset` 的未过期码一致（发出后 2 分钟内） |
 | `password` | string | 是 | 8–128 字符 |
 
 **Response**
@@ -324,6 +324,27 @@ Content-Type: application/json
 
 - `200` + `UserPrivate`
 - `401` `unauthenticated`
+
+---
+
+#### `PUT /api/v1/me/password`
+
+- **鉴权：** 是
+- **职责：** 已登录用户用当前密码改成新密码。成功保持当前会话，不发验证码。
+
+**Request body**
+
+| 字段 | 类型 | 必填 | 约束 |
+| --- | --- | --- | --- |
+| `current_password` | string | 是 | 非空；须与库中密码一致 |
+| `password` | string | 是 | 8–128 字符；须与 `current_password` 不同 |
+
+**Response**
+
+- `204` 无 body
+- `401` `unauthenticated`
+- `422` `validation_error`（缺字段、新密码过短或与当前相同、当前密码不对写在 `current_password`）
+- `503` `storage_unavailable`
 
 ---
 
@@ -873,6 +894,26 @@ Forum 详情停留时可重复请求本接口（间隔与列表相同），合�
     "code": "unauthenticated",
     "message": "Please sign in to continue.",
     "fields": []
+  }
+}
+```
+
+---
+
+### 2.4a `PUT /api/v1/me/password`
+
+**成功 `204`** 无 body。当前会话仍有效。
+
+**错误 `422`（当前密码不对）**
+
+```json
+{
+  "error": {
+    "code": "validation_error",
+    "message": "One or more fields are invalid.",
+    "fields": [
+      { "field": "current_password", "message": "Current password is incorrect." }
+    ]
   }
 }
 ```

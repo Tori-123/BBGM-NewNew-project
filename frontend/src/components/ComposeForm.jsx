@@ -147,11 +147,14 @@ export default function ComposeForm({ category, onPublished, onCancel }) {
       <div className="mt-6 flex items-center gap-4">
         <button
           type="submit"
-          disabled={submitting}
+          disabled={submitting || user.muted}
           className="rounded-[2px] bg-black px-5 py-2 font-sans text-[11px] uppercase tracking-[0.18em] text-white"
         >
           Publish
         </button>
+        {user.muted ? (
+          <p className="font-sans text-sm text-red-700">This account is muted and cannot publish.</p>
+        ) : null}
         {onCancel ? (
           <button
             type="button"

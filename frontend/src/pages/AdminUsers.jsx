@@ -1,8 +1,9 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { ApiError, api } from "../api";
 import { useAuth } from "../auth";
 import { ErrorBanner, FrontPageLink, SectionRule } from "../components/ui";
+import { useLiveRefresh } from "../live";
 
 const ROLES = [
   { value: "student", label: "Student" },
@@ -28,17 +29,17 @@ export default function AdminUsers() {
     }
   }, [ready, user, navigate]);
 
+  const refreshUsers = useCallback(async () => {
+    const data = await api.listUsers({ pageSize: 50 });
+    setItems(data.items);
+    setError(null);
+  }, []);
+
   useEffect(() => {
-    if (!user || user.role !== "super_admin") return;
+    if (!user || user.role !== "super_admin") return undefined;
     let cancelled = false;
     setLoading(true);
-    api
-      .listUsers()
-      .then((data) => {
-        if (cancelled) return;
-        setItems(data.items);
-        setError(null);
-      })
+    refreshUsers()
       .catch((err) => {
         if (cancelled) return;
         if (err instanceof ApiError && err.status === 401) {
@@ -58,7 +59,9 @@ export default function AdminUsers() {
     return () => {
       cancelled = true;
     };
-  }, [user, navigate, setUser]);
+  }, [user, navigate, setUser, refreshUsers]);
+
+  useLiveRefresh(Boolean(user && user.role === "super_admin") && !loading, refreshUsers);
 
   function replaceItem(updated) {
     setItems((current) => current.map((item) => (item.id === updated.id ? updated : item)));

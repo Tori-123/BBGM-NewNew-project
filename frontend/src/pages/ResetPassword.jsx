@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { api, fieldMessage } from "../api";
-import { ErrorBanner, FieldError, FrontPageLink, SectionRule } from "../components/ui";
+import { ErrorBanner, FieldError, FrontPageLink, ManualPasswordInput, SectionRule } from "../components/ui";
 
 export default function ResetPassword() {
   const [email, setEmail] = useState("");
@@ -63,7 +63,7 @@ export default function ResetPassword() {
       <FrontPageLink />
       <SectionRule>Reset password</SectionRule>
       <ErrorBanner error={banner} />
-      <form onSubmit={onSubmit} className="space-y-5">
+      <form onSubmit={onSubmit} autoComplete="off" className="space-y-5">
         <div>
           <label className="block font-sans text-[11px] uppercase tracking-[0.16em] text-[#1A4FBF]" htmlFor="email">
             School email
@@ -71,6 +71,7 @@ export default function ResetPassword() {
           <input
             id="email"
             type="email"
+            autoComplete="off"
             value={email}
             onChange={(event) => {
               setEmail(event.target.value);
@@ -90,7 +91,7 @@ export default function ResetPassword() {
               inputMode="numeric"
               autoComplete="one-time-code"
               value={code}
-              onChange={(event) => setCode(event.target.value)}
+              onChange={(event) => setCode(event.target.value.replace(/\D/g, "").slice(0, 6))}
               className="min-w-0 flex-1 border-0 border-b border-black py-2 font-sans text-sm outline-none"
             />
             <button
@@ -111,13 +112,7 @@ export default function ResetPassword() {
           <label className="block font-sans text-[11px] uppercase tracking-[0.16em] text-[#1A4FBF]" htmlFor="password">
             New password
           </label>
-          <input
-            id="password"
-            type="password"
-            value={password}
-            onChange={(event) => setPassword(event.target.value)}
-            className="mt-2 w-full border-0 border-b border-black py-2 font-sans text-sm outline-none"
-          />
+          <ManualPasswordInput id="password" value={password} onChange={(event) => setPassword(event.target.value)} />
           <FieldError message={fieldMessage(error, "password")} />
         </div>
         <button

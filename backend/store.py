@@ -327,7 +327,7 @@ def revoke_user_sessions(db: Session, user_id: str) -> None:
         row.revoked_at = now
 
 
-CODE_TTL_MINUTES = 10
+CODE_TTL_MINUTES = 2
 CODE_RESEND_SECONDS = 60
 CODE_MAX_ATTEMPTS = 5
 
@@ -366,12 +366,13 @@ def issue_email_code(db: Session, email: str, purpose: str) -> str:
         created_at=now,
     )
     db.add(record)
-    db.flush()
+    db.commit()
     return code
 
 
 def consume_email_code(db: Session, email: str, purpose: str, code: str) -> bool:
     from errors import validation_error
+    from validate import normalize_code
 
     now = _as_utc(utc_now())
     latest = db.scalar(
@@ -382,7 +383,7 @@ def consume_email_code(db: Session, email: str, purpose: str, code: str) -> bool
     invalid = [{"field": "code", "message": "Enter the 6-digit code sent to your email."}]
     if latest is None or _as_utc(latest.expires_at) <= now or latest.attempt_count >= CODE_MAX_ATTEMPTS:
         raise validation_error(invalid)
-    if not verify_password(code.strip(), latest.code_hash):
+    if not verify_password(normalize_code(code), latest.code_hash):
         latest.attempt_count += 1
         db.flush()
         raise validation_error(invalid)

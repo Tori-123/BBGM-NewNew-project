@@ -51,6 +51,10 @@ def normalize_email(value: str) -> str:
     return value.strip().lower()
 
 
+def normalize_code(value: str) -> str:
+    return "".join(ch for ch in (value or "") if ch.isdigit())
+
+
 def email_field_error(email: str, *, required: bool = True) -> dict[str, str] | None:
     raw = email.strip()
     if not raw:
@@ -66,7 +70,7 @@ def email_field_error(email: str, *, required: bool = True) -> dict[str, str] | 
 
 
 def code_field_error(code: str) -> dict[str, str] | None:
-    if not CODE_RE.match((code or "").strip()):
+    if not CODE_RE.match(normalize_code(code)):
         return {"field": "code", "message": CODE_MESSAGE}
     return None
 
@@ -104,6 +108,17 @@ def email_code_field_errors(email: str, purpose: str) -> list[dict[str, str]]:
         fields.append(email_error)
     if purpose not in EMAIL_CODE_PURPOSES:
         fields.append({"field": "purpose", "message": PURPOSE_MESSAGE})
+    return fields
+
+
+def change_password_field_errors(current_password: str, password: str) -> list[dict[str, str]]:
+    fields: list[dict[str, str]] = []
+    if not current_password:
+        fields.append({"field": "current_password", "message": "Current password is required."})
+    if len(password) < 8 or len(password) > 128:
+        fields.append({"field": "password", "message": "Password must be 8–128 characters."})
+    elif current_password and password == current_password:
+        fields.append({"field": "password", "message": "Choose a different password."})
     return fields
 
 

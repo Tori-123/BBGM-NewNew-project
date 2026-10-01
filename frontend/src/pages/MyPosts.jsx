@@ -1,10 +1,11 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { ApiError, api } from "../api";
 import { useAuth } from "../auth";
 import { StoryRow, StoryRowSkeleton } from "../components/StoryRow";
 import { ErrorBanner, FrontPageLink, SectionRule } from "../components/ui";
 import { canEditNews } from "../format";
+import { useLiveRefresh } from "../live";
 
 export default function MyPosts() {
   const { user, ready, setUser } = useAuth();
@@ -20,18 +21,18 @@ export default function MyPosts() {
     }
   }, [ready, user, navigate]);
 
+  const refreshMine = useCallback(async () => {
+    const data = await api.myPosts({ page: 1, pageSize: 20 });
+    setItems(data.items);
+    setTotal(data.total);
+    setError(null);
+  }, []);
+
   useEffect(() => {
     if (!ready || !user) return undefined;
     let cancelled = false;
     setLoading(true);
-    api
-      .myPosts({ page: 1, pageSize: 20 })
-      .then((data) => {
-        if (cancelled) return;
-        setItems(data.items);
-        setTotal(data.total);
-        setError(null);
-      })
+    refreshMine()
       .catch((err) => {
         if (cancelled) return;
         if (err instanceof ApiError && err.status === 401) {
@@ -47,7 +48,9 @@ export default function MyPosts() {
     return () => {
       cancelled = true;
     };
-  }, [ready, user, navigate, setUser]);
+  }, [ready, user, navigate, setUser, refreshMine]);
+
+  useLiveRefresh(Boolean(ready && user) && !loading, refreshMine);
 
   if (!ready || !user) return null;
 

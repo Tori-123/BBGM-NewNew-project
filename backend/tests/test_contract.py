@@ -884,7 +884,22 @@ def test_school_email_codes_register_and_password_reset(tmp_path, monkeypatch):
         assert no_code.status_code == 422
         assert no_code.json()["error"]["fields"][0]["field"] == "code"
 
-        created = _register(client, "jordan.hale@basischina.com", "east-hall-8", "Jordan Hale")
+        sent = client.post(
+            "/api/v1/auth/email-codes",
+            json={"email": "jordan.hale@basischina.com", "purpose": "register"},
+        )
+        assert sent.status_code == 204, sent.text
+        raw_code = peek_console_code("jordan.hale@basischina.com", "register")
+        assert raw_code
+        created = client.post(
+            "/api/v1/auth/register",
+            json={
+                "email": "jordan.hale@basischina.com",
+                "password": "east-hall-8",
+                "display_name": "Jordan Hale",
+                "code": f"{raw_code}.",
+            },
+        )
         assert created.status_code == 201, created.text
 
         taken = client.post(
@@ -928,6 +943,54 @@ def test_school_email_codes_register_and_password_reset(tmp_path, monkeypatch):
             json={"email": "jordan.hale@basischina.com", "password": "new-hall-99"},
         )
         assert new_login.status_code == 200, new_login.text
+    app.state.engine.dispose()
+
+
+def test_change_password_keeps_session(tmp_path, monkeypatch):
+    app = _make_app(tmp_path, monkeypatch)
+    with TestClient(app) as client:
+        created = _register(client, "jordan.hale@basischina.com", "east-hall-8", "Jordan Hale")
+        assert created.status_code == 201, created.text
+
+        guest = TestClient(app)
+        assert guest.put(
+            "/api/v1/me/password",
+            json={"current_password": "east-hall-8", "password": "new-hall-99"},
+        ).status_code == 401
+
+        wrong = client.put(
+            "/api/v1/me/password",
+            json={"current_password": "wrong-pass", "password": "new-hall-99"},
+        )
+        assert wrong.status_code == 422
+        assert wrong.json()["error"]["fields"][0]["field"] == "current_password"
+
+        same = client.put(
+            "/api/v1/me/password",
+            json={"current_password": "east-hall-8", "password": "east-hall-8"},
+        )
+        assert same.status_code == 422
+
+        changed = client.put(
+            "/api/v1/me/password",
+            json={"current_password": "east-hall-8", "password": "new-hall-99"},
+        )
+        assert changed.status_code == 204, changed.text
+        assert client.get("/api/v1/me").status_code == 200
+        assert (
+            client.post(
+                "/api/v1/auth/login",
+                json={"email": "jordan.hale@basischina.com", "password": "east-hall-8"},
+            ).status_code
+            == 401
+        )
+        assert (
+            client.post(
+                "/api/v1/auth/login",
+                json={"email": "jordan.hale@basischina.com", "password": "new-hall-99"},
+            ).status_code
+            == 200
+        )
     app.state.engine.dispose()
 
 

@@ -19,6 +19,7 @@ from models import User, to_iso, utc_now
 from mail import send_verification_email
 from schemas import (
     AVATAR_PRESETS,
+    ChangePasswordBody,
     EmailCodeBody,
     LoginBody,
     Notice,
@@ -39,6 +40,7 @@ from store import (
     list_system_notices,
 )
 from validate import (
+    change_password_field_errors,
     email_code_field_errors,
     login_field_errors,
     normalize_email,
@@ -139,12 +141,15 @@ def register(body: RegisterBody, request: Request, db: Session = Depends(get_db)
         token = create_session(db, user.id)
     except IntegrityError as exc:
         db.rollback()
-        raise ApiError(
-            409,
-            "email_taken",
-            "An account with this email already exists.",
-            [{"field": "email", "message": "This email is already registered."}],
-        ) from exc
+        detail = str(getattr(exc, "orig", None) or exc)
+        if "users.email" in detail:
+            raise ApiError(
+                409,
+                "email_taken",
+                "An account with this email already exists.",
+                [{"field": "email", "message": "This email is already registered."}],
+            ) from exc
+        raise StorageError() from exc
     except SQLAlchemyError as exc:
         db.rollback()
         raise StorageError() from exc
@@ -221,6 +226,27 @@ def logout(request: Request, response: Response, db: Session = Depends(get_db)) 
 @router.get("/me")
 def me(user: User = Depends(get_current_user)) -> dict:
     return _user_private(user)
+
+
+@router.put("/me/password", status_code=204)
+def change_password(
+    body: ChangePasswordBody,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> None:
+    fields = change_password_field_errors(body.current_password, body.password)
+    if fields:
+        raise validation_error(fields)
+    if not verify_password(body.current_password, user.password_hash):
+        raise validation_error(
+            [{"field": "current_password", "message": "Current password is incorrect."}]
+        )
+    try:
+        user.password_hash = hash_password(body.password)
+        db.flush()
+    except SQLAlchemyError as exc:
+        db.rollback()
+        raise StorageError() from exc
 
 
 @router.put("/me/avatar")

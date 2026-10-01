@@ -158,6 +158,37 @@ def make_session_factory(engine):
     return sessionmaker(bind=engine, expire_on_commit=False)
 
 
+def _sqlite_drop_users_banned(conn) -> None:
+    conn.exec_driver_sql("PRAGMA foreign_keys=OFF")
+    conn.exec_driver_sql(
+        """
+        CREATE TABLE users__new (
+            id VARCHAR(36) NOT NULL PRIMARY KEY,
+            email VARCHAR(320) NOT NULL UNIQUE,
+            password_hash TEXT NOT NULL,
+            display_name VARCHAR(40) NOT NULL,
+            role VARCHAR(16) NOT NULL DEFAULT 'student',
+            avatar VARCHAR(160) NOT NULL DEFAULT 'preset:oak',
+            muted INTEGER NOT NULL DEFAULT 0,
+            created_at DATETIME NOT NULL
+        )
+        """
+    )
+    conn.exec_driver_sql(
+        """
+        INSERT INTO users__new (
+            id, email, password_hash, display_name, role, avatar, muted, created_at
+        )
+        SELECT id, email, password_hash, display_name, role, avatar,
+               COALESCE(muted, banned, 0), created_at
+        FROM users
+        """
+    )
+    conn.exec_driver_sql("DROP TABLE users")
+    conn.exec_driver_sql("ALTER TABLE users__new RENAME TO users")
+    conn.exec_driver_sql("PRAGMA foreign_keys=ON")
+
+
 def _drop_sports_and_backfill_blocks(conn) -> None:
     sports_ids = [
         row[0] for row in conn.exec_driver_sql("SELECT id FROM posts WHERE category='sports'").fetchall()
@@ -206,16 +237,15 @@ def migrate_schema(engine) -> None:
                 conn.exec_driver_sql(
                     "ALTER TABLE users ADD COLUMN avatar VARCHAR(160) NOT NULL DEFAULT 'preset:oak'"
                 )
-            if cols and "banned" not in cols:
-                conn.exec_driver_sql(
-                    "ALTER TABLE users ADD COLUMN banned INTEGER NOT NULL DEFAULT 0"
-                )
             if cols and "muted" not in cols:
                 conn.exec_driver_sql(
                     "ALTER TABLE users ADD COLUMN muted INTEGER NOT NULL DEFAULT 0"
                 )
                 if "banned" in cols:
                     conn.exec_driver_sql("UPDATE users SET muted = banned")
+            cols = {row[1] for row in conn.exec_driver_sql("PRAGMA table_info(users)").fetchall()}
+            if cols and "banned" in cols:
+                _sqlite_drop_users_banned(conn)
             post_cols = {row[1] for row in conn.exec_driver_sql("PRAGMA table_info(posts)").fetchall()}
             if post_cols and "images" not in post_cols:
                 conn.exec_driver_sql(

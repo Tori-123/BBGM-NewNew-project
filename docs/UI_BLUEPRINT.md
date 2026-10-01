@@ -21,6 +21,7 @@
 | `/posts/:postId` | 帖子详情 | 公开 | `GET /api/v1/posts/{post_id}`；Forum 另 `GET .../comments` |
 | `/me/posts` | 我的帖子 | 需登录 | `GET /api/v1/me/posts` |
 | `/me/avatar` | 选/上传头像 | 需登录 | `PUT` / `POST /api/v1/me/avatar` |
+| `/me/password` | 修改密码 | 需登录 | `PUT /api/v1/me/password`（`current_password` `password`） |
 | `/admin/users` | 用户与角色 | 需 `super_admin` | `GET /api/v1/admin/users`；`PATCH` 改 `role` 或 `muted`；`DELETE` 删用户 |
 | `/paper` | 旧路径 | — | 重定向到 `/` |
 | `/system` | System 通知 | 需登录 | `GET /api/v1/me/notices`。无回复框 |
@@ -32,7 +33,8 @@
 **全局壳 `PaperShell`**
 
 - 顶栏左：`ABOUT` `CONTACT` `SYSTEM`（`/system`）。顶栏右：账号区 + 本地日期文案 `Today: {formatted local date}`（不是 schema 字段）。
-- 账号：启动时 `GET /api/v1/me`。`401` = 访客，显示 `SIGN IN`（去 `/sign-in`）。`200` = 已登录，显示头像（`avatar`）、`display_name`、`AVATAR`（`/me/avatar`）、`MY POSTS`（`/me/posts`）、`SIGN OUT`。顶栏不放 `DRAFTS`。`role===super_admin` 另显示 `USERS`（`/admin/users`）。
+- 账号：启动时 `GET /api/v1/me`。登录后同一套 live refresh（约 4 秒）再拉 `/me`，超管改 `role` / `muted` / 删号后顶栏与导航跟着变，不必整页刷新。`401` = 访客，显示 `SIGN IN`（去 `/sign-in`）。`200` = 已登录，显示头像（`avatar`）、`display_name`、`AVATAR`（`/me/avatar`）、`PASSWORD`（`/me/password`）、`MY POSTS`（`/me/posts`）、`SIGN OUT`。顶栏不放 `DRAFTS`。`role===super_admin` 另显示 `USERS`（`/admin/users`）。
+- 列表同步：首页 / Forum / 帖详情已 live refresh。`/admin/users`、`/news/drafts` 列表、`/system`、`/me/posts` 同样轮询，超管或其他人刚做的改动会进当前页。打开中的草稿编辑框不自动覆盖，以免冲掉未保存正文。
 - 报头：左搜索框（外形保留；提交不调接口，在报头下出一条静态说明）。中：斜体衬线字标 `Elegram` 链回 `/`。右：静态「COMMUNITY HOSTED / Independent campus forum」。
 - 标语静态：`YOUR CAMPUS. YOUR STORIES. YOUR VOICE.`
 - 导航：`NEWS`（`/`）`DRAFTS`（`/news/drafts`）`FORUM` `OPINION`。`DRAFTS` 只在 `role` 为 `editor` 或 `super_admin` 时出现，与 `FORUM` 同一行。当前路由下划黑线。无 `SUBMIT`，无单独的 News 列表项。Forum 发帖在栏目页内。News 稿在 `/news/drafts`。
@@ -149,6 +151,16 @@ Photo of the Day / Track of the Day / Student Art：静态标题+空图框+固�
 | 503 | 表单顶 `ErrorBanner` ← `error.message`。输入保留。 |
 | 成功 201 | Forum：去详情。 |
 
+### 3.5a 修改密码 `/me/password`
+
+| 状态 | 表现 |
+| --- | --- |
+| 401 | 去 `/sign-in?next=/me/password`。 |
+| 首次 | 窄表：`current_password`、新 `password`。密码框不走系统 Strong Password。 |
+| 422 | 字段下 ← `error.fields[]`。 |
+| 503 | 表单顶 `ErrorBanner`。 |
+| 成功 | 「Your password was updated.」链回 `/`。 |
+
 ### 3.5 我的帖子 `/me/posts`
 
 | 状态 | 表现 |
@@ -163,7 +175,7 @@ Photo of the Day / Track of the Day / Student Art：静态标题+空图框+固�
 
 | 状态 | 表现 |
 | --- | --- |
-| 首次 | 窄表。登录：`email` `password`，表下链 `/reset-password`（Forgot password）。注册：`display_name` `email` `password`、「发送验证码」、`code`。 |
+| 首次 | 窄表。登录：`email` `password`，表下链 `/reset-password`（Forgot password）。注册：`display_name` `email` `password`、「发送验证码」、`code`。注册与找回密码的密码框不走系统 Strong Password / 浏览器自动生成，由用户自己输入。 |
 | 422 | 字段下 ← `error.fields[]`。非 `@basischina.com` 只显示 email 错误，不进入等待验证码态。 |
 | 401 `invalid_credentials` | 表单上沿 ← `error.message`（Email or password is incorrect.）。 |
 | 409 `email_taken` | `email` 下 ← `fields[].message` 或 `error.message`。 |

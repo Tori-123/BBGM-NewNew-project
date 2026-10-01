@@ -44,6 +44,7 @@ export default function SignIn() {
           <input
             id="email"
             type="email"
+            autoComplete="username"
             value={email}
             onChange={(event) => setEmail(event.target.value)}
             className="mt-2 w-full border-0 border-b border-black py-2 font-sans text-sm outline-none"
@@ -57,6 +58,7 @@ export default function SignIn() {
           <input
             id="password"
             type="password"
+            autoComplete="current-password"
             value={password}
             onChange={(event) => setPassword(event.target.value)}
             className="mt-2 w-full border-0 border-b border-black py-2 font-sans text-sm outline-none"

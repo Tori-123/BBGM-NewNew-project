@@ -83,6 +83,8 @@ async function uploadFile(path, file) {
 
 export const api = {
   me: () => request("/me"),
+  changePassword: (body) =>
+    request("/me/password", { method: "PUT", body: JSON.stringify(body) }),
   setAvatarPreset: (preset) =>
     request("/me/avatar", { method: "PUT", body: JSON.stringify({ preset }) }),
   uploadAvatar: (file) => uploadFile("/me/avatar", file),

@@ -4,6 +4,7 @@ import PaperShell from "./components/PaperShell";
 import About from "./pages/About";
 import AdminUsers from "./pages/AdminUsers";
 import AvatarSettings from "./pages/AvatarSettings";
+import ChangePassword from "./pages/ChangePassword";
 import Category, { StaticCategory } from "./pages/Category";
 import Contact from "./pages/Contact";
 import Home from "./pages/Home";
@@ -35,6 +36,7 @@ export default function App() {
             <Route path="/posts/:postId" element={<PostDetail />} />
             <Route path="/me/posts" element={<MyPosts />} />
             <Route path="/me/avatar" element={<AvatarSettings />} />
+            <Route path="/me/password" element={<ChangePassword />} />
             <Route path="/admin/users" element={<AdminUsers />} />
             <Route path="/paper" element={<Navigate to="/" replace />} />
             <Route path="/system" element={<SystemNotices />} />
