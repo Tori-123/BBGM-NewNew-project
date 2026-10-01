@@ -68,11 +68,11 @@ Must 服务主故事 P1-US1（Forum 发帖被看见）以及角色、跟帖、Ne
 
 | ID | 能力 | 说明 |
 | --- | --- | --- |
-| M1 | 注册、登录、退出 | 仅 `@basischina.com`。注册先发邮箱验证码，码通过后才建账号；登录用邮箱 + 密码。会话可跨请求识别当前用户。发帖回路离开登录不成立。 |
+| M1 | 注册、登录、退出 | 仅 `@basischina.com`。注册先发邮箱验证码，码通过后才建账号；请求里 `accept_terms` 必须为 `true`，服务端写入 `terms_accepted_at`。公开页 `/terms` 为用户协议（默认英文，可切中文）。未同意不建账号。登录用邮箱 + 密码。会话可跨请求识别当前用户。发帖回路离开登录不成立。协议上线前已有账号的 `terms_accepted_at` 为 `null`，登录不因此被拒。 |
 | M23 | 找回密码 | 登录页可走忘记密码。校内邮箱收验证码后设新密码，再用登录接口进站。非 `@basischina.com` 当场拒绝，不发信。 |
 | M24 | 登录后改密码 | 顶栏账号旁可改密码：校验当前密码后设新密码，无需再发验证码。 |
 | M2 | 鉴权与权限 | 未登录可读已发布内容与 Forum 评论；仅登录用户可发帖 / 跟帖；直接发 News 被拒绝；用户不能改删自己的帖或评论。被禁言者仍可登录阅读。 |
-| M3 | 多页面 | 至少：News（`/` 报头版式，不再单列 News 列表页）、Forum、帖子详情（Forum 含楼中楼）、登录/注册/找回密码、登录后改密码、我的帖子、News 草稿、System 通知、超级管理员用户列表。Forum 发帖在栏目页内，无独立 Submit 页。 |
+| M3 | 多页面 | 至少：News（`/` 报头版式，不再单列 News 列表页）、Forum、帖子详情（Forum 含楼中楼）、登录/注册/找回密码、登录后改密码、用户协议、我的帖子、News 草稿、System 通知、超级管理员用户列表。Forum 发帖在栏目页内，无独立 Submit 页。 |
 | M4 | 发帖 | Forum：标题、正文必填，发布后 `published`，作者绑定当前用户，可附带最多 4 张图。News 不经此接口公开。 |
 | M6 | 按栏目阅读 | 栏目页只列出该栏目已发布帖。News 详情只展示已同意板块。 |
 | M7 | News 露出 | `/` 的报头版式展示近期已发布 **News**，不含 Forum，不含尚无已同意板块的草稿。导航第一项是 News，没有单独的 News 列表页。 |
@@ -136,7 +136,7 @@ Must 服务主故事 P1-US1（Forum 发帖被看见）以及角色、跟帖、Ne
 
 ### 4.1 主路径成功（P1-US1 + P2 看见 + P3 发稿）
 
-1. 给定未注册访客在注册页，当填写未被占用的 `@basischina.com` 邮箱、收到验证码并与符合规则的密码一并提交，则创建用户且可立即用该邮箱密码登录。非该后缀则拒绝且不发信。
+1. 给定未注册访客在注册页，当填写未被占用的 `@basischina.com` 邮箱、收到验证码、符合规则的密码，且 `accept_terms` 为 `true`，则创建用户、写入 `terms_accepted_at`，且可立即用该邮箱密码登录。非该后缀则拒绝且不发信。
 2. 给定已注册用户在登录页，当提交正确校内邮箱与密码，则进入已登录态，并可以在 Forum 直接写帖发布。非 `@basischina.com` 登录失败（字段错误，不建立会话）。
 3. 给定已登录学生在 Forum，当填写标题、正文并发布，则该帖 `published`，`category=forum`，作者为当前用户，并进入该帖详情。
 4. 给定 3 中刚发布的帖，当另一未登录会话打开 Forum，则列表中出现该标题；打开详情则正文一致；首页无 `category` 的列表**不**出现该 Forum 帖。
@@ -165,6 +165,7 @@ Must 服务主故事 P1-US1（Forum 发帖被看见）以及角色、跟帖、Ne
 30. 给定超级管理员删除一名学生，则该用户不能再登录，其已发帖从公开列表消失。不能删除自己或 `super_admin`。
 31. 给定一篇已有一块已同意内容的 News，当编辑修改该块并提交、超级管理员尚未同意，则公开详情仍是同意前的正文；同意后才换成新正文。
 29. 给定已注册校内邮箱用户在找回密码页，当用该邮箱收到验证码并提交新密码，则旧密码不能再登录、新密码可以。非 `@basischina.com` 或不存在的账号：前者当场拒绝不发信；后者发码接口仍回成功、重置失败不泄露该邮箱是否已注册。
+32. 给定未注册访客提交注册，当 `accept_terms` 不是 `true`（缺省或 `false`），则 `422`，不建账号，且该验证码仍可再用于一次成功注册。协议上线前已存在的账号 `terms_accepted_at` 为 `null`，用原密码登录仍成功。
 
 ### 4.3 关键非功能（可测、且为本产品需要）
 
@@ -197,7 +198,7 @@ Elegram 应用（Web 页面 + 服务端）
 
 | 实体 | 关键字段 | 生命周期 |
 | --- | --- | --- |
-| User | id, email, password_hash, display_name, role, avatar, muted, created_at | 邮箱须 `@basischina.com`；验证码通过后注册为 `student`，`muted` 默认 false；禁言后仍可登录，不能写帖 |
+| User | id, email, password_hash, display_name, role, avatar, muted, terms_accepted_at, created_at | 邮箱须 `@basischina.com`；验证码通过且 `accept_terms` 为 `true` 后注册为 `student`，服务端写入 `terms_accepted_at`；`muted` 默认 false；禁言后仍可登录，不能写帖。协议上线前的账号该时间为 `null` |
 | EmailCode | email, purpose, code_hash, expires_at, attempt_count | 注册或找回密码发码；明文不入库；发出后 2 分钟过期，或用过后失效 |
 | Session | 可校验的登录凭证，绑定 user_id，可失效 | 登录创建 → 退出、删除用户或过期销毁。禁言不废除会话 |
 | Post | id, author_id, title, body, category, status, images, created_at, updated_at | Forum 校验通过后 `published`。News 在至少一块被同意前为 `draft`，公开接口不返回。`admin` / `super_admin` 可整帖删除 |

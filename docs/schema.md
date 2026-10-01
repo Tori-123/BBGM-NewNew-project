@@ -70,7 +70,7 @@ Content-Type: application/json
 | 403 | `account_muted` | 已登录但被禁言，仍调用发帖、跟帖、点赞、创建或提交草稿 |
 | 404 | `not_found` | 帖子、评论父楼或用户不存在 |
 | 409 | `email_taken` | 注册邮箱已被占用 |
-| 422 | `validation_error` | 缺必填、超长、非法栏目、非法配图、非校内邮箱后缀、验证码无效或过期 |
+| 422 | `validation_error` | 缺必填、超长、非法栏目、非法配图、非校内邮箱后缀、验证码无效或过期、注册时 `accept_terms` 不是 `true` |
 | 503 | `storage_unavailable` | 存储写入失败；不得返回成功或半截资源 |
 
 成功响应不包 `{ "data": ... }` 中间层：对象或列表字段直接放在 JSON 根上。
@@ -106,6 +106,7 @@ Content-Type: application/json
 | `role` | string | `student` \| `editor` \| `admin` \| `super_admin` |
 | `avatar` | string | 同 AuthorPublic |
 | `muted` | boolean | 是否禁言。注册默认为 `false`。禁言后仍可登录 |
+| `terms_accepted_at` | string \| null | 同意用户协议的时间，UTC ISO 8601 带 `Z`。注册成功时由服务端写入。协议上线前已存在的账号为 `null`。客户端不能指定该时间 |
 | `created_at` | string | |
 
 **PostSummary**（列表：首页、栏目、我的帖子）
@@ -236,7 +237,7 @@ Content-Type: application/json
 #### `POST /api/v1/auth/register`
 
 - **鉴权：** 否
-- **职责：** 校验校内邮箱与验证码后注册学生账号；成功则创建用户、建立会话并 `Set-Cookie`。校验顺序：后缀 → 码有效 → 再建用户。
+- **职责：** 校验校内邮箱与验证码后注册学生账号；成功则创建用户、写入 `terms_accepted_at`、建立会话并 `Set-Cookie`。校验顺序：字段（含 `accept_terms` 必须为 JSON `true`）→ 后缀与码有效 → 再建用户。`accept_terms` 不是 `true` 时不消耗验证码。不接受客户端传来的同意时间。
 
 **Request body**
 
@@ -246,12 +247,13 @@ Content-Type: application/json
 | `password` | string | 是 | 8–128 字符 |
 | `display_name` | string | 是 | 去掉首尾空白后 1–40 字符 |
 | `code` | string | 是 | 6 位数字；须与该邮箱最近一次 `purpose=register` 的未过期码一致（发出后 2 分钟内） |
+| `accept_terms` | boolean | 是 | 必须为 JSON `true`。`false` 或缺省为 `422`，`fields[].field` 为 `accept_terms` |
 
 **Response**
 
-- `201` + `UserPrivate`；`Set-Cookie: scoop_session=...`
+- `201` + `UserPrivate`（含服务端写入的 `terms_accepted_at`）；`Set-Cookie: scoop_session=...`
 - `409` `email_taken`
-- `422` `validation_error`（缺字段、邮箱非法、非校内后缀、密码过短、展示名为空、验证码无效或过期）
+- `422` `validation_error`（缺字段、邮箱非法、非校内后缀、密码过短、展示名为空、验证码无效或过期、未同意协议）
 - `503` `storage_unavailable`
 
 ---
@@ -800,6 +802,7 @@ Forum 详情停留时可重复请求本接口（间隔与列表相同），合�
   "role": "student",
   "avatar": "preset:oak",
   "muted": false,
+  "terms_accepted_at": "2026-09-10T11:02:18Z",
   "created_at": "2026-09-10T11:02:18Z"
 }
 ```
@@ -832,6 +835,7 @@ Forum 详情停留时可重复请求本接口（间隔与列表相同），合�
   "role": "editor",
   "avatar": "preset:oak",
   "muted": false,
+  "terms_accepted_at": "2026-08-21T09:10:00Z",
   "created_at": "2026-08-21T09:10:00Z"
 }
 ```
@@ -882,6 +886,7 @@ Forum 详情停留时可重复请求本接口（间隔与列表相同），合�
   "role": "student",
   "avatar": "preset:oak",
   "muted": false,
+  "terms_accepted_at": "2026-09-10T11:02:18Z",
   "created_at": "2026-09-10T11:02:18Z"
 }
 ```

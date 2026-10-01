@@ -53,6 +53,7 @@ export default function PaperShell() {
         <div className="flex items-center justify-between border-b border-black py-[10px] font-sans text-[11px] font-medium tracking-[0.18em] text-[#111111]">
           <nav className="flex items-center gap-7 uppercase">
             <Link to="/about">About</Link>
+            <Link to="/terms">Terms</Link>
             <Link to="/contact">Contact</Link>
             <Link to="/system">System</Link>
             {user ? (

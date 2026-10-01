@@ -18,6 +18,7 @@ class RegisterBody(BaseModel):
     password: str
     display_name: str
     code: str
+    accept_terms: bool
 
 
 class LoginBody(BaseModel):
@@ -68,6 +69,7 @@ class UserPrivate(BaseModel):
     role: str
     avatar: str
     muted: bool
+    terms_accepted_at: str | None
     created_at: str
 
 

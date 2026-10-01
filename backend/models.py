@@ -29,6 +29,7 @@ class User(Base):
     role: Mapped[str] = mapped_column(String(16), nullable=False, default="student")
     avatar: Mapped[str] = mapped_column(String(160), nullable=False, default="preset:oak")
     muted: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    terms_accepted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
 
     posts: Mapped[list["Post"]] = relationship(back_populates="author")
@@ -170,6 +171,7 @@ def _sqlite_drop_users_banned(conn) -> None:
             role VARCHAR(16) NOT NULL DEFAULT 'student',
             avatar VARCHAR(160) NOT NULL DEFAULT 'preset:oak',
             muted INTEGER NOT NULL DEFAULT 0,
+            terms_accepted_at DATETIME,
             created_at DATETIME NOT NULL
         )
         """
@@ -177,10 +179,10 @@ def _sqlite_drop_users_banned(conn) -> None:
     conn.exec_driver_sql(
         """
         INSERT INTO users__new (
-            id, email, password_hash, display_name, role, avatar, muted, created_at
+            id, email, password_hash, display_name, role, avatar, muted, terms_accepted_at, created_at
         )
         SELECT id, email, password_hash, display_name, role, avatar,
-               COALESCE(muted, banned, 0), created_at
+               COALESCE(muted, banned, 0), terms_accepted_at, created_at
         FROM users
         """
     )
@@ -243,6 +245,8 @@ def migrate_schema(engine) -> None:
                 )
                 if "banned" in cols:
                     conn.exec_driver_sql("UPDATE users SET muted = banned")
+            if cols and "terms_accepted_at" not in cols:
+                conn.exec_driver_sql("ALTER TABLE users ADD COLUMN terms_accepted_at DATETIME")
             cols = {row[1] for row in conn.exec_driver_sql("PRAGMA table_info(users)").fetchall()}
             if cols and "banned" in cols:
                 _sqlite_drop_users_banned(conn)

@@ -59,6 +59,7 @@ def _user_private(user: User) -> dict:
         role=user.role,
         avatar=normalize_avatar(user.avatar),
         muted=bool(user.muted),
+        terms_accepted_at=to_iso(user.terms_accepted_at) if user.terms_accepted_at else None,
         created_at=to_iso(user.created_at),
     ).model_dump()
 
@@ -110,7 +111,9 @@ def request_email_code(body: EmailCodeBody, request: Request, db: Session = Depe
 
 @router.post("/auth/register")
 def register(body: RegisterBody, request: Request, db: Session = Depends(get_db)):
-    fields = register_field_errors(body.email, body.password, body.display_name, body.code)
+    fields = register_field_errors(
+        body.email, body.password, body.display_name, body.code, body.accept_terms
+    )
     if fields:
         raise validation_error(fields)
 
@@ -133,6 +136,7 @@ def register(body: RegisterBody, request: Request, db: Session = Depends(get_db)
         role="super_admin" if admin_email and email == admin_email else "student",
         muted=False,
         avatar=DEFAULT_AVATAR,
+        terms_accepted_at=utc_now(),
         created_at=utc_now(),
     )
     try:

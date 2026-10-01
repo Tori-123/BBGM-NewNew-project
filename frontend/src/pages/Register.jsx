@@ -16,6 +16,8 @@ export default function Register() {
   const [submitting, setSubmitting] = useState(false);
   const [sendingCode, setSendingCode] = useState(false);
   const [codeSent, setCodeSent] = useState(false);
+  const [acceptTerms, setAcceptTerms] = useState(false);
+  const [termsError, setTermsError] = useState("");
 
   async function onSendCode() {
     setSendingCode(true);
@@ -33,14 +35,20 @@ export default function Register() {
 
   async function onSubmit(event) {
     event.preventDefault();
+    if (!acceptTerms) {
+      setTermsError("You must accept the user agreement.");
+      return;
+    }
     setSubmitting(true);
     setError(null);
+    setTermsError("");
     try {
       const profile = await api.register({
         email,
         password,
         display_name: displayName,
         code,
+        accept_terms: true,
       });
       signIn(profile);
       navigate(safeNext(params.get("next")));
@@ -125,6 +133,28 @@ export default function Register() {
           {codeSent && !fieldMessage(error, "code") && !emailError ? (
             <p className="mt-2 font-sans text-sm text-neutral-500">A code was sent to that school email.</p>
           ) : null}
+        </div>
+        <div>
+          <label className="flex items-start gap-3 font-sans text-sm leading-6" htmlFor="accept_terms">
+            <input
+              id="accept_terms"
+              type="checkbox"
+              checked={acceptTerms}
+              onChange={(event) => {
+                setAcceptTerms(event.target.checked);
+                if (event.target.checked) setTermsError("");
+              }}
+              className="mt-1"
+            />
+            <span>
+              I agree to the{" "}
+              <Link to="/terms" className="text-[#1A4FBF]">
+                user agreement
+              </Link>
+              .
+            </span>
+          </label>
+          <FieldError message={termsError || fieldMessage(error, "accept_terms")} />
         </div>
         <button
           type="submit"
