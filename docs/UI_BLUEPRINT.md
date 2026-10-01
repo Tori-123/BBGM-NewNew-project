@@ -28,10 +28,11 @@
 | `/register` | 注册 | 访客 | `POST /api/v1/auth/email-codes`（`purpose=register`）后 `POST /api/v1/auth/register` |
 | `/reset-password` | 找回密码 | 访客 | `POST /api/v1/auth/email-codes`（`purpose=reset`）后 `POST /api/v1/auth/password-reset` |
 | `/about` `/contact` | 静态稿（截图顶栏） | 公开 | 无 API |
+| `/terms` | 用户协议 | 公开 | 无 API。默认英文，页内可切中文；语言选择记在浏览器本地，不进接口 |
 
 **全局壳 `PaperShell`**
 
-- 顶栏左：`ABOUT` `CONTACT` `SYSTEM`（`/system`）。顶栏右：账号区 + 本地日期文案 `Today: {formatted local date}`（不是 schema 字段）。
+- 顶栏左：`ABOUT` `TERMS`（`/terms`）`CONTACT` `SYSTEM`（`/system`）。顶栏右：账号区 + 本地日期文案 `Today: {formatted local date}`（不是 schema 字段）。
 - 账号：启动时 `GET /api/v1/me`。`401` = 访客，显示 `SIGN IN`（去 `/sign-in`）。`200` = 已登录，显示头像（`avatar`）、`display_name`、`AVATAR`（`/me/avatar`）、`MY POSTS`（`/me/posts`）、`SIGN OUT`。顶栏不放 `DRAFTS`。`role===super_admin` 另显示 `USERS`（`/admin/users`）。
 - 报头：左搜索框（外形保留；提交不调接口，在报头下出一条静态说明）。中：斜体衬线字标 `Elegram` 链回 `/`。右：静态「COMMUNITY HOSTED / Independent campus forum」。
 - 标语静态：`YOUR CAMPUS. YOUR STORIES. YOUR VOICE.`
@@ -163,8 +164,8 @@ Photo of the Day / Track of the Day / Student Art：静态标题+空图框+固�
 
 | 状态 | 表现 |
 | --- | --- |
-| 首次 | 窄表。登录：`email` `password`，表下链 `/reset-password`（Forgot password）。注册：`display_name` `email` `password`、「发送验证码」、`code`。 |
-| 422 | 字段下 ← `error.fields[]`。非 `@basischina.com` 只显示 email 错误，不进入等待验证码态。 |
+| 首次 | 窄表。登录：`email` `password`，表下链 `/reset-password`（Forgot password）。注册：`display_name` `email` `password`、「发送验证码」、`code`，以及勾选同意用户协议（链 `/terms`）。未勾选不提交；勾选后 body 带 `accept_terms: true`。 |
+| 422 | 字段下 ← `error.fields[]`。非 `@basischina.com` 只显示 email 错误，不进入等待验证码态。`accept_terms` 错误显示在勾选下方。 |
 | 401 `invalid_credentials` | 表单上沿 ← `error.message`（Email or password is incorrect.）。 |
 | 409 `email_taken` | `email` 下 ← `fields[].message` 或 `error.message`。 |
 | 503 | 表单顶 ← `error.message`。 |
@@ -185,7 +186,7 @@ Photo of the Day / Track of the Day / Student Art：静态标题+空图框+固�
 
 | 状态 | 表现 |
 | --- | --- |
-| 成功 | 行：`display_name` `email` `role` `muted`。不是自己、也不是 `super_admin` 时：可设为 Student / Editor / Admin，显示 `Mute` 或 `Unmute`（看 `muted`），以及 `Delete user`。 |
+| 成功 | 行：`display_name` `email` `role` `muted`。不展示 `terms_accepted_at`。不是自己、也不是 `super_admin` 时：可设为 Student / Editor / Admin，显示 `Mute` 或 `Unmute`（看 `muted`），以及 `Delete user`。 |
 | 禁言 | `PATCH` body `{ "muted": true }`。成功行更新。对方仍可登录；发帖时见 `account_muted`。 |
 | 删除 | 确认后 `DELETE /api/v1/admin/users/{id}`。成功后该行消失。 |
 | 错误 | `ErrorBanner` ← `error.message`。 |
@@ -223,7 +224,7 @@ Photo of the Day / Track of the Day / Student Art：静态标题+空图框+固�
 
 - `<PaperShell>`
   - `<UtilityBar>`
-    - 链 About / Contact / System
+    - 链 About / Terms / Contact / System
     - `<AccountNav>`
       - 访客：SIGN IN
       - 登录：`display_name` ← `GET /me`；MY POSTS；`role===super_admin` 时 USERS；SIGN OUT

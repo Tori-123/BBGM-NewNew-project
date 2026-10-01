@@ -29,6 +29,7 @@ class User(Base):
     role: Mapped[str] = mapped_column(String(16), nullable=False, default="student")
     avatar: Mapped[str] = mapped_column(String(160), nullable=False, default="preset:oak")
     muted: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    terms_accepted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
 
     posts: Mapped[list["Post"]] = relationship(back_populates="author")
@@ -216,6 +217,8 @@ def migrate_schema(engine) -> None:
                 )
                 if "banned" in cols:
                     conn.exec_driver_sql("UPDATE users SET muted = banned")
+            if cols and "terms_accepted_at" not in cols:
+                conn.exec_driver_sql("ALTER TABLE users ADD COLUMN terms_accepted_at DATETIME")
             post_cols = {row[1] for row in conn.exec_driver_sql("PRAGMA table_info(posts)").fetchall()}
             if post_cols and "images" not in post_cols:
                 conn.exec_driver_sql(

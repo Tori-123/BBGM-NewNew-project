@@ -41,7 +41,13 @@ def _register(client, email, password, display_name):
     assert code
     return client.post(
         "/api/v1/auth/register",
-        json={"email": email, "password": password, "display_name": display_name, "code": code},
+        json={
+            "email": email,
+            "password": password,
+            "display_name": display_name,
+            "code": code,
+            "accept_terms": True,
+        },
     )
 
 
@@ -66,6 +72,7 @@ def test_register_login_create_post_public_read_and_persist(tmp_path, monkeypatc
         assert body["display_name"] == "Jordan Hale"
         assert body["role"] == "super_admin"
         assert body["muted"] is False
+        assert body["terms_accepted_at"].endswith("Z")
         assert "password" not in body and "password_hash" not in body
         assert "scoop_session" in register.cookies
 
@@ -854,6 +861,36 @@ def test_admin_delete_post_and_ban_account(tmp_path, monkeypatch):
     app.state.engine.dispose()
 
 
+def test_register_requires_accept_terms(tmp_path, monkeypatch):
+    app = _make_app(tmp_path, monkeypatch)
+    email = "jordan.hale@basischina.com"
+    with TestClient(app) as client:
+        sent = client.post("/api/v1/auth/email-codes", json={"email": email, "purpose": "register"})
+        assert sent.status_code == 204, sent.text
+        code = peek_console_code(normalize_email(email), "register")
+        payload = {
+            "email": email,
+            "password": "east-hall-8",
+            "display_name": "Jordan Hale",
+            "code": code,
+        }
+        missing = client.post("/api/v1/auth/register", json=payload)
+        assert missing.status_code == 422, missing.text
+        assert any(item["field"] == "accept_terms" for item in missing.json()["error"]["fields"])
+
+        rejected = client.post("/api/v1/auth/register", json={**payload, "accept_terms": False})
+        assert rejected.status_code == 422, rejected.text
+        assert rejected.json()["error"]["fields"][0]["field"] == "accept_terms"
+
+        login = client.post("/api/v1/auth/login", json={"email": email, "password": "east-hall-8"})
+        assert login.status_code == 401
+
+        created = client.post("/api/v1/auth/register", json={**payload, "accept_terms": True})
+        assert created.status_code == 201, created.text
+        assert created.json()["terms_accepted_at"].endswith("Z")
+    app.state.engine.dispose()
+
+
 def test_school_email_codes_register_and_password_reset(tmp_path, monkeypatch):
     app = _make_app(tmp_path, monkeypatch)
     with TestClient(app) as client:
@@ -879,6 +916,7 @@ def test_school_email_codes_register_and_password_reset(tmp_path, monkeypatch):
                 "password": "east-hall-8",
                 "display_name": "Jordan Hale",
                 "code": "000000",
+                "accept_terms": True,
             },
         )
         assert no_code.status_code == 422

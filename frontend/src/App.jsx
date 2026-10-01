@@ -12,6 +12,7 @@ import NewsDrafts from "./pages/NewsDrafts";
 import PostDetail from "./pages/PostDetail";
 import SystemNotices from "./pages/SystemNotices";
 import Register from "./pages/Register";
+import Terms from "./pages/Terms";
 import ResetPassword from "./pages/ResetPassword";
 import SignIn from "./pages/SignIn";
 
@@ -42,6 +43,7 @@ export default function App() {
             <Route path="/register" element={<Register />} />
             <Route path="/reset-password" element={<ResetPassword />} />
             <Route path="/about" element={<About />} />
+            <Route path="/terms" element={<Terms />} />
             <Route path="/contact" element={<Contact />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Route>

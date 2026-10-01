@@ -71,7 +71,9 @@ def code_field_error(code: str) -> dict[str, str] | None:
     return None
 
 
-def register_field_errors(email: str, password: str, display_name: str, code: str) -> list[dict[str, str]]:
+def register_field_errors(
+    email: str, password: str, display_name: str, code: str, accept_terms: bool
+) -> list[dict[str, str]]:
     fields: list[dict[str, str]] = []
     email_error = email_field_error(email)
     if email_error:
@@ -84,6 +86,8 @@ def register_field_errors(email: str, password: str, display_name: str, code: st
     code_error = code_field_error(code)
     if code_error:
         fields.append(code_error)
+    if accept_terms is not True:
+        fields.append({"field": "accept_terms", "message": "You must accept the user agreement."})
     return fields
 
 

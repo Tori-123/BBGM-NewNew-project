@@ -22,6 +22,7 @@ def _user_private(user: User) -> dict:
         role=user.role,
         avatar=normalize_avatar(getattr(user, "avatar", None)),
         muted=bool(user.muted),
+        terms_accepted_at=to_iso(user.terms_accepted_at) if user.terms_accepted_at else None,
         created_at=to_iso(user.created_at),
     ).model_dump()
 
