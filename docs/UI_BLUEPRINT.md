@@ -1,6 +1,6 @@
 # UI 蓝图：Elegram 印刷版
 
-选定 2.3A **提案 1** 的版式（报头、头条、栏目）。产品名 **Elegram**。社区托管，**不**代表 BASIS Bilingual Guangming。字段只绑定 `docs/schema.md`；没有封面图、featured 标记、检索接口——图框是 CSS 占位，不是数据。
+选定 2.3A **提案 1** 的版式（报头、头条、栏目）。产品名 **Elegram**。由 **广东智云建材有限公司** 所有并运营。字段只绑定 `docs/schema.md`；没有封面图、featured 标记、检索接口——图框是 CSS 占位，不是数据。
 
 ---
 
@@ -28,18 +28,19 @@
 | `/sign-in` | 登录 | 访客 | `POST /api/v1/auth/login` |
 | `/register` | 注册 | 访客 | `POST /api/v1/auth/email-codes`（`purpose=register`）后 `POST /api/v1/auth/register` |
 | `/reset-password` | 找回密码 | 访客 | `POST /api/v1/auth/email-codes`（`purpose=reset`）后 `POST /api/v1/auth/password-reset` |
-| `/about` `/contact` | 静态稿（截图顶栏） | 公开 | 无 API |
+| `/about` | 静态稿。写明由广东智云建材有限公司所有，并给出联系邮箱 | 公开 | 无 API |
+| `/contact` | 静态稿。联系方式为该超管邮箱 | 公开 | 无 API |
 | `/terms` | 用户协议 | 公开 | 无 API。默认英文，可切中文；语言选择记在浏览器本地，不进接口。直接打开此地址是整页。站内顶栏与注册勾选不跳到本页，改为当前页浮层 |
 
 **全局壳 `PaperShell`**
 
-- 顶栏左：`ABOUT` `TERMS`（当前页浮层，不切路由）`CONTACT` `SYSTEM`（`/system`）。顶栏右：账号区 + 本地日期文案 `Today: {formatted local date}`（不是 schema 字段）。`TERMS` 浮层可滚动，点遮罩或关闭即收起，仍停在打开前的页面。
-- 账号：启动时 `GET /api/v1/me`。登录后同一套 live refresh（约 4 秒）再拉 `/me`，超管改 `role` / `muted` / 删号后顶栏与导航跟着变，不必整页刷新。`401` = 访客，显示 `SIGN IN`（去 `/sign-in`）。`200` = 已登录，显示头像（`avatar`）、`display_name`、`AVATAR`（`/me/avatar`）、`PASSWORD`（`/me/password`）、`MY POSTS`（`/me/posts`）、`SIGN OUT`。顶栏不放 `DRAFTS`。`role===super_admin` 另显示 `USERS`（`/admin/users`）。
+- 顶栏一行，从左到右：`SYSTEM`、登录后的 `SETTINGS`、登录后的 `MY POSTS`、`NOTICES`。`SYSTEM` 点开菜单：`ABOUT`、`TERMS`（当前页浮层，不切路由）、`CONTACT`。`SETTINGS` 点开菜单：`AVATAR`（`/me/avatar`）、`PASSWORD`（`/me/password`）；`role===super_admin` 再加 `USERS`（`/admin/users`）。`MY POSTS` 直接去 `/me/posts`。`NOTICES` 直接去 `/system`（通知页，顶栏不叫 System）。菜单点外面、按 Esc 或选中一项后收起。子项不常驻顶栏。`TERMS` 浮层可滚动，点遮罩或关闭即收起，仍停在打开前的页面。
+- 顶栏右侧：本地日期 `Today: {formatted local date}`（不是 schema 字段）。`401` = 访客，日期前显示 `SIGN IN`（去 `/sign-in`），不显示 Settings 与 My Posts。`200` = 已登录，日期前显示头像（`avatar`）、`display_name`、`SIGN OUT`。启动时 `GET /api/v1/me`。登录后同一套 live refresh（约 4 秒）再拉 `/me`，超管改 `role` / `muted` / 删号后顶栏与导航跟着变，不必整页刷新。顶栏不放 `DRAFTS`。
 - 列表同步：首页 / Forum / 帖详情已 live refresh。`/admin/users`、`/news/drafts` 列表、`/system`、`/me/posts` 同样轮询，超管或其他人刚做的改动会进当前页。打开中的草稿编辑框不自动覆盖，以免冲掉未保存正文。
-- 报头：左搜索框（外形保留；提交不调接口，在报头下出一条静态说明）。中：斜体衬线字标 `Elegram` 链回 `/`。右：静态「COMMUNITY HOSTED / Independent campus forum」。
-- 标语静态：`YOUR CAMPUS. YOUR STORIES. YOUR VOICE.`
+- 报头：左搜索框（外形保留；提交不调接口，在报头下出一条静态说明）。中：斜体衬线字标 `Elegram` 链回 `/`。右：静态「OWNED BY / 广东智云建材有限公司」。
+- 标语静态：`YOUR STORIES. YOUR VOICE. YOUR PAGE.`
 - 导航：`NEWS`（`/`）`DRAFTS`（`/news/drafts`）`FORUM` `OPINION`。`DRAFTS` 只在 `role` 为 `editor` 或 `super_admin` 时出现，与 `FORUM` 同一行。当前路由下划黑线。无 `SUBMIT`，无单独的 News 列表项。Forum 发帖在栏目页内。News 稿在 `/news/drafts`。
-- 页脚声明（非 schema）：`Community-hosted.`
+- 页脚声明（非 schema）：`Owned by 广东智云建材有限公司.`
 
 **栏目枚举 → 导航文案（展示层，不是新字段）**
 
@@ -236,10 +237,11 @@ Photo of the Day / Track of the Day / Student Art：静态标题+空图框+固�
 
 - `<PaperShell>`
   - `<UtilityBar>`
-    - 链 About / Terms / Contact / System
-    - `<AccountNav>`
-      - 访客：SIGN IN
-      - 登录：`display_name` ← `GET /me`；MY POSTS；`role===super_admin` 时 USERS；SIGN OUT
+    - `SYSTEM` 菜单：About / Terms / Contact
+    - 登录后 `SETTINGS` 菜单：Avatar / Password；`role===super_admin` 时 Users
+    - 登录后 `MY POSTS` → `/me/posts`
+    - `NOTICES` → `/system`
+    - 右侧：访客 SIGN IN；登录后头像、`display_name` ← `GET /me`、SIGN OUT
     - `<TodayLabel>` 本地日期（非 API）
   - `<Masthead>`
     - `<SearchStub>` 静态
@@ -249,7 +251,7 @@ Photo of the Day / Track of the Day / Student Art：静态标题+空图框+固�
   - `<SectionNav>` NEWS（`/`）/ DRAFTS（仅 `editor` 或 `super_admin`，`/news/drafts`）/ FORUM / OPINION
   - `<SearchNotice>` 仅搜索提交后显示（静态文案）
   - `<Outlet>` 下列页面之一
-  - `<Disclaimer>` Community-hosted.
+  - `<Disclaimer>` Owned by 广东智云建材有限公司.
 
 - `<Page: Home>`
   - `<ErrorBanner>` ← `error.code` `error.message`（仅列表失败）

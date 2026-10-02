@@ -133,7 +133,7 @@ export default function Register() {
           </div>
           <FieldError message={fieldMessage(error, "code")} />
           {codeSent && !fieldMessage(error, "code") && !emailError ? (
-            <p className="mt-2 font-sans text-sm text-neutral-500">A code was sent to that school email.</p>
+            <p className="mt-2 font-sans text-sm text-neutral-500">A code was sent to that email.</p>
           ) : null}
         </div>
         <div>

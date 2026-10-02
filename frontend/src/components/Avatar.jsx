@@ -4,7 +4,7 @@ export const AVATAR_PRESETS = [
   { id: "oak", label: "Oak" },
   { id: "gym", label: "Gym" },
   { id: "book", label: "Book" },
-  { id: "dorm", label: "Dorm" },
+  { id: "dorm", label: "Room" },
   { id: "bus", label: "Bus" },
   { id: "night", label: "Night" },
 ];

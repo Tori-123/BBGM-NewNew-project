@@ -6,12 +6,12 @@ const STORAGE_KEY = "elegram_terms_lang";
 const COPY = {
   en: {
     title: "Terms",
-    lead: "Elegram is a community-hosted campus forum. It is not the registrar, not a ticket office, and not a recommendation engine. Creating an account means you accept this agreement.",
+    lead: "Elegram is owned and operated by 广东智云建材有限公司. It is not a ticket office, and not a recommendation engine. Creating an account means you accept this agreement.",
     sections: [
       {
         heading: "Account and cybersecurity",
         items: [
-          "Use only your own @basischina.com email.",
+          "Use only your own email address.",
           "Do not give your password to anyone else.",
           "Do not break into another account, skip sign-in, upload malicious files, or disrupt the service.",
           "Passwords are stored as hashes. The session cookie is HttpOnly.",
@@ -38,7 +38,7 @@ const COPY = {
       {
         heading: "What you should do",
         items: [
-          "Register with your own school email.",
+          "Register with your own email address.",
           "Do not spread the content listed above.",
           "If you see a violation, tell a super admin. This site has no report form. The Contact page does not send mail.",
         ],
@@ -49,12 +49,12 @@ const COPY = {
   },
   zh: {
     title: "用户协议",
-    lead: "Elegram 是社区托管的校园论坛，不是教务处，不是售票处，也不是推荐引擎。注册即表示接受本协议。",
+    lead: "Elegram 由广东智云建材有限公司所有并运营。不是售票处，也不是推荐引擎。注册即表示接受本协议。",
     sections: [
       {
         heading: "账号与网络安全",
         items: [
-          "只用自己的 @basischina.com 邮箱。",
+          "只用自己的邮箱。",
           "不要把密码交给别人。",
           "不要入侵他人账号、绕过登录、上传恶意文件或扰乱服务。",
           "密码只以哈希保存。会话 Cookie 为 HttpOnly。",
@@ -81,7 +81,7 @@ const COPY = {
       {
         heading: "你该怎么做",
         items: [
-          "用本人的校内邮箱注册。",
+          "用本人的邮箱注册。",
           "不传播上面列出的内容。",
           "看到违规内容，告诉超级管理员。站内没有举报表单。Contact 页不发信。",
         ],

@@ -6,7 +6,7 @@ alwaysApply: true
 
 # 全局架构
 
-Elegram 是社区托管的校园 Web：登录发帖、按栏目阅读。与 BASIS Bilingual Guangming 无关。前后端分目录，不要搭成单仓混写或后台套件。
+Elegram 由广东智云建材有限公司所有并运营：登录发帖、按栏目阅读。前后端分目录，不要搭成单仓混写或后台套件。
 
 ## 目录
 

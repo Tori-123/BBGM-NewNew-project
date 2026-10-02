@@ -105,7 +105,7 @@ export default function ResetPassword() {
           </div>
           <FieldError message={fieldMessage(error, "code")} />
           {codeSent && !fieldMessage(error, "code") && !fieldMessage(error, "email") ? (
-            <p className="mt-2 font-sans text-sm text-neutral-500">If that school email has an account, a code was sent.</p>
+            <p className="mt-2 font-sans text-sm text-neutral-500">If that email has an account, a code was sent.</p>
           ) : null}
         </div>
         <div>

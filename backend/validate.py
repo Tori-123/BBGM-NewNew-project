@@ -7,7 +7,7 @@ from schemas import CATEGORIES, CATEGORY_MESSAGE
 EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 CODE_RE = re.compile(r"^\d{6}$")
 SCHOOL_EMAIL_SUFFIX = "@basischina.com"
-SCHOOL_EMAIL_MESSAGE = "Use your school email ending in @basischina.com."
+SCHOOL_EMAIL_MESSAGE = "Use an email ending in @basischina.com."
 CODE_MESSAGE = "Enter the 6-digit code sent to your email."
 EMAIL_CODE_PURPOSES = ("register", "reset")
 PURPOSE_MESSAGE = "Must be one of: register, reset."

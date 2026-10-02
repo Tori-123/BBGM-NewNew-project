@@ -69,7 +69,7 @@ export default function AvatarSettings() {
         <Avatar avatar={user.avatar} size={64} />
         <div>
           <p className="font-sans text-sm">{user.display_name}</p>
-          <p className="mt-1 font-sans text-xs text-neutral-500">Choose a campus mark or upload a photo.</p>
+          <p className="mt-1 font-sans text-xs text-neutral-500">Choose a mark or upload a photo.</p>
         </div>
       </div>
 

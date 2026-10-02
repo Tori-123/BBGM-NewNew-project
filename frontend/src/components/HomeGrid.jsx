@@ -6,19 +6,19 @@ import { Dek, Headline, ImageWell, Kicker, SectionRule, StoryTile, TitleLine } f
 const PLACEHOLDER = {
   featured: {
     kicker: "FEATURED",
-    title: "The biggest story on campus goes here",
+    title: "The biggest story goes here",
   },
   secondary: {
     kicker: "NEWS",
-    title: "Secondary campus story with a strong image",
+    title: "Secondary story with a strong image",
   },
-  campus: {
+  third: {
     kicker: "NEWS",
     title: "A smaller story with a different rhythm",
   },
   sports: {
     kicker: "NEWS",
-    title: "Another campus story with a wider text treatment",
+    title: "Another story with a wider text treatment",
     dek: "A short summary can appear here when the story needs more context.",
   },
 };
@@ -50,7 +50,7 @@ function SlotTitle({ post, fallback, className }) {
 function Hero({ items, loading }) {
   const featured = loading ? null : slot(items, 0);
   const secondary = loading ? null : slot(items, 1);
-  const campus = loading ? null : slot(items, 2);
+  const third = loading ? null : slot(items, 2);
   const sports = loading ? null : slot(items, 3);
 
   return (
@@ -75,8 +75,8 @@ function Hero({ items, loading }) {
           <article>
             <ImageWell className="aspect-square w-full" />
             <div className="mt-3 border-b border-neutral-200 pb-4">
-              <SlotKicker post={campus} fallback={PLACEHOLDER.campus.kicker} />
-              <SlotTitle post={campus} fallback={PLACEHOLDER.campus.title} className="mt-1 text-[21px] font-semibold" />
+              <SlotKicker post={third} fallback={PLACEHOLDER.third.kicker} />
+              <SlotTitle post={third} fallback={PLACEHOLDER.third.title} className="mt-1 text-[21px] font-semibold" />
             </div>
           </article>
         </div>
@@ -193,7 +193,7 @@ export default function HomeGrid({ items, total, loading }) {
             </div>
           </div>
 
-          <SectionRule>CAMPUS LIFE</SectionRule>
+          <SectionRule>MORE STORIES</SectionRule>
           <div className="grid gap-6 md:grid-cols-3">
             {[12, 13, 14].map((index) => (
               <StoryTile
@@ -213,16 +213,16 @@ export default function HomeGrid({ items, total, loading }) {
           <StaticRail
             kicker="Photo of the Day"
             title="From the quad"
-            note="Student photo submissions open in a later version."
+            note="Photo submissions open in a later version."
           />
           <StaticRail
             kicker="Track of the Day"
             title="No playlist today"
-            note="A campus track will live here later. No Spotify embed in this version."
+            note="A track will live here later. No Spotify embed in this version."
             wellClassName="h-16"
           />
           <StaticRail
-            kicker="Student Art"
+            kicker="Art"
             title="Open wall"
             note="Art submissions are a later version. This frame stays empty on purpose."
           />

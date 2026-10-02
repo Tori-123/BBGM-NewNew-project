@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { Link, NavLink, Outlet } from "react-router-dom";
+import { useEffect, useRef, useState } from "react";
+import { Link, NavLink, Outlet, useLocation } from "react-router-dom";
 import { useAuth } from "../auth";
 import { Avatar } from "./Avatar";
 import { canEditNews, CATEGORY_ROUTES, formatToday } from "../format";
@@ -9,6 +9,30 @@ function navClass({ isActive }) {
   return `font-sans text-[12px] font-medium uppercase tracking-[0.18em] ${
     isActive ? "text-neutral-900" : "text-neutral-900 hover:text-[#1A4FBF]"
   }`;
+}
+
+const menuItemClass =
+  "block w-full px-4 py-2 text-left uppercase tracking-[0.18em] hover:text-[#1A4FBF]";
+
+function BarMenu({ label, open, onToggle, children }) {
+  return (
+    <div className="relative">
+      <button
+        type="button"
+        className="uppercase"
+        aria-expanded={open}
+        aria-haspopup="menu"
+        onClick={onToggle}
+      >
+        {label}
+      </button>
+      {open ? (
+        <div role="menu" className="absolute left-0 top-full z-20 mt-2 min-w-[9.5rem] border border-black bg-white py-1">
+          {children}
+        </div>
+      ) : null}
+    </div>
+  );
 }
 
 function SearchIcon() {
@@ -32,9 +56,35 @@ function SearchIcon() {
 
 export default function PaperShell() {
   const { user, signOut } = useAuth();
+  const location = useLocation();
+  const barRef = useRef(null);
   const [query, setQuery] = useState("");
   const [searchNotice, setSearchNotice] = useState(false);
   const [termsOpen, setTermsOpen] = useState(false);
+  const [openMenu, setOpenMenu] = useState(null);
+
+  useEffect(() => {
+    setOpenMenu(null);
+  }, [location.pathname]);
+
+  useEffect(() => {
+    function onPointerDown(event) {
+      if (!barRef.current?.contains(event.target)) setOpenMenu(null);
+    }
+    function onKeyDown(event) {
+      if (event.key === "Escape") setOpenMenu(null);
+    }
+    document.addEventListener("pointerdown", onPointerDown);
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("pointerdown", onPointerDown);
+      document.removeEventListener("keydown", onKeyDown);
+    };
+  }, []);
+
+  function toggleMenu(name) {
+    setOpenMenu((current) => (current === name ? null : name));
+  }
 
   function onSearch(event) {
     event.preventDefault();
@@ -52,33 +102,83 @@ export default function PaperShell() {
   return (
     <div className="min-h-screen bg-white text-[#111111]">
       <div className="mx-auto max-w-[1180px] px-8 pb-20">
-        <div className="flex items-center justify-between border-b border-black py-[10px] font-sans text-[11px] font-medium tracking-[0.18em] text-[#111111]">
-          <nav className="flex items-center gap-7 uppercase">
-            <Link to="/about">About</Link>
-            <button type="button" className="uppercase" onClick={() => setTermsOpen(true)}>
-              Terms
-            </button>
-            <Link to="/contact">Contact</Link>
-            <Link to="/system">System</Link>
-            {user ? (
-              <>
-                <Link to="/me/avatar" className="flex items-center gap-2.5 normal-case tracking-normal text-[#111111]">
-                  <Avatar avatar={user.avatar} size={28} />
-                  {user.display_name}
+        <div
+          ref={barRef}
+          className="border-b border-black py-[10px] font-sans text-[11px] font-medium tracking-[0.18em] text-[#111111]"
+        >
+          <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-2">
+            <nav className="flex flex-wrap items-center gap-x-6 gap-y-2 uppercase" aria-label="Site">
+              <BarMenu label="System" open={openMenu === "system"} onToggle={() => toggleMenu("system")}>
+                <Link role="menuitem" to="/about" className={menuItemClass}>
+                  About
                 </Link>
-                <Link to="/me/avatar">Avatar</Link>
-                <Link to="/me/password">Password</Link>
-                <Link to="/me/posts">My Posts</Link>
-                {user.role === "super_admin" ? <Link to="/admin/users">Users</Link> : null}
-                <button type="button" onClick={onSignOut} className="uppercase">
-                  Sign Out
+                <button
+                  type="button"
+                  role="menuitem"
+                  className={menuItemClass}
+                  onClick={() => {
+                    setOpenMenu(null);
+                    setTermsOpen(true);
+                  }}
+                >
+                  Terms
                 </button>
-              </>
-            ) : (
-              <Link to="/sign-in">Sign In</Link>
-            )}
-          </nav>
-          <p className="font-medium tracking-[0.06em] text-[#111111]">Today: {formatToday()}</p>
+                <Link role="menuitem" to="/contact" className={menuItemClass}>
+                  Contact
+                </Link>
+              </BarMenu>
+              {user ? (
+                <BarMenu
+                  label="Settings"
+                  open={openMenu === "settings"}
+                  onToggle={() => toggleMenu("settings")}
+                >
+                  <Link role="menuitem" to="/me/avatar" className={menuItemClass}>
+                    Avatar
+                  </Link>
+                  <Link role="menuitem" to="/me/password" className={menuItemClass}>
+                    Password
+                  </Link>
+                  {user.role === "super_admin" ? (
+                    <Link role="menuitem" to="/admin/users" className={menuItemClass}>
+                      Users
+                    </Link>
+                  ) : null}
+                </BarMenu>
+              ) : null}
+              {user ? (
+                <Link to="/me/posts" className="uppercase">
+                  My Posts
+                </Link>
+              ) : null}
+              <Link to="/system" className="uppercase">
+                Notices
+              </Link>
+            </nav>
+            <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
+              {user ? (
+                <>
+                  <Link
+                    to="/me/avatar"
+                    className="flex items-center gap-2.5 normal-case tracking-normal text-[#111111]"
+                  >
+                    <Avatar avatar={user.avatar} size={28} />
+                    {user.display_name}
+                  </Link>
+                  <button type="button" onClick={onSignOut} className="uppercase">
+                    Sign Out
+                  </button>
+                </>
+              ) : (
+                <Link to="/sign-in" className="uppercase">
+                  Sign In
+                </Link>
+              )}
+              <p className="font-medium tracking-[0.06em] text-[#111111] sm:ml-1 sm:border-l sm:border-black sm:pl-5">
+                Today: {formatToday()}
+              </p>
+            </div>
+          </div>
         </div>
 
         <header className="grid grid-cols-[1fr_auto_1fr] items-center gap-6 pb-1 pt-8">
@@ -106,17 +206,17 @@ export default function PaperShell() {
 
           <div className="text-right">
             <p className="font-sans text-[10px] font-semibold tracking-[0.16em] text-[#1A4FBF]">
-              COMMUNITY HOSTED
+              OWNED BY
             </p>
             <p className="mt-[3px] font-sans text-[10px] font-normal tracking-[0.01em] text-neutral-500">
-              Independent campus forum
+              广东智云建材有限公司
             </p>
           </div>
         </header>
 
         <p className="pb-6 pt-4 text-center font-sans text-[13px] font-semibold uppercase tracking-[0.28em] text-[#111111]">
           <Link to="/" className="text-inherit no-underline">
-            Your campus. Your stories. Your voice.
+            Your stories. Your voice. Your page.
           </Link>
         </p>
 
@@ -143,7 +243,7 @@ export default function PaperShell() {
         <Outlet />
 
         <p className="mt-16 border-t border-neutral-200 pt-4 font-sans text-[11px] leading-5 text-neutral-500">
-          Community-hosted.
+          Owned by 广东智云建材有限公司.
         </p>
       </div>
       {termsOpen ? <TermsDialog onClose={() => setTermsOpen(false)} /> : null}

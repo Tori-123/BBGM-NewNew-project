@@ -7,12 +7,12 @@ import { canEditNews } from "../format";
 import { useLiveRefresh } from "../live";
 
 const FALLBACK = {
-  0: { kicker: "FEATURED", title: "The biggest story on campus goes here" },
-  1: { kicker: "NEWS", title: "Secondary campus story with a strong image" },
+  0: { kicker: "FEATURED", title: "The biggest story goes here" },
+  1: { kicker: "NEWS", title: "Secondary story with a strong image" },
   2: { kicker: "NEWS", title: "A smaller story with a different rhythm" },
   3: {
     kicker: "NEWS",
-    title: "Another campus story with a wider text treatment",
+    title: "Another story with a wider text treatment",
     dek: "A short summary can appear here when the story needs more context.",
   },
 };
@@ -206,7 +206,7 @@ function DraftBoard({ draft, isSuper, error, onSave, onSubmit, onApprove, onReje
             </div>
           </div>
 
-          <SectionRule>CAMPUS LIFE</SectionRule>
+          <SectionRule>MORE STORIES</SectionRule>
           <div className="grid gap-6 md:grid-cols-3">
             {[12, 13, 14].map((index) => (
               <SlotButton key={index} index={index} block={blocks[index + 1]} selected={active === index} onSelect={setActive}>
@@ -231,16 +231,16 @@ function DraftBoard({ draft, isSuper, error, onSave, onSubmit, onApprove, onReje
           <StaticRail
             kicker="Photo of the Day"
             title="From the quad"
-            note="Student photo submissions open in a later version."
+            note="Photo submissions open in a later version."
           />
           <StaticRail
             kicker="Track of the Day"
             title="No playlist today"
-            note="A campus track will live here later. No Spotify embed in this version."
+            note="A track will live here later. No Spotify embed in this version."
             wellClassName="h-16"
           />
           <StaticRail
-            kicker="Student Art"
+            kicker="Art"
             title="Open wall"
             note="Art submissions are a later version. This frame stays empty on purpose."
           />
