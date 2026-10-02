@@ -394,14 +394,8 @@ def test_student_community_comments_promote_and_admin_roles(tmp_path, monkeypatc
             f"/api/v1/posts/{post_id}/comments",
             json={"body": "I will come by after dinner.", "parent_id": floor_id},
         )
-        assert reply.status_code == 201, reply.text
-        assert reply.json()["parent_id"] == floor_id
-
-        nested = client.post(
-            f"/api/v1/posts/{post_id}/comments",
-            json={"body": "Too deep.", "parent_id": reply.json()["id"]},
-        )
-        assert nested.status_code == 422
+        assert reply.status_code == 422
+        assert reply.json()["error"]["fields"][0]["field"] == "parent_id"
 
         newspaper = guest.get(f"/api/v1/posts/{post_id}")
         news_id = None
@@ -411,7 +405,8 @@ def test_student_community_comments_promote_and_admin_roles(tmp_path, monkeypatc
         comments = guest.get(f"/api/v1/posts/{post_id}/comments")
         assert comments.status_code == 200
         assert comments.json()["total"] == 1
-        assert comments.json()["items"][0]["replies"][0]["body"] == "I will come by after dinner."
+        assert comments.json()["items"][0]["replies"] == []
+        assert comments.json()["items"][0]["body"] == "I have a roll in 312."
         assert comments.json()["items"][0]["author"]["avatar"] == "preset:oak"
 
         board_after = guest.get("/api/v1/posts?category=forum")

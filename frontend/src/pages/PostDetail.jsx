@@ -20,7 +20,6 @@ export default function PostDetail() {
   const [commentPage, setCommentPage] = useState(1);
   const [commentError, setCommentError] = useState(null);
   const [commentBody, setCommentBody] = useState("");
-  const [replyTo, setReplyTo] = useState(null);
   const [commentSubmitting, setCommentSubmitting] = useState(false);
   const [ready, setReady] = useState(false);
   const commentPageRef = useRef(1);
@@ -122,14 +121,12 @@ export default function PostDetail() {
     try {
       await api.createComment(postId, {
         body: commentBody,
-        parent_id: replyTo,
       });
       const thread = await api.listComments(postId, { page: 1 });
       setComments(thread.items);
       setCommentPage(thread.page);
       setCommentTotal(thread.total);
       setCommentBody("");
-      setReplyTo(null);
     } catch (err) {
       if (err instanceof ApiError && err.status === 401) {
         setUser(null);
@@ -223,35 +220,26 @@ export default function PostDetail() {
 
           {isForum ? (
             <section className="mt-12 border-t border-black pt-8">
-              <h2 className="font-serif text-2xl">Replies</h2>
+              <h2 className="font-serif text-2xl">Comments</h2>
               <ErrorBanner error={commentError && !commentError.fields?.length ? commentError : null} />
               {comments.length === 0 ? (
-                <p className="mt-4 font-sans text-sm text-neutral-500">No replies yet.</p>
+                <p className="mt-4 font-sans text-sm text-neutral-500">No comments yet.</p>
               ) : (
-                comments.map((floor) => (
-                  <div key={floor.id} className="mt-6 border-t border-neutral-200 pt-4">
+                comments.map((item) => (
+                  <div key={item.id} className="mt-6 border-t border-neutral-200 pt-4">
                     <div className="flex items-center gap-3">
-                      <Avatar avatar={floor.author?.avatar} size={28} />
+                      <Avatar avatar={item.author?.avatar} size={28} />
                       <p className="font-sans text-[11px] uppercase tracking-[0.16em] text-[#1A4FBF]">
-                        #{floor.floor} · {floor.author?.display_name}
+                        {item.author?.display_name}
                       </p>
                     </div>
-                    <p className="mt-2 whitespace-pre-wrap font-sans text-sm leading-6">{floor.body}</p>
-                    {user ? (
-                      <button
-                        type="button"
-                        onClick={() => setReplyTo(floor.id)}
-                        className="mt-2 font-sans text-[11px] uppercase tracking-[0.14em] text-[#1A4FBF]"
-                      >
-                        Reply
-                      </button>
-                    ) : null}
-                    {floor.replies?.map((item) => (
-                      <div key={item.id} className="mt-3 ml-6 flex gap-2 border-l border-black pl-4">
-                        <Avatar avatar={item.author?.avatar} size={22} />
+                    <p className="mt-2 whitespace-pre-wrap font-sans text-sm leading-6">{item.body}</p>
+                    {item.replies?.map((reply) => (
+                      <div key={reply.id} className="mt-3 ml-6 flex gap-2 border-l border-black pl-4">
+                        <Avatar avatar={reply.author?.avatar} size={22} />
                         <div>
-                          <p className="font-sans text-[11px] text-neutral-500">{item.author?.display_name}</p>
-                          <p className="mt-1 whitespace-pre-wrap font-sans text-sm leading-6">{item.body}</p>
+                          <p className="font-sans text-[11px] text-neutral-500">{reply.author?.display_name}</p>
+                          <p className="mt-1 whitespace-pre-wrap font-sans text-sm leading-6">{reply.body}</p>
                         </div>
                       </div>
                     ))}
@@ -264,22 +252,14 @@ export default function PostDetail() {
                   onClick={loadOlderComments}
                   className="mt-6 font-sans text-sm uppercase tracking-[0.14em] text-[#1A4FBF]"
                 >
-                  Older replies
+                  Older comments
                 </button>
               ) : null}
 
               {user ? (
                 <form onSubmit={onComment} className="mt-8">
-                  {replyTo ? (
-                    <p className="mb-2 font-sans text-xs text-neutral-500">
-                      Replying to a floor.{" "}
-                      <button type="button" className="text-[#1A4FBF]" onClick={() => setReplyTo(null)}>
-                        Post as a new floor
-                      </button>
-                    </p>
-                  ) : null}
                   <label className="block font-sans text-[11px] uppercase tracking-[0.16em] text-[#1A4FBF]" htmlFor="comment-body">
-                    {replyTo ? "Reply" : "New floor"}
+                    Comment
                   </label>
                   <textarea
                     id="comment-body"
@@ -289,13 +269,12 @@ export default function PostDetail() {
                     className="mt-2 w-full border border-black p-3 font-sans text-sm outline-none"
                   />
                   <FieldError message={fieldMessage(commentError, "body")} />
-                  <FieldError message={fieldMessage(commentError, "parent_id")} />
                   <button
                     type="submit"
                     disabled={commentSubmitting}
                     className="mt-4 rounded-[2px] bg-black px-5 py-2 font-sans text-[11px] uppercase tracking-[0.18em] text-white"
                   >
-                    Post reply
+                    Post comment
                   </button>
                 </form>
               ) : (
@@ -303,7 +282,7 @@ export default function PostDetail() {
                   <Link to={`/sign-in?next=/posts/${postId}`} className="text-[#1A4FBF]">
                     Sign in
                   </Link>{" "}
-                  to reply.
+                  to comment.
                 </p>
               )}
             </section>

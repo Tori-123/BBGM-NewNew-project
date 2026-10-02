@@ -28,7 +28,7 @@
 | `/sign-in` | 登录 | 访客 | `POST /api/v1/auth/login` |
 | `/register` | 注册 | 访客 | `POST /api/v1/auth/email-codes`（`purpose=register`）后 `POST /api/v1/auth/register` |
 | `/reset-password` | 找回密码 | 访客 | `POST /api/v1/auth/email-codes`（`purpose=reset`）后 `POST /api/v1/auth/password-reset` |
-| `/about` | 静态稿。写明由广东智云建材有限公司所有，并给出联系邮箱 | 公开 | 无 API |
+| `/about` | 静态稿。写明由广东智云建材有限公司所有，并给出联系邮箱。另有 Contributors：本网站是由 Tori zhao, Leo Gao, Ben lu, Dewey Peng 制作的 | 公开 | 无 API |
 | `/contact` | 静态稿。联系方式为该超管邮箱 | 公开 | 无 API |
 | `/terms` | 用户协议 | 公开 | 无 API。默认英文，可切中文；语言选择记在浏览器本地，不进接口。直接打开此地址是整页。站内顶栏与注册勾选不跳到本页，改为当前页浮层 |
 
@@ -134,7 +134,7 @@ Photo of the Day / Track of the Day / Student Art：静态标题+空图框+固�
 | --- | --- |
 | 加载 | 图框+标题横线。 |
 | 成功 | kicker←`category`；标题←`title`；byline←`author.display_name`、`created_at`。Forum 正文←`body`。News 按 `blocks[]` 分段渲染 `heading` 与 `body`，不展示未同意板块。 |
-| Forum | `category===forum` 时正文下请求 `GET /comments`。楼主与每楼显示 `author.avatar`。有 `images[]` 则在正文下展示实图，不用校报占位图框。楼层显示 `floor`、`author.display_name`、`body`、`replies[]`。已登录显示跟帖框；未登录显示去登录。校报详情**不**请求评论，图框仍是 CSS 占位。停留时约每 4 秒再请求详情与已加载的评论页；有新楼则追加。输入框内容不丢。后台失败不盖错误条。精选表不在本页。 |
+| Forum | `category===forum` 时正文下请求 `GET /comments`。楼主与每条评论显示 `author.avatar`。有 `images[]` 则在正文下展示实图，不用校报占位图框。评论显示 `author.display_name`、`body`。不显示楼号，没有「新楼层」，也不能回复某一条评论。已登录显示评论框；未登录显示去登录。校报详情**不**请求评论，图框仍是 CSS 占位。停留时约每 4 秒再请求详情与已加载的评论页；有新评论则追加。输入框内容不丢。后台失败不盖错误条。精选表不在本页。 |
 | 删帖 | `role` 为 `admin` 或 `super_admin` 时显示 `Delete`。确认后 `DELETE /api/v1/posts/{id}`，成功回到该帖栏目（Forum 去 `/forum`，News 去 `/`）。`403` 用 `ErrorBanner`。 |
 | 空 / 404 | `error.code === not_found`：衬线 “Story not found.” 无假文。 |
 | 错误 | `503`/`400`：`ErrorBanner` ← `error.message`。 |
@@ -358,8 +358,8 @@ Photo of the Day / Track of the Day / Student Art：静态标题+空图框+固�
 | 点 DRAFTS | `GET /api/v1/news/drafts` | 草稿页；仅 `editor` / `super_admin` 看见导航项 | 403 回 `/` |
 | 点 FORUM | `GET /api/v1/posts?category=forum` | 卡片列表 | 栏目下错误条 |
 | 打开详情 | `GET /api/v1/posts/{post_id}` | 绑 `PostDetail` | `404` 文案；`503` 错误条 |
-| Forum 详情 | `GET /api/v1/posts/{id}/comments` | 楼层与楼中楼 | `422` 不在校报页出现 |
-| 跟帖 | `POST .../comments` | 追加楼或楼中楼 | 401 去登录；422 字段下 |
+| Forum 详情 | `GET /api/v1/posts/{id}/comments` | 帖子下的评论 | `422` 不在校报页出现 |
+| 评论 | `POST .../comments` | 追加一条评论，不带 `parent_id` | 401 去登录；422 字段下 |
 | 打开草稿 | `GET /api/v1/news/drafts` | 列出稿与板块 | 403 回 `/` |
 | 提交板块 | `POST .../blocks/{id}/submit` | 该块 `pending` | 403 `account_muted` |
 | 同意板块 | `POST .../approve` | 公开 News 出现该块 | 非超级管理员 403 |

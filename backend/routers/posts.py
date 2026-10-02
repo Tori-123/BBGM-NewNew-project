@@ -370,18 +370,8 @@ def create_post_comment(
     if not text or len(text) > 4000:
         fields.append({"field": "body", "message": "Body must be 1–4000 characters."})
 
-    parent = None
-    parent_id = body.parent_id
-    if parent_id:
-        parent_id = parse_uuid(parent_id, "parent_id")
-        try:
-            parent = db.scalar(select(Comment).where(Comment.id == parent_id, Comment.post_id == post_id))
-        except SQLAlchemyError as exc:
-            raise StorageError() from exc
-        if parent is None:
-            raise ApiError(404, "not_found", "Comment not found.")
-        if parent.parent_id is not None:
-            fields.append({"field": "parent_id", "message": "Replies must target a floor, not another reply."})
+    if body.parent_id:
+        fields.append({"field": "parent_id", "message": "Comments are on the post. A new floor is not accepted."})
 
     if fields:
         raise validation_error(fields)
@@ -392,7 +382,7 @@ def create_post_comment(
             post=post,
             author=user,
             body=text,
-            parent_id=parent.id if parent else None,
+            parent_id=None,
         )
     except StorageError:
         raise ApiError(503, "storage_unavailable", "Could not save the comment. Try again in a moment.") from None

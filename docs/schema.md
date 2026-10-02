@@ -2,7 +2,7 @@
 
 依据：`docs/PRD.md` Must Have 与 Entity Flow。本文件同时约束前端 Mock 与后端实现。不包含业务代码。
 
-第一版 **无公开审计查询接口**（M10 仅服务端落库）。作者不能改删自己的帖或评论。`admin` 与 `super_admin` 可整帖删除，并给作者一条 System 通知。仅 `super_admin` 可禁言或删除用户。包含 Forum 评论（楼中楼）、角色与 News 分板块草稿。
+第一版 **无公开审计查询接口**（M10 仅服务端落库）。作者不能改删自己的帖或评论。`admin` 与 `super_admin` 可整帖删除，并给作者一条 System 通知。仅 `super_admin` 可禁言或删除用户。包含 Forum 评论、角色与 News 分板块草稿。新评论直接挂在帖子上，不新增楼层或楼中楼。
 
 ---
 
@@ -514,39 +514,39 @@ Content-Type: application/json
 #### `GET /api/v1/posts/{post_id}/comments`
 
 - **鉴权：** 否
-- **职责：** 列出 Forum 帖的楼层（含楼中楼）。分页作用在**楼层**上。`floor` 是全帖楼号，不是当前页内序号。
+- **职责：** 列出 Forum 帖下的评论。分页作用在直接挂在帖上的评论。旧数据里若已有楼中楼，仍出现在对应评论的 `replies` 中；新写入不再产生楼层或楼中楼。
 
 **Query：** `page`、`page_size`（同通用分页）。
 
 **Response**
 
-- `200` `{ items: CommentFloor[], page, page_size, total }`（`total` 为楼层总数）
+- `200` `{ items: CommentFloor[], page, page_size, total }`（`total` 为直接挂在帖上的评论数）
 - `400` `bad_request`（非法 `post_id` 或分页）
 - `404` `not_found`（帖不存在）
 - `422` `validation_error`（帖存在但不是 Forum）
 - `503` `storage_unavailable`
 
-Forum 详情停留时可重复请求本接口（间隔与列表相同），合并已见楼层并追加新楼。形状不变。
+Forum 详情停留时可重复请求本接口（间隔与列表相同），合并已见评论并追加新评论。形状不变。
 
 #### `POST /api/v1/posts/{post_id}/comments`
 
 - **鉴权：** 是
-- **职责：** 在 Forum 帖下发楼层或楼中楼。本版不能改删评论。
+- **职责：** 在 Forum 帖下写一条评论。评论直接挂在帖子上。不新增楼层，不写楼中楼。本版不能改删评论。
 
 **Request body**
 
 | 字段 | 类型 | 必填 | 约束 |
 | --- | --- | --- | --- |
 | `body` | string | 是 | 去掉首尾空白后 1–4000 字符 |
-| `parent_id` | string \| null | 否 | 不传或 `null` = 新楼层；若传则必须是**该帖的楼层** id，禁止回复楼中楼 |
+| `parent_id` | string \| null | 否 | 不接受。传入任意非空值则为 `422` |
 
 **Response**
 
-- `201` + 所创建的 `CommentFloor`（新楼，`replies` 为 `[]`）或 `CommentReply`
+- `201` + 所创建的 `CommentFloor`（`parent_id` 为 `null`，`replies` 为 `[]`）
 - `401` `unauthenticated`
 - `403` `account_muted`
-- `404` `not_found`（帖或 `parent_id` 楼层不存在）
-- `422` `validation_error`（非 Forum 帖、正文非法、`parent_id` 不是该帖楼层）
+- `404` `not_found`（帖不存在）
+- `422` `validation_error`（非 Forum 帖、正文非法、传入 `parent_id`）
 - `503` `storage_unavailable`
 
 ### 1.4 News 草稿

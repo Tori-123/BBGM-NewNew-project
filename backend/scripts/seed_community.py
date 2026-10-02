@@ -165,27 +165,16 @@ def main() -> None:
         if status != 201:
             raise SystemExit(f"Could not create {thread['title']!r} ({status}).")
         post_id = post["id"]
-        floor_ids: list[str] = []
         for index, body in enumerate(thread["floors"]):
             author = neighbor if neighbor and index % 2 else token
-            status, floor, _ = _request(
+            status, _, _ = _request(
                 "POST",
                 f"/posts/{post_id}/comments",
                 token=author,
                 body={"body": body},
             )
             if status != 201:
-                raise SystemExit(f"Could not add floor on {thread['title']!r} ({status}).")
-            floor_ids.append(floor["id"])
-        for index in thread["nested"]:
-            status, _, _ = _request(
-                "POST",
-                f"/posts/{post_id}/comments",
-                token=neighbor or token,
-                body={"body": thread["nested_body"], "parent_id": floor_ids[index]},
-            )
-            if status != 201:
-                raise SystemExit(f"Could not add nested reply on {thread['title']!r} ({status}).")
+                raise SystemExit(f"Could not add comment on {thread['title']!r} ({status}).")
         created += 1
     print(f"seeded {created} forum threads", file=sys.stderr)
 

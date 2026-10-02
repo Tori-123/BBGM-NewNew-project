@@ -25,6 +25,10 @@ export default function About() {
         The owner is 广东智云建材有限公司. This site is not a ticket office, and not a recommendation
         engine.
       </p>
+      <SectionRule>Contributors</SectionRule>
+      <p className="mt-4 font-sans text-[15px] leading-7">
+        本网站是由 Tori zhao, Leo Gao, Ben lu, Dewey Peng 制作的。
+      </p>
     </div>
   );
 }
