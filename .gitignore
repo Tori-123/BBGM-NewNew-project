@@ -1,6 +1,8 @@
 node_modules/
 dist/
 build/
+!CJ_Project/build/
+!CJ_Project/build/**
 .vite/
 
 .env
@@ -21,4 +23,3 @@ venv/
 backend/uploads/
 
 .DS_Store
-
