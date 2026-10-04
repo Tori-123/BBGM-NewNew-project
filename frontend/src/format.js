@@ -5,6 +5,7 @@ export const CATEGORY_LABELS = {
 
 export const CATEGORY_ROUTES = [
   { to: "/forum", label: "FORUM", category: "forum" },
+  { to: "/cj", label: "CJ", category: null },
   { to: "/opinion", label: "OPINION", category: null },
 ];
 
@@ -20,33 +21,38 @@ export function categoryLabel(category) {
   return CATEGORY_LABELS[category] || (category || "").toUpperCase();
 }
 
-export function formatToday() {
-  return new Date().toLocaleDateString("en-US", {
+function dateLocale(lang) {
+  return lang === "zh" ? "zh-CN" : "en-US";
+}
+
+export function formatToday(lang = "en") {
+  return new Date().toLocaleDateString(dateLocale(lang), {
     month: "long",
     day: "numeric",
     year: "numeric",
   });
 }
 
-export function formatDateline(iso) {
+export function formatDateline(iso, lang = "en") {
   if (!iso) return "";
-  return new Date(iso).toLocaleDateString(undefined, {
+  return new Date(iso).toLocaleDateString(dateLocale(lang), {
     month: "long",
     day: "numeric",
     year: "numeric",
   });
 }
 
-export function formatRelative(iso) {
+export function formatRelative(iso, lang = "en") {
   if (!iso) return "";
   const then = new Date(iso).getTime();
   if (Number.isNaN(then)) return "";
+  const zh = lang === "zh";
   const minutes = Math.max(0, Math.floor((Date.now() - then) / 60000));
-  if (minutes < 1) return "just now";
-  if (minutes < 60) return `${minutes}m ago`;
+  if (minutes < 1) return zh ? "刚刚" : "just now";
+  if (minutes < 60) return zh ? `${minutes} 分钟前` : `${minutes}m ago`;
   const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours}h ago`;
+  if (hours < 24) return zh ? `${hours} 小时前` : `${hours}h ago`;
   const days = Math.floor(hours / 24);
-  if (days < 7) return `${days}d ago`;
-  return formatDateline(iso);
+  if (days < 7) return zh ? `${days} 天前` : `${days}d ago`;
+  return formatDateline(iso, lang);
 }

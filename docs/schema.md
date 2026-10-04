@@ -774,6 +774,101 @@ Forum 详情停留时可重复请求本接口（间隔与列表相同），合�
 | `PATCH` / `DELETE` | `/api/v1/posts/{post_id}/comments/{comment_id}` | 本版不能改删单条评论。若误调用：`405`。 |
 | `GET` | `/api/v1/audit-events` | Should（S5）。审计只写不读。 |
 
+### 1.7 CJ
+
+与 Forum 平级的课表，不是帖子栏目。`category` 枚举不含 `cj`。读接口公开。写接口不看 `scoop_session`，看请求头 `X-CJ-Admin-Code`。口令来自环境变量 `CJ_ADMIN_CODE`。该变量为空且请求主机是 `localhost` 或 `127.0.0.1` 时，本地口令 `CJ-DEMO` 可用。
+
+学科目录由服务端准备。学生把学科放进 Period 1–8 的选择只留在浏览器，不写入本接口。
+
+#### `GET /api/v1/cj`
+
+**Query**
+
+| 字段 | 类型 | 必填 | 约束 |
+| --- | --- | --- | --- |
+| `week_start` | string | 是 | `YYYY-MM-DD`，该周周一 |
+
+**Response**
+
+- `200`
+
+```json
+{
+  "week_start": "2026-10-05",
+  "subjects": [{ "id": "ap-calculus", "name": "AP Calculus AB", "short_name": "AP Cal AB", "color": "#2563eb" }],
+  "entries": [{
+    "id": "sample-1",
+    "week_start": "2026-10-05",
+    "day_index": 0,
+    "period": 1,
+    "subject_id": "ap-calculus",
+    "ic": "Limits and continuity review",
+    "hw": "Complete FRQ Set 2",
+    "announcement": "Quiz on Wednesday",
+    "updated_at": "2026-10-05T00:00:00Z"
+  }],
+  "exams": [{
+    "id": "exam-sample-1",
+    "week_start": "2026-10-05",
+    "day_index": 2,
+    "title": "AP Calculus AB · Unit Quiz",
+    "time": "10:05",
+    "location": "Room 402",
+    "note": "Related rates",
+    "updated_at": "2026-10-05T00:00:00Z"
+  }]
+}
+```
+
+`day_index`：0 周一 … 4 周五。
+
+- `422` `validation_error`（`week_start` 非法或缺失）
+- `503` `storage_unavailable`
+
+#### `PUT /api/v1/cj`
+
+按周、日、学科写入或覆盖一条 CJ。学科的 `period` 由服务端从学科目录取出。
+
+**Request body**
+
+| 字段 | 类型 | 必填 | 约束 |
+| --- | --- | --- | --- |
+| `week_start` | string | 是 | `YYYY-MM-DD` |
+| `day_index` | integer | 是 | 0–4 |
+| `subject_id` | string | 是 | 已有学科 |
+| `ic` | string | 否 | 去空白后 ≤800 |
+| `hw` | string | 否 | 去空白后 ≤800 |
+| `announcement` | string | 否 | 去空白后 ≤800。页面上的 A |
+
+**Response**
+
+- `200` `{ "id", "updated_at" }`
+- `401` `unauthenticated`（口令不对）
+- `404` `not_found`（学科不存在）
+- `422` `validation_error`
+- `503` `storage_unavailable`
+
+#### `PUT /api/v1/cj/exams`
+
+**Request body**
+
+| 字段 | 类型 | 必填 | 约束 |
+| --- | --- | --- | --- |
+| `id` | string | 否 | 空则新建；有则覆盖该条 |
+| `week_start` | string | 是 | `YYYY-MM-DD` |
+| `day_index` | integer | 是 | 0–4 |
+| `title` | string | 是 | 去空白后 1–800 |
+| `time` | string | 是 | `HH:MM` |
+| `location` | string | 否 | ≤800 |
+| `note` | string | 否 | ≤800 |
+
+**Response**
+
+- `200` `{ "id", "updated_at" }`
+- `401` `unauthenticated`
+- `422` `validation_error`
+- `503` `storage_unavailable`
+
 ---
 
 ## 2. Mock 数据

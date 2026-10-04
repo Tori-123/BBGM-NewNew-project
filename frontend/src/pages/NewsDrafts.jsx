@@ -4,22 +4,8 @@ import { ApiError, api, fieldMessage } from "../api";
 import { useAuth } from "../auth";
 import { ErrorBanner, FieldError, FrontPageLink, SectionRule } from "../components/ui";
 import { canEditNews } from "../format";
+import { useI18n } from "../i18n";
 import { useLiveRefresh } from "../live";
-
-const FALLBACK = {
-  0: { kicker: "FEATURED", title: "The biggest story goes here" },
-  1: { kicker: "NEWS", title: "Secondary story with a strong image" },
-  2: { kicker: "NEWS", title: "A smaller story with a different rhythm" },
-  3: {
-    kicker: "NEWS",
-    title: "Another story with a wider text treatment",
-    dek: "A short summary can appear here when the story needs more context.",
-  },
-};
-
-function fallback(index) {
-  return FALLBACK[index] || { kicker: "NEWS", title: "An open slot on the front page" };
-}
 
 function blockTone(block) {
   if (!block) return "empty";
@@ -63,12 +49,13 @@ function excerpt(block, tone) {
 }
 
 function SlotButton({ index, block, selected, onSelect, children, className = "" }) {
+  const { t } = useI18n();
   const tone = blockTone(block);
   return (
     <button
       type="button"
       onClick={() => onSelect(index)}
-      aria-label={block ? `Edit ${block.heading}` : `Edit empty slot ${index + 1}`}
+      aria-label={block ? t("drafts.edit", { name: block.heading }) : t("drafts.editEmpty", { index: index + 1 })}
       className={`block w-full p-3 text-left ${toneClass(tone)} ${
         selected ? "outline outline-2 outline-offset-2 outline-black" : ""
       } ${className}`}
@@ -79,8 +66,22 @@ function SlotButton({ index, block, selected, onSelect, children, className = ""
 }
 
 function SlotCopy({ index, block, titleClass }) {
+  const { t } = useI18n();
   const tone = blockTone(block);
-  const place = fallback(index);
+  const place = {
+    kicker: index === 0 ? t("home.featured") : t("home.news"),
+    title:
+      index === 0
+        ? t("home.featuredTitle")
+        : index === 1
+          ? t("home.secondaryTitle")
+          : index === 2
+            ? t("home.thirdTitle")
+            : index === 3
+              ? t("home.wideTitle")
+              : t("home.openSlot"),
+    dek: index === 3 ? t("home.wideDek") : undefined,
+  };
   const title = block ? (tone === "live" ? block.published_heading || block.heading : block.heading) : place.title;
   const dek = block ? excerpt(block, tone) : place.dek;
   return (
@@ -110,6 +111,7 @@ function StaticRail({ kicker, title, note, wellClassName = "h-28" }) {
 }
 
 function DraftBoard({ draft, isSuper, error, onSave, onSubmit, onApprove, onReject }) {
+  const { t } = useI18n();
   const [active, setActive] = useState(null);
   const blocks = Object.fromEntries(draft.blocks.map((block) => [block.position, block]));
   const activeBlock = active == null ? null : blocks[active + 1] || null;
@@ -120,7 +122,7 @@ function DraftBoard({ draft, isSuper, error, onSave, onSubmit, onApprove, onReje
         <h2 className="font-serif text-3xl">{draft.title}</h2>
         {draft.status === "published" ? (
           <Link to={`/posts/${draft.id}`} className="font-sans text-[11px] uppercase tracking-[0.16em] text-[#1A4FBF]">
-            View live
+            {t("drafts.viewLive")}
           </Link>
         ) : null}
       </div>
@@ -130,7 +132,7 @@ function DraftBoard({ draft, isSuper, error, onSave, onSubmit, onApprove, onReje
           <button
             type="button"
             onClick={() => setActive(0)}
-            aria-label={blocks[1] ? `Edit ${blocks[1].heading}` : "Edit empty slot 1"}
+            aria-label={blocks[1] ? t("drafts.edit", { name: blocks[1].heading }) : t("drafts.editEmpty", { index: 1 })}
             className={`block w-full ${active === 0 ? "outline outline-2 outline-offset-2 outline-black" : ""}`}
           >
             <Well tone={blockTone(blocks[1])} className="h-full min-h-[320px] w-full" />
@@ -165,7 +167,7 @@ function DraftBoard({ draft, isSuper, error, onSave, onSubmit, onApprove, onReje
 
       <div className="mt-10 grid grid-cols-1 gap-10 lg:grid-cols-12">
         <div className="lg:col-span-8">
-          <SectionRule>LATEST</SectionRule>
+          <SectionRule>{t("home.latest")}</SectionRule>
           <div className="grid gap-8 md:grid-cols-12">
             <div className="md:col-span-7">
               <SlotButton index={4} block={blocks[5]} selected={active === 4} onSelect={setActive}>
@@ -187,7 +189,7 @@ function DraftBoard({ draft, isSuper, error, onSave, onSubmit, onApprove, onReje
             </div>
           </div>
 
-          <SectionRule>FEATURES</SectionRule>
+          <SectionRule>{t("home.features")}</SectionRule>
           <div className="grid gap-8 md:grid-cols-12">
             <div className="flex flex-col gap-5 md:col-span-5">
               {[8, 9, 10].map((index) => (
@@ -206,7 +208,7 @@ function DraftBoard({ draft, isSuper, error, onSave, onSubmit, onApprove, onReje
             </div>
           </div>
 
-          <SectionRule>MORE STORIES</SectionRule>
+          <SectionRule>{t("home.more")}</SectionRule>
           <div className="grid gap-6 md:grid-cols-3">
             {[12, 13, 14].map((index) => (
               <SlotButton key={index} index={index} block={blocks[index + 1]} selected={active === index} onSelect={setActive}>
@@ -218,7 +220,7 @@ function DraftBoard({ draft, isSuper, error, onSave, onSubmit, onApprove, onReje
             ))}
           </div>
 
-          <SectionRule>Special Feature</SectionRule>
+          <SectionRule>{t("home.special")}</SectionRule>
           <SlotButton index={15} block={blocks[16]} selected={active === 15} onSelect={setActive}>
             <Well tone={blockTone(blocks[16])} className="h-64 w-full" />
             <div className="mt-3">
@@ -228,27 +230,19 @@ function DraftBoard({ draft, isSuper, error, onSave, onSubmit, onApprove, onReje
         </div>
 
         <aside className="flex flex-col gap-8 lg:col-span-4">
+          <StaticRail kicker={t("home.photoKicker")} title={t("home.photoTitle")} note={t("home.photoNote")} />
           <StaticRail
-            kicker="Photo of the Day"
-            title="From the quad"
-            note="Photo submissions open in a later version."
-          />
-          <StaticRail
-            kicker="Track of the Day"
-            title="No playlist today"
-            note="A track will live here later. No Spotify embed in this version."
+            kicker={t("home.trackKicker")}
+            title={t("home.trackTitle")}
+            note={t("home.trackNote")}
             wellClassName="h-16"
           />
-          <StaticRail
-            kicker="Art"
-            title="Open wall"
-            note="Art submissions are a later version. This frame stays empty on purpose."
-          />
+          <StaticRail kicker={t("home.artKicker")} title={t("home.artTitle")} note={t("home.artNote")} />
         </aside>
       </div>
 
       {active == null ? (
-        <p className="mt-8 font-sans text-sm text-neutral-500">Click a slot to edit it.</p>
+        <p className="mt-8 font-sans text-sm text-neutral-500">{t("drafts.click")}</p>
       ) : (
         <SlotEditor
           key={`${draft.id}-${active}-${activeBlock?.id || "new"}-${activeBlock?.updated_at || ""}`}
@@ -266,6 +260,7 @@ function DraftBoard({ draft, isSuper, error, onSave, onSubmit, onApprove, onReje
 }
 
 function SlotEditor({ block, isSuper, error, onSave, onSubmit, onApprove, onReject }) {
+  const { t } = useI18n();
   const [heading, setHeading] = useState(block?.heading || "");
   const [body, setBody] = useState(block?.draft_body || "");
 
@@ -278,12 +273,12 @@ function SlotEditor({ block, isSuper, error, onSave, onSubmit, onApprove, onReje
       }}
     >
       <p className="font-sans text-[11px] uppercase tracking-[0.16em] text-[#1A4FBF]">
-        {block ? block.review_status : "Empty slot"}
+        {block ? labelStatus(t, block.review_status) : t("drafts.empty")}
       </p>
       <input
         value={heading}
         onChange={(event) => setHeading(event.target.value)}
-        placeholder="Section heading"
+        placeholder={t("drafts.heading")}
         className="mt-3 w-full border-0 border-b border-black bg-transparent py-2 font-serif text-2xl outline-none"
       />
       <FieldError message={fieldMessage(error, "heading")} />
@@ -291,25 +286,25 @@ function SlotEditor({ block, isSuper, error, onSave, onSubmit, onApprove, onReje
         value={body}
         onChange={(event) => setBody(event.target.value)}
         rows={6}
-        placeholder="Section draft"
+        placeholder={t("drafts.body")}
         className="mt-4 w-full border border-black p-3 font-sans text-[15px] outline-none"
       />
       <FieldError message={fieldMessage(error, "body") || fieldMessage(error, "position")} />
       {block?.published_body ? (
         <p className="mt-3 font-sans text-sm text-neutral-500">
-          Live: {block.published_heading}. The public page keeps that text until this draft is approved.
+          {t("drafts.live", { heading: block.published_heading })}
         </p>
       ) : null}
       <div className="mt-3 flex flex-wrap gap-4">
         <button type="submit" className="font-sans text-[11px] uppercase tracking-[0.18em] text-[#1A4FBF]">
-          Save draft
+          {t("drafts.save")}
         </button>
         <button
           type="button"
           onClick={() => onSubmit(heading, body)}
           className="font-sans text-[11px] uppercase tracking-[0.18em] text-[#1A4FBF]"
         >
-          Submit
+          {t("drafts.submit")}
         </button>
         {isSuper && block?.review_status === "pending" ? (
           <>
@@ -318,14 +313,14 @@ function SlotEditor({ block, isSuper, error, onSave, onSubmit, onApprove, onReje
               onClick={onApprove}
               className="font-sans text-[11px] uppercase tracking-[0.18em] text-[#1A4FBF]"
             >
-              Approve
+              {t("drafts.approve")}
             </button>
             <button
               type="button"
               onClick={onReject}
               className="font-sans text-[11px] uppercase tracking-[0.18em] text-red-700"
             >
-              Send back
+              {t("drafts.reject")}
             </button>
           </>
         ) : null}
@@ -334,8 +329,15 @@ function SlotEditor({ block, isSuper, error, onSave, onSubmit, onApprove, onReje
   );
 }
 
+function labelStatus(t, status) {
+  const key = `drafts.status.${status}`;
+  const label = t(key);
+  return label === key ? status : label;
+}
+
 export default function NewsDrafts() {
   const { user, ready, setUser } = useAuth();
+  const { t } = useI18n();
   const navigate = useNavigate();
   const [drafts, setDrafts] = useState([]);
   const [draft, setDraft] = useState(null);
@@ -443,11 +445,11 @@ export default function NewsDrafts() {
   return (
     <div className="mt-8">
       <FrontPageLink />
-      <SectionRule>Drafts</SectionRule>
+      <SectionRule>{t("drafts.title")}</SectionRule>
       <ErrorBanner error={error && !error.fields?.length ? error : null} />
       <form onSubmit={createDraft} className="mt-6 max-w-xl">
         <label className="block font-sans text-[11px] uppercase tracking-[0.16em] text-[#1A4FBF]" htmlFor="draft-title">
-          New story
+          {t("drafts.new")}
         </label>
         <input
           id="draft-title"
@@ -457,12 +459,12 @@ export default function NewsDrafts() {
         />
         <FieldError message={fieldMessage(error, "title")} />
         <button type="submit" className="mt-3 font-sans text-[11px] uppercase tracking-[0.18em] text-[#1A4FBF]">
-          Create draft
+          {t("drafts.create")}
         </button>
       </form>
 
       {loading ? (
-        <p className="mt-8 font-sans text-sm text-neutral-500">Loading drafts.</p>
+        <p className="mt-8 font-sans text-sm text-neutral-500">{t("drafts.loading")}</p>
       ) : (
         <ul className="mt-8 border-t border-black">
           {drafts.map((item) => (
@@ -474,7 +476,7 @@ export default function NewsDrafts() {
               >
                 <span className="font-serif text-xl">{item.title}</span>
                 <span className="font-sans text-[11px] uppercase tracking-[0.14em] text-neutral-500">
-                  {item.status}
+                  {labelStatus(t, item.status)}
                 </span>
               </button>
             </li>

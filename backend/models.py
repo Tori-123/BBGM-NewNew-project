@@ -1,7 +1,7 @@
 from datetime import datetime, timezone
 from uuid import uuid4
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, Text, UniqueConstraint, create_engine
+from sqlalchemy import Boolean, DateTime, ForeignKey, Index, Integer, String, Text, UniqueConstraint, create_engine
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship, sessionmaker
 
 
@@ -134,6 +134,56 @@ class AuditEvent(Base):
     action: Mapped[str] = mapped_column(String(64), nullable=False)
     post_id: Mapped[str] = mapped_column(ForeignKey("posts.id"), nullable=False)
     at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+
+class Subject(Base):
+    __tablename__ = "subjects"
+    __table_args__ = (UniqueConstraint("name", name="idx_subjects_name"),)
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    name: Mapped[str] = mapped_column(String(120), nullable=False)
+    short_name: Mapped[str] = mapped_column(String(40), nullable=False)
+    color: Mapped[str] = mapped_column(String(16), nullable=False)
+    period: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+    sort_order: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+
+
+class Exam(Base):
+    __tablename__ = "exams"
+    __table_args__ = (Index("idx_exams_week_day", "week_start", "day_index"),)
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    week_start: Mapped[str] = mapped_column(String(10), nullable=False)
+    day_index: Mapped[int] = mapped_column(Integer, nullable=False)
+    title: Mapped[str] = mapped_column(Text, nullable=False)
+    time: Mapped[str] = mapped_column(String(5), nullable=False)
+    location: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    note: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    updated_at: Mapped[str] = mapped_column(String(32), nullable=False)
+
+
+class CJEntry(Base):
+    __tablename__ = "cj_entries"
+    __table_args__ = (
+        UniqueConstraint(
+            "week_start",
+            "day_index",
+            "period",
+            "subject_id",
+            name="idx_cj_entry_slot",
+        ),
+        Index("idx_cj_entries_week_day", "week_start", "day_index"),
+    )
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    week_start: Mapped[str] = mapped_column(String(10), nullable=False)
+    day_index: Mapped[int] = mapped_column(Integer, nullable=False)
+    period: Mapped[int] = mapped_column(Integer, nullable=False)
+    subject_id: Mapped[str] = mapped_column(ForeignKey("subjects.id"), nullable=False)
+    ic: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    hw: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    announcement: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    updated_at: Mapped[str] = mapped_column(String(32), nullable=False)
 
 
 class EmailCode(Base):

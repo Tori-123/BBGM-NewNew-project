@@ -189,6 +189,22 @@ export const api = {
     }),
   deleteUser: (userId) => request(`/admin/users/${encodeURIComponent(userId)}`, { method: "DELETE" }),
   deletePost: (postId) => request(`/posts/${encodeURIComponent(postId)}`, { method: "DELETE" }),
+  readCj: (weekStart) => {
+    const query = new URLSearchParams({ week_start: weekStart });
+    return request(`/cj?${query}`);
+  },
+  saveCj: (body, adminCode) =>
+    request("/cj", {
+      method: "PUT",
+      headers: { "X-CJ-Admin-Code": adminCode },
+      body: JSON.stringify(body),
+    }),
+  saveExam: (body, adminCode) =>
+    request("/cj/exams", {
+      method: "PUT",
+      headers: { "X-CJ-Admin-Code": adminCode },
+      body: JSON.stringify(body),
+    }),
   likePost: (postId) => request(`/posts/${encodeURIComponent(postId)}/likes`, { method: "POST" }),
   unlikePost: (postId) => request(`/posts/${encodeURIComponent(postId)}/likes`, { method: "DELETE" }),
 };

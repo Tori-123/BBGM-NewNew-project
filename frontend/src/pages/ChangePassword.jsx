@@ -3,9 +3,11 @@ import { Link, useNavigate } from "react-router-dom";
 import { ApiError, api, fieldMessage } from "../api";
 import { useAuth } from "../auth";
 import { ErrorBanner, FieldError, FrontPageLink, ManualPasswordInput, SectionRule } from "../components/ui";
+import { useI18n } from "../i18n";
 
 export default function ChangePassword() {
   const { user, ready, setUser } = useAuth();
+  const { t } = useI18n();
   const navigate = useNavigate();
   const [currentPassword, setCurrentPassword] = useState("");
   const [password, setPassword] = useState("");
@@ -44,11 +46,11 @@ export default function ChangePassword() {
     return (
       <div className="mx-auto mt-10 max-w-md">
         <FrontPageLink />
-        <SectionRule>Password</SectionRule>
-        <p className="font-sans text-sm text-neutral-700">Your password was updated.</p>
+        <SectionRule>{t("password.title")}</SectionRule>
+        <p className="font-sans text-sm text-neutral-700">{t("reset.updated")}</p>
         <p className="mt-4 font-sans text-sm">
           <Link to="/" className="text-[#1A4FBF]">
-            Front page
+            {t("link.frontPage")}
           </Link>
         </p>
       </div>
@@ -60,12 +62,12 @@ export default function ChangePassword() {
   return (
     <div className="mx-auto mt-10 max-w-md">
       <FrontPageLink />
-      <SectionRule>Password</SectionRule>
+      <SectionRule>{t("password.title")}</SectionRule>
       <ErrorBanner error={banner} />
       <form onSubmit={onSubmit} autoComplete="off" className="space-y-5">
         <div>
           <label className="block font-sans text-[11px] uppercase tracking-[0.16em] text-[#1A4FBF]" htmlFor="current_password">
-            Current password
+            {t("password.current")}
           </label>
           <ManualPasswordInput
             id="current_password"
@@ -76,7 +78,7 @@ export default function ChangePassword() {
         </div>
         <div>
           <label className="block font-sans text-[11px] uppercase tracking-[0.16em] text-[#1A4FBF]" htmlFor="password">
-            New password
+            {t("password.new")}
           </label>
           <ManualPasswordInput id="password" value={password} onChange={(event) => setPassword(event.target.value)} />
           <FieldError message={fieldMessage(error, "password")} />
@@ -86,7 +88,7 @@ export default function ChangePassword() {
           disabled={submitting}
           className="rounded-[2px] bg-black px-5 py-2 font-sans text-[11px] uppercase tracking-[0.18em] text-white"
         >
-          Update password
+          {t("password.submit")}
         </button>
       </form>
     </div>

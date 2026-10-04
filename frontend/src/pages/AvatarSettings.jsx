@@ -4,9 +4,11 @@ import { ApiError, api, fieldMessage } from "../api";
 import { useAuth } from "../auth";
 import { Avatar, AVATAR_PRESETS } from "../components/Avatar";
 import { ErrorBanner, FieldError, FrontPageLink, SectionRule } from "../components/ui";
+import { useI18n } from "../i18n";
 
 export default function AvatarSettings() {
   const { user, ready, setUser } = useAuth();
+  const { t } = useI18n();
   const navigate = useNavigate();
   const [error, setError] = useState(null);
   const [saving, setSaving] = useState(false);
@@ -63,17 +65,17 @@ export default function AvatarSettings() {
   return (
     <div className="mt-8">
       <FrontPageLink />
-      <SectionRule>Avatar</SectionRule>
+      <SectionRule>{t("avatar.title")}</SectionRule>
       <ErrorBanner error={topMessage} />
       <div className="flex items-center gap-4">
         <Avatar avatar={user.avatar} size={64} />
         <div>
           <p className="font-sans text-sm">{user.display_name}</p>
-          <p className="mt-1 font-sans text-xs text-neutral-500">Choose a mark or upload a photo.</p>
+          <p className="mt-1 font-sans text-xs text-neutral-500">{t("avatar.hint")}</p>
         </div>
       </div>
 
-      <p className="mt-8 font-sans text-[11px] uppercase tracking-[0.16em] text-[#1A4FBF]">Presets</p>
+      <p className="mt-8 font-sans text-[11px] uppercase tracking-[0.16em] text-[#1A4FBF]">{t("avatar.presets")}</p>
       <div className="mt-3 flex flex-wrap gap-3">
         {AVATAR_PRESETS.map((item) => (
           <button
@@ -86,14 +88,14 @@ export default function AvatarSettings() {
             }`}
           >
             <Avatar avatar={`preset:${item.id}`} size={40} className="mx-auto" />
-            <span className="mt-2 block">{item.label}</span>
+            <span className="mt-2 block">{t(`avatar.${item.id}`)}</span>
           </button>
         ))}
       </div>
       <FieldError message={fieldMessage(error, "preset")} />
 
       <label className="mt-8 block font-sans text-[11px] uppercase tracking-[0.16em] text-[#1A4FBF]" htmlFor="avatar-file">
-        Upload
+        {t("avatar.upload")}
       </label>
       <input
         id="avatar-file"

@@ -1,6 +1,7 @@
 import { Link } from "react-router-dom";
 import { useAuth } from "../auth";
 import { canEditNews } from "../format";
+import { useI18n } from "../i18n";
 import { Dek, Headline, ImageWell, Kicker, SectionRule, StoryTile, TitleLine } from "./ui";
 
 const PLACEHOLDER = {
@@ -48,6 +49,7 @@ function SlotTitle({ post, fallback, className }) {
 }
 
 function Hero({ items, loading }) {
+  const { t } = useI18n();
   const featured = loading ? null : slot(items, 0);
   const secondary = loading ? null : slot(items, 1);
   const third = loading ? null : slot(items, 2);
@@ -64,10 +66,10 @@ function Hero({ items, loading }) {
           <article>
             <ImageWell className="aspect-square w-full" />
             <div className="mt-3 border-b border-neutral-200 pb-4">
-              <SlotKicker post={secondary} fallback={PLACEHOLDER.secondary.kicker} />
+              <SlotKicker post={secondary} fallback={t("home.news")} />
               <SlotTitle
                 post={secondary}
-                fallback={PLACEHOLDER.secondary.title}
+                fallback={t("home.secondaryTitle")}
                 className="mt-1 text-[21px] font-semibold"
               />
             </div>
@@ -75,8 +77,8 @@ function Hero({ items, loading }) {
           <article>
             <ImageWell className="aspect-square w-full" />
             <div className="mt-3 border-b border-neutral-200 pb-4">
-              <SlotKicker post={third} fallback={PLACEHOLDER.third.kicker} />
-              <SlotTitle post={third} fallback={PLACEHOLDER.third.title} className="mt-1 text-[21px] font-semibold" />
+              <SlotKicker post={third} fallback={t("home.news")} />
+              <SlotTitle post={third} fallback={t("home.thirdTitle")} className="mt-1 text-[21px] font-semibold" />
             </div>
           </article>
         </div>
@@ -84,11 +86,11 @@ function Hero({ items, loading }) {
 
       <div className="lg:col-span-7 lg:pr-6">
         <p className="font-sans text-[11px] font-semibold uppercase tracking-[0.16em] text-[#1A4FBF]">
-          {PLACEHOLDER.featured.kicker}
+          {t("home.featured")}
         </p>
         <SlotTitle
           post={featured}
-          fallback={PLACEHOLDER.featured.title}
+          fallback={t("home.featuredTitle")}
           className="mt-1 text-[40px] font-bold sm:text-[44px]"
         />
         {featured?.excerpt ? <Dek>{featured.excerpt}</Dek> : null}
@@ -97,13 +99,13 @@ function Hero({ items, loading }) {
       <div className="grid grid-cols-[minmax(120px,0.85fr)_1.15fr] gap-4 lg:col-span-5">
         <ImageWell className="h-[110px] w-full" />
         <article>
-          <SlotKicker post={sports} fallback={PLACEHOLDER.sports.kicker} />
-          <SlotTitle post={sports} fallback={PLACEHOLDER.sports.title} className="mt-1 text-[22px] font-semibold" />
+          <SlotKicker post={sports} fallback={t("home.news")} />
+          <SlotTitle post={sports} fallback={t("home.wideTitle")} className="mt-1 text-[22px] font-semibold" />
           {sports?.excerpt ? (
             <p className="mt-2 font-sans text-[13px] font-normal leading-relaxed text-neutral-600">{sports.excerpt}</p>
           ) : (
             <p className="mt-2 font-sans text-[13px] font-normal leading-relaxed text-neutral-600">
-              {PLACEHOLDER.sports.dek}
+              {t("home.wideDek")}
             </p>
           )}
         </article>
@@ -113,19 +115,20 @@ function Hero({ items, loading }) {
 }
 
 function EmptyFeatured({ user }) {
+  const { t } = useI18n();
   if (!user) return null;
   return (
     <div className="mt-6">
       {canEditNews(user) ? (
         <p className="font-sans text-sm">
           <Link to="/news/drafts" className="text-[#1A4FBF]">
-            Edit News drafts
+            {t("home.editDrafts")}
           </Link>
         </p>
       ) : (
         <p className="font-sans text-sm">
           <Link to="/forum" className="text-[#1A4FBF]">
-            Write in Forum
+            {t("home.writeForum")}
           </Link>
         </p>
       )}
@@ -146,6 +149,7 @@ function StaticRail({ kicker, title, note, wellClassName = "h-28" }) {
 
 export default function HomeGrid({ items, total, loading }) {
   const { user } = useAuth();
+  const { t } = useI18n();
   const emptyCampus = !loading && total === 0;
 
   return (
@@ -155,7 +159,7 @@ export default function HomeGrid({ items, total, loading }) {
 
       <div className="mt-10 grid grid-cols-1 gap-10 lg:grid-cols-12">
         <div className="lg:col-span-8">
-          <SectionRule>LATEST</SectionRule>
+          <SectionRule>{t("home.latest")}</SectionRule>
           <div className="grid gap-8 md:grid-cols-12">
             <div className="md:col-span-7">
               <StoryTile post={loading ? null : slot(items, 4)} wellClassName="h-56" />
@@ -167,7 +171,7 @@ export default function HomeGrid({ items, total, loading }) {
             </div>
           </div>
 
-          <SectionRule>FEATURES</SectionRule>
+          <SectionRule>{t("home.features")}</SectionRule>
           <div className="grid gap-8 md:grid-cols-12">
             <div className="flex flex-col gap-5 md:col-span-5">
               {[8, 9, 10].map((index) => {
@@ -193,7 +197,7 @@ export default function HomeGrid({ items, total, loading }) {
             </div>
           </div>
 
-          <SectionRule>MORE STORIES</SectionRule>
+          <SectionRule>{t("home.more")}</SectionRule>
           <div className="grid gap-6 md:grid-cols-3">
             {[12, 13, 14].map((index) => (
               <StoryTile
@@ -205,27 +209,19 @@ export default function HomeGrid({ items, total, loading }) {
             ))}
           </div>
 
-          <SectionRule>Special Feature</SectionRule>
+          <SectionRule>{t("home.special")}</SectionRule>
           <StoryTile post={loading ? null : slot(items, 15)} wellClassName="h-64" showDate />
         </div>
 
         <aside className="flex flex-col gap-8 lg:col-span-4">
+          <StaticRail kicker={t("home.photoKicker")} title={t("home.photoTitle")} note={t("home.photoNote")} />
           <StaticRail
-            kicker="Photo of the Day"
-            title="From the quad"
-            note="Photo submissions open in a later version."
-          />
-          <StaticRail
-            kicker="Track of the Day"
-            title="No playlist today"
-            note="A track will live here later. No Spotify embed in this version."
+            kicker={t("home.trackKicker")}
+            title={t("home.trackTitle")}
+            note={t("home.trackNote")}
             wellClassName="h-16"
           />
-          <StaticRail
-            kicker="Art"
-            title="Open wall"
-            note="Art submissions are a later version. This frame stays empty on purpose."
-          />
+          <StaticRail kicker={t("home.artKicker")} title={t("home.artTitle")} note={t("home.artNote")} />
         </aside>
       </div>
     </div>

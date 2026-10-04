@@ -5,10 +5,12 @@ import { useAuth } from "../auth";
 import { StoryRow, StoryRowSkeleton } from "../components/StoryRow";
 import { ErrorBanner, FrontPageLink, SectionRule } from "../components/ui";
 import { canEditNews } from "../format";
+import { useI18n } from "../i18n";
 import { useLiveRefresh } from "../live";
 
 export default function MyPosts() {
   const { user, ready, setUser } = useAuth();
+  const { t } = useI18n();
   const navigate = useNavigate();
   const [items, setItems] = useState([]);
   const [total, setTotal] = useState(0);
@@ -57,7 +59,7 @@ export default function MyPosts() {
   return (
     <div className="mt-8">
       <FrontPageLink />
-      <SectionRule>My Posts</SectionRule>
+      <SectionRule>{t("mine.title")}</SectionRule>
       <ErrorBanner error={error} />
       {loading ? (
         <>
@@ -66,15 +68,15 @@ export default function MyPosts() {
         </>
       ) : total === 0 ? (
         <div className="mt-6">
-          <p className="font-serif text-2xl">You have not published yet.</p>
+          <p className="font-serif text-2xl">{t("mine.empty")}</p>
           <p className="mt-2 font-sans text-sm">
             {canEditNews(user) ? (
               <Link to="/news/drafts" className="text-[#1A4FBF]">
-                Edit News drafts
+                {t("home.editDrafts")}
               </Link>
             ) : (
               <Link to="/forum" className="text-[#1A4FBF]">
-                Write in Forum
+                {t("home.writeForum")}
               </Link>
             )}
           </p>

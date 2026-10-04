@@ -15,6 +15,10 @@
 | `/news/drafts` | News 草稿 | 需 `editor` 或 `super_admin` | `GET/POST /api/v1/news/drafts` 与板块提交、同意、退回 |
 | `/sports` | 旧路径 | — | 重定向到 `/` |
 | `/forum` | Forum 卡片列表 | 公开 | `GET /api/v1/posts?category=forum`；绑 `author.avatar` `title` `author.display_name` `excerpt` `created_at` `images[0]` `reply_count` `like_count` `liked`。气泡进详情；拇指赞/取消 |
+| `/cj` | CJ 月历 | 公开 | 不请求帖子。每一天单独链到 `/cj/day?date=`。「查看今天」打开当天 |
+| `/cj/day` | CJ 单日 | 公开 | `GET /api/v1/cj?week_start=` 取该日所在周的周一，只渲染这一天的课程和当天考试。没有前一天 / 下一天。Period 选择存在浏览器本地，不进接口 |
+| `/cj/week` | 旧路径 | — | 转到 `/cj/day?date=`，`start` 作为那一天；没有 `start` 时用今天 |
+| `/cj/admin` | CJ 管理 | 口令，不要求登录 | 读同上。`PUT /api/v1/cj` 与 `PUT /api/v1/cj/exams`，请求头 `X-CJ-Admin-Code` |
 | `/opinion` | 栏目占位 | 公开 | **不请求** `category=opinion`（枚举外会 422）。固定空态。 |
 | `/community` `/submit` | 旧路径 | — | 重定向到 `/forum` |
 | `/dorm-life` `/events` `/photo` | 旧路径 | — | 重定向到 `/` |
@@ -30,16 +34,16 @@
 | `/reset-password` | 找回密码 | 访客 | `POST /api/v1/auth/email-codes`（`purpose=reset`）后 `POST /api/v1/auth/password-reset` |
 | `/about` | 静态稿。写明由广东智云建材有限公司所有，并给出联系邮箱。另有 Contributors：本网站是由 Tori zhao, Leo Gao, Ben lu, Dewey Peng 制作的 | 公开 | 无 API |
 | `/contact` | 静态稿。联系方式为该超管邮箱 | 公开 | 无 API |
-| `/terms` | 用户协议 | 公开 | 无 API。默认英文，可切中文；语言选择记在浏览器本地，不进接口。直接打开此地址是整页。站内顶栏与注册勾选不跳到本页，改为当前页浮层 |
+| `/terms` | 用户协议 | 公开 | 无 API。中英跟 System 菜单里的总开关走，本页没有单独的语言按钮。直接打开此地址是整页。站内顶栏与注册勾选不跳到本页，改为当前页浮层 |
 
 **全局壳 `PaperShell`**
 
-- 顶栏一行，从左到右：`SYSTEM`、登录后的 `SETTINGS`、登录后的 `MY POSTS`、`NOTICES`。`SYSTEM` 点开菜单：`ABOUT`、`TERMS`（当前页浮层，不切路由）、`CONTACT`。`SETTINGS` 点开菜单：`AVATAR`（`/me/avatar`）、`PASSWORD`（`/me/password`）；`role===super_admin` 再加 `USERS`（`/admin/users`）。`MY POSTS` 直接去 `/me/posts`。`NOTICES` 直接去 `/system`（通知页，顶栏不叫 System）。菜单点外面、按 Esc 或选中一项后收起。子项不常驻顶栏。`TERMS` 浮层可滚动，点遮罩或关闭即收起，仍停在打开前的页面。
+- 顶栏一行，从左到右：`SYSTEM`、登录后的 `SETTINGS`、登录后的 `MY POSTS`、`NOTICES`。`SYSTEM` 点开菜单：`ABOUT`、`TERMS`（当前页浮层，不切路由）、`CONTACT`，以及一项中英切换（当前英文时写「中文」，当前中文时写「English」）。点一下切换并收起菜单。选择记在浏览器本地 `elegram_lang`，默认英文，不进接口。字标 Elegram 不翻译。Forum 帖子的标题、正文、摘要和评论保持原文。News 稿件正文和已保存的 CJ 文字也按库存原文显示。`SETTINGS` 点开菜单：`AVATAR`（`/me/avatar`）、`PASSWORD`（`/me/password`）；`role===super_admin` 再加 `USERS`（`/admin/users`）。`MY POSTS` 直接去 `/me/posts`。`NOTICES` 直接去 `/system`（通知页，顶栏不叫 System）。菜单点外面、按 Esc 或选中一项后收起。子项不常驻顶栏。`TERMS` 浮层可滚动，点遮罩或关闭即收起，仍停在打开前的页面。
 - 顶栏右侧：本地日期 `Today: {formatted local date}`（不是 schema 字段）。`401` = 访客，日期前显示 `SIGN IN`（去 `/sign-in`），不显示 Settings 与 My Posts。`200` = 已登录，日期前显示头像（`avatar`）、`display_name`、`SIGN OUT`。启动时 `GET /api/v1/me`。登录后同一套 live refresh（约 4 秒）再拉 `/me`，超管改 `role` / `muted` / 删号后顶栏与导航跟着变，不必整页刷新。顶栏不放 `DRAFTS`。
 - 列表同步：首页 / Forum / 帖详情已 live refresh。`/admin/users`、`/news/drafts` 列表、`/system`、`/me/posts` 同样轮询，超管或其他人刚做的改动会进当前页。打开中的草稿编辑框不自动覆盖，以免冲掉未保存正文。
 - 报头：左搜索框（外形保留；提交不调接口，在报头下出一条静态说明）。中：斜体衬线字标 `Elegram` 链回 `/`。右：静态「OWNED BY / 广东智云建材有限公司」。
 - 标语静态：`YOUR STORIES. YOUR VOICE. YOUR PAGE.`
-- 导航：`NEWS`（`/`）`DRAFTS`（`/news/drafts`）`FORUM` `OPINION`。`DRAFTS` 只在 `role` 为 `editor` 或 `super_admin` 时出现，与 `FORUM` 同一行。当前路由下划黑线。无 `SUBMIT`，无单独的 News 列表项。Forum 发帖在栏目页内。News 稿在 `/news/drafts`。
+- 导航：`NEWS`（`/`）`DRAFTS`（`/news/drafts`）`FORUM` `CJ` `OPINION`。`CJ` 与 `FORUM` 同一行，链到 `/cj`。`DRAFTS` 只在 `role` 为 `editor` 或 `super_admin` 时出现。当前路由下划黑线。无 `SUBMIT`，无单独的 News 列表项。Forum 发帖在栏目页内。News 稿在 `/news/drafts`。
 - 页脚声明（非 schema）：`Owned by 广东智云建材有限公司.`
 
 **栏目枚举 → 导航文案（展示层，不是新字段）**
@@ -237,7 +241,7 @@ Photo of the Day / Track of the Day / Student Art：静态标题+空图框+固�
 
 - `<PaperShell>`
   - `<UtilityBar>`
-    - `SYSTEM` 菜单：About / Terms / Contact
+    - `SYSTEM` 菜单：About / Terms / Contact / 中英切换
     - 登录后 `SETTINGS` 菜单：Avatar / Password；`role===super_admin` 时 Users
     - 登录后 `MY POSTS` → `/me/posts`
     - `NOTICES` → `/system`
@@ -248,7 +252,7 @@ Photo of the Day / Track of the Day / Student Art：静态标题+空图框+固�
     - 字标 `Elegram` 链 `/`
     - 静态 Community hosted
   - `<Tagline>` 静态
-  - `<SectionNav>` NEWS（`/`）/ DRAFTS（仅 `editor` 或 `super_admin`，`/news/drafts`）/ FORUM / OPINION
+  - `<SectionNav>` NEWS（`/`）/ DRAFTS（仅 `editor` 或 `super_admin`，`/news/drafts`）/ FORUM / CJ（`/cj`）/ OPINION
   - `<SearchNotice>` 仅搜索提交后显示（静态文案）
   - `<Outlet>` 下列页面之一
   - `<Disclaimer>` Owned by 广东智云建材有限公司.

@@ -72,14 +72,15 @@ Must 服务主故事 P1-US1（Forum 发帖被看见）以及角色、跟帖、Ne
 | M23 | 找回密码 | 登录页可走忘记密码。校内邮箱收验证码后设新密码，再用登录接口进站。非 `@basischina.com` 当场拒绝，不发信。 |
 | M24 | 登录后改密码 | 顶栏账号旁可改密码：校验当前密码后设新密码，无需再发验证码。 |
 | M2 | 鉴权与权限 | 未登录可读已发布内容与 Forum 评论；仅登录用户可发帖 / 跟帖；直接发 News 被拒绝；用户不能改删自己的帖或评论。被禁言者仍可登录阅读。 |
-| M3 | 多页面 | 至少：News（`/` 报头版式，不再单列 News 列表页）、Forum、帖子详情（Forum 含评论）、登录/注册/找回密码、登录后改密码、用户协议、我的帖子、News 草稿、System 通知、超级管理员用户列表。Forum 发帖在栏目页内，无独立 Submit 页。 |
+| M3 | 多页面 | 至少：News（`/` 报头版式，不再单列 News 列表页）、Forum、CJ（月历、学生端单日、管理端按周）、帖子详情（Forum 含评论）、登录/注册/找回密码、登录后改密码、用户协议、我的帖子、News 草稿、System 通知、超级管理员用户列表。Forum 发帖在栏目页内，无独立 Submit 页。 |
 | M4 | 发帖 | Forum：标题、正文必填，发布后 `published`，作者绑定当前用户，可附带最多 4 张图。News 不经此接口公开。 |
 | M6 | 按栏目阅读 | 栏目页只列出该栏目已发布帖。News 详情只展示已同意板块。 |
 | M7 | News 露出 | `/` 的报头版式展示近期已发布 **News**，不含 Forum，不含尚无已同意板块的草稿。导航第一项是 News，没有单独的 News 列表页。 |
 | M8 | 持久化 | 用户（含角色）、会话、帖子、评论、Forum 主帖点赞写入应用存储；重启后仍可登录并读到已发帖、评论与赞数。 |
 | M9 | 关键错误处理 | 密码错误、未登录发帖/跟帖、缺必填、非法栏目、非法配图、无权限、存储失败：均返回明确失败，不创建半截已发布帖或评论。 |
 | M10 | 写操作留痕 | Forum 发帖或创建 News 草稿成功时记录 `author_id`、`created_at`；服务端另写一条审计记录（谁、何时、创建了哪篇帖）。 |
-| M11 | Forum | 与 News 平级的单一讨论区；一个列表，不是用户自建多吧。 |
+| M11 | Forum | 与 News、CJ 平级的单一讨论区；一个列表，不是用户自建多吧。 |
+| M26 | CJ | 与 Forum 平级的课表栏。公开月历；学生点某一天只看那一天的课程和当天考试，没有前一天 / 下一天。仍请求该日所在周的 `GET /api/v1/cj?week_start=`（周一），前端按 `day_index` 过滤。Period 1–8 自选学科留在单日页，选择只存在浏览器本地。管理端继续按周编辑。写入 CJ 与考试需要管理员口令，不走登录会话。 |
 | M12 | Forum 评论 | 仅 Forum 详情：帖子下的评论。未登录可读；登录可写。不新增楼层，不写楼中楼。校报详情不加评论。 |
 | M13 | 角色 | `student` / `editor` / `admin` / `super_admin`。`ADMIN_EMAIL` 在注册或登录时升为 `super_admin`。 |
 | M14 | News 分板块草稿 | `editor` 与 `super_admin` 在 `/news/drafts` 新建稿并按板块保存、提交。`super_admin` 可同意或退回单个板块。公开 News 只含已同意板块。已上线板块再改，仍须再次同意后才替换线上正文。 |
@@ -124,7 +125,7 @@ Must 服务主故事 P1-US1（Forum 发帖被看见）以及角色、跟帖、Ne
 | W5 | 向量库、微服务拆分、指定云厂商 | 未评估，不写入本版承诺。 |
 | W6 | 用户自建吧、校报帖下评论、楼层与楼中楼 | Forum 只有一个吧；评论直接挂在帖子上。 |
 | W7 | 单条删评、下架状态、完整审核后台 | 管理员可删整帖（M21）。不能只删一楼，没有 `hidden` 状态。News 审稿只按板块同意或退回。 |
-| W8 | 活动时间地点、Sports、Dorm Life / Events / Photo 栏目 | 本版只保留 News 与 Forum；Opinion 为静态空栏。`/sports` 回到首页。 |
+| W8 | 活动时间地点、Sports、Dorm Life / Events / Photo 栏目 | 本版栏目为 News、Forum 与 CJ；Opinion 为静态空栏。`/sports` 回到首页。 |
 
 登录、数据库、多页面路由、测试均不在 Won't 中。它们按主故事需要出现在 Must 或工程实践中。
 
@@ -207,6 +208,9 @@ Elegram 应用（Web 页面 + 服务端）
 | PostLike | user_id, post_id, created_at | 仅 Forum 主帖；同一用户同一帖唯一；取消则删行 |
 | Comment | id, post_id, author_id, parent_id, body, created_at | 仅 Forum；新评论 `parent_id` 为空。写入不接受楼层或楼中楼 |
 | AuditEvent | id, actor_id, action, post_id, at | Forum 发帖或创建 News 草稿成功时追加；只增不改 |
+| Subject | id, name, short_name, color, period, sort_order | CJ 学科目录。学生端不按 `period` 固定排课 |
+| CJEntry | id, week_start, day_index, period, subject_id, ic, hw, announcement, updated_at | 某一周、某一天、某一学科的 IC / HW / A |
+| Exam | id, week_start, day_index, title, time, location, note, updated_at | 某一周的考试安排 |
 
 `category` 枚举：`news`、`forum`。无 `category` 的列表只含 `news`。
 

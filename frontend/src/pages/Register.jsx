@@ -3,10 +3,12 @@ import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { api, fieldMessage, safeNext } from "../api";
 import { useAuth } from "../auth";
 import { ErrorBanner, FieldError, FrontPageLink, ManualPasswordInput, SectionRule } from "../components/ui";
+import { useI18n } from "../i18n";
 import { TermsDialog } from "./Terms";
 
 export default function Register() {
   const { signIn } = useAuth();
+  const { t } = useI18n();
   const navigate = useNavigate();
   const [params] = useSearchParams();
   const [email, setEmail] = useState("");
@@ -38,7 +40,7 @@ export default function Register() {
   async function onSubmit(event) {
     event.preventDefault();
     if (!acceptTerms) {
-      setTermsError("You must accept the user agreement.");
+      setTermsError("accept");
       return;
     }
     setSubmitting(true);
@@ -69,12 +71,12 @@ export default function Register() {
   return (
     <div className="mx-auto mt-10 max-w-md">
       <FrontPageLink />
-      <SectionRule>Register</SectionRule>
+      <SectionRule>{t("register.title")}</SectionRule>
       <ErrorBanner error={banner} />
       <form onSubmit={onSubmit} autoComplete="off" className="space-y-5">
         <div>
           <label className="block font-sans text-[11px] uppercase tracking-[0.16em] text-[#1A4FBF]" htmlFor="display_name">
-            Display name
+            {t("register.name")}
           </label>
           <input
             id="display_name"
@@ -87,7 +89,7 @@ export default function Register() {
         </div>
         <div>
           <label className="block font-sans text-[11px] uppercase tracking-[0.16em] text-[#1A4FBF]" htmlFor="email">
-            School email
+            {t("register.email")}
           </label>
           <input
             id="email"
@@ -104,14 +106,14 @@ export default function Register() {
         </div>
         <div>
           <label className="block font-sans text-[11px] uppercase tracking-[0.16em] text-[#1A4FBF]" htmlFor="password">
-            Password
+            {t("register.password")}
           </label>
           <ManualPasswordInput id="password" value={password} onChange={(event) => setPassword(event.target.value)} />
           <FieldError message={fieldMessage(error, "password")} />
         </div>
         <div>
           <label className="block font-sans text-[11px] uppercase tracking-[0.16em] text-[#1A4FBF]" htmlFor="code">
-            Verification code
+            {t("register.code")}
           </label>
           <div className="mt-2 flex items-end gap-3">
             <input
@@ -128,12 +130,12 @@ export default function Register() {
               onClick={onSendCode}
               className="shrink-0 border border-black px-3 py-2 font-sans text-[11px] uppercase tracking-[0.16em]"
             >
-              {sendingCode ? "Sending" : "Send code"}
+              {sendingCode ? t("register.sending") : t("register.send")}
             </button>
           </div>
           <FieldError message={fieldMessage(error, "code")} />
           {codeSent && !fieldMessage(error, "code") && !emailError ? (
-            <p className="mt-2 font-sans text-sm text-neutral-500">A code was sent to that email.</p>
+            <p className="mt-2 font-sans text-sm text-neutral-500">{t("register.sent")}</p>
           ) : null}
         </div>
         <div>
@@ -149,7 +151,7 @@ export default function Register() {
               className="mt-1"
             />
             <span>
-              I agree to the{" "}
+              {t("register.agree")}{" "}
               <button
                 type="button"
                 className="text-[#1A4FBF]"
@@ -159,25 +161,25 @@ export default function Register() {
                   setTermsOpen(true);
                 }}
               >
-                user agreement
+                {t("register.agreement")}
               </button>
               .
             </span>
           </label>
-          <FieldError message={termsError || fieldMessage(error, "accept_terms")} />
+          <FieldError message={(termsError === "accept" ? t("register.mustAccept") : termsError) || fieldMessage(error, "accept_terms")} />
         </div>
         <button
           type="submit"
           disabled={submitting}
           className="rounded-[2px] bg-black px-5 py-2 font-sans text-[11px] uppercase tracking-[0.18em] text-white"
         >
-          Create account
+          {t("register.submit")}
         </button>
       </form>
       <p className="mt-6 font-sans text-sm text-neutral-500">
-        Already have an account?{" "}
+        {t("register.have")}{" "}
         <Link to={`/sign-in${nextQuery}`} className="text-[#1A4FBF]">
-          Sign in
+          {t("signIn.submit")}
         </Link>
       </p>
       {termsOpen ? (

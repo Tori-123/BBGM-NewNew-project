@@ -6,11 +6,13 @@ import { uploadSrc } from "../avatar";
 import { Avatar } from "../components/Avatar";
 import { ErrorBanner, FieldError, FrontPageLink, Headline, ImageWell, Kicker, TitleLine } from "../components/ui";
 import { canDeletePosts, formatDateline } from "../format";
+import { useI18n } from "../i18n";
 import { mergeLiveFloors, useLiveRefresh } from "../live";
 
 export default function PostDetail() {
   const { postId } = useParams();
   const { user, setUser } = useAuth();
+  const { lang, t } = useI18n();
   const navigate = useNavigate();
   const [post, setPost] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -94,7 +96,7 @@ export default function PostDetail() {
   useLiveRefresh(ready && !commentSubmitting && !notFound, refreshThread);
 
   async function onDelete() {
-    if (!post || !window.confirm("Delete this post?")) return;
+    if (!post || !window.confirm(t("post.deleteConfirm"))) return;
     setError(null);
     try {
       await api.deletePost(postId);
@@ -161,7 +163,7 @@ export default function PostDetail() {
           <TitleLine className="mt-3 w-2/3" />
         </>
       ) : notFound ? (
-        <h1 className="font-serif text-4xl">Story not found.</h1>
+        <h1 className="font-serif text-4xl">{t("post.missing")}</h1>
       ) : error ? (
         <ErrorBanner error={error} />
       ) : (
@@ -172,7 +174,7 @@ export default function PostDetail() {
             {isForum ? <Avatar avatar={post.author?.avatar} size={48} /> : null}
             <p className="font-sans text-sm text-neutral-500">
               {post.author?.display_name}
-              {post.created_at ? ` · ${formatDateline(post.created_at)}` : ""}
+              {post.created_at ? ` · ${formatDateline(post.created_at, lang)}` : ""}
             </p>
           </div>
           {isForum ? (
@@ -214,16 +216,16 @@ export default function PostDetail() {
               onClick={onDelete}
               className="mt-8 font-sans text-[11px] uppercase tracking-[0.18em] text-red-700"
             >
-              Delete
+              {t("post.delete")}
             </button>
           ) : null}
 
           {isForum ? (
             <section className="mt-12 border-t border-black pt-8">
-              <h2 className="font-serif text-2xl">Comments</h2>
+              <h2 className="font-serif text-2xl">{t("post.comments")}</h2>
               <ErrorBanner error={commentError && !commentError.fields?.length ? commentError : null} />
               {comments.length === 0 ? (
-                <p className="mt-4 font-sans text-sm text-neutral-500">No comments yet.</p>
+                <p className="mt-4 font-sans text-sm text-neutral-500">{t("post.none")}</p>
               ) : (
                 comments.map((item) => (
                   <div key={item.id} className="mt-6 border-t border-neutral-200 pt-4">
@@ -252,14 +254,14 @@ export default function PostDetail() {
                   onClick={loadOlderComments}
                   className="mt-6 font-sans text-sm uppercase tracking-[0.14em] text-[#1A4FBF]"
                 >
-                  Older comments
+                  {t("post.older")}
                 </button>
               ) : null}
 
               {user ? (
                 <form onSubmit={onComment} className="mt-8">
                   <label className="block font-sans text-[11px] uppercase tracking-[0.16em] text-[#1A4FBF]" htmlFor="comment-body">
-                    Comment
+                    {t("post.comment")}
                   </label>
                   <textarea
                     id="comment-body"
@@ -274,15 +276,15 @@ export default function PostDetail() {
                     disabled={commentSubmitting}
                     className="mt-4 rounded-[2px] bg-black px-5 py-2 font-sans text-[11px] uppercase tracking-[0.18em] text-white"
                   >
-                    Post comment
+                    {t("post.postComment")}
                   </button>
                 </form>
               ) : (
                 <p className="mt-6 font-sans text-sm text-neutral-500">
                   <Link to={`/sign-in?next=/posts/${postId}`} className="text-[#1A4FBF]">
-                    Sign in
+                    {t("post.signInToComment")}
                   </Link>{" "}
-                  to comment.
+                  {t("post.toComment")}
                 </p>
               )}
             </section>

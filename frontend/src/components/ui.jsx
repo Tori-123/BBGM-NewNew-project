@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom";
-import { categoryLabel, formatDateline } from "../format";
+import { formatDateline } from "../format";
+import { useI18n } from "../i18n";
 
 export function ImageWell({ className = "h-40" }) {
   return <div className={`bg-[#D6DEEE] ${className}`} aria-hidden="true" />;
@@ -40,20 +41,23 @@ export function ManualPasswordInput({ id, value, onChange }) {
 }
 
 export function FrontPageLink() {
+  const { t } = useI18n();
   return (
     <p className="mb-6 font-sans text-[11px] font-medium uppercase tracking-[0.16em]">
       <Link to="/" className="text-[#1A4FBF] hover:text-[#111111]">
-        ← Front page
+        {t("link.front")}
       </Link>
     </p>
   );
 }
 
 export function Kicker({ category }) {
+  const { t } = useI18n();
   if (!category) return null;
+  const key = category === "forum" ? "category.forum" : "category.news";
   return (
     <p className="font-sans text-[11px] font-semibold uppercase tracking-[0.16em] text-[#1A4FBF]">
-      {categoryLabel(category)}
+      {t(key)}
     </p>
   );
 }
@@ -78,8 +82,9 @@ export function Dek({ children }) {
 }
 
 export function Dateline({ iso }) {
+  const { lang } = useI18n();
   if (!iso) return null;
-  return <p className="mt-1 font-sans text-xs text-neutral-500">{formatDateline(iso)}</p>;
+  return <p className="mt-1 font-sans text-xs text-neutral-500">{formatDateline(iso, lang)}</p>;
 }
 
 export function SectionRule({ children }) {

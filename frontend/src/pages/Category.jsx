@@ -6,20 +6,22 @@ import { CommunityCard, CommunityCardSkeleton } from "../components/CommunityCar
 import ComposeForm from "../components/ComposeForm";
 import { EmptyCategory, StoryRow, StoryRowSkeleton } from "../components/StoryRow";
 import { ErrorBanner, FrontPageLink, SectionRule } from "../components/ui";
+import { useI18n } from "../i18n";
 import { mergeLivePosts, useLiveRefresh } from "../live";
 
 function ComposeFab({ to, onClick }) {
+  const { t } = useI18n();
   const className =
     "fixed bottom-6 right-6 z-20 flex h-14 w-14 items-center justify-center rounded-full bg-[#1A4FBF] text-[2rem] leading-none text-white";
   if (to) {
     return (
-      <Link to={to} className={className} aria-label="Write a post">
+      <Link to={to} className={className} aria-label={t("forum.write")}>
         +
       </Link>
     );
   }
   return (
-    <button type="button" onClick={onClick} className={className} aria-label="Write a post">
+    <button type="button" onClick={onClick} className={className} aria-label={t("forum.write")}>
       +
     </button>
   );
@@ -27,6 +29,8 @@ function ComposeFab({ to, onClick }) {
 
 export default function Category({ category, title }) {
   const { user } = useAuth();
+  const { t } = useI18n();
+  const heading = category === "forum" ? t("nav.forum") : title;
   const [items, setItems] = useState([]);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
@@ -121,7 +125,7 @@ export default function Category({ category, title }) {
   return (
     <div className="mt-8">
       <FrontPageLink />
-      <SectionRule>{title}</SectionRule>
+      <SectionRule>{heading}</SectionRule>
       <ErrorBanner error={error} />
       {loading ? (
         isForum ? (
@@ -138,7 +142,7 @@ export default function Category({ category, title }) {
           </>
         )
       ) : items.length === 0 ? (
-        <EmptyCategory name={title} />
+        <EmptyCategory name={heading} />
       ) : (
         <>
           {items.map((post) =>
@@ -155,7 +159,7 @@ export default function Category({ category, title }) {
               disabled={loadingMore}
               className="mt-6 font-sans text-sm uppercase tracking-[0.14em] text-[#1A4FBF]"
             >
-              Older stories
+              {t("forum.older")}
             </button>
           ) : null}
         </>
@@ -172,7 +176,7 @@ export default function Category({ category, title }) {
           <button
             type="button"
             className="absolute inset-0 cursor-default"
-            aria-label="Close compose"
+            aria-label={t("forum.close")}
             onClick={() => setWriting(false)}
           />
           <div className="relative z-10 w-full max-w-2xl bg-white p-8">
@@ -184,7 +188,9 @@ export default function Category({ category, title }) {
   );
 }
 
-export function StaticCategory({ title }) {
+export function StaticCategory() {
+  const { t } = useI18n();
+  const title = t("nav.opinion");
   return (
     <div className="mt-8">
       <FrontPageLink />

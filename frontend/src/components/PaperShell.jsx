@@ -3,6 +3,7 @@ import { Link, NavLink, Outlet, useLocation } from "react-router-dom";
 import { useAuth } from "../auth";
 import { Avatar } from "./Avatar";
 import { canEditNews, CATEGORY_ROUTES, formatToday } from "../format";
+import { useI18n } from "../i18n";
 import { TermsDialog } from "../pages/Terms";
 
 function navClass({ isActive }) {
@@ -54,8 +55,15 @@ function SearchIcon() {
   );
 }
 
+const NAV_KEYS = {
+  "/forum": "nav.forum",
+  "/cj": "nav.cj",
+  "/opinion": "nav.opinion",
+};
+
 export default function PaperShell() {
   const { user, signOut } = useAuth();
+  const { lang, t, toggleLang } = useI18n();
   const location = useLocation();
   const barRef = useRef(null);
   const [query, setQuery] = useState("");
@@ -108,9 +116,9 @@ export default function PaperShell() {
         >
           <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-2">
             <nav className="flex flex-wrap items-center gap-x-6 gap-y-2 uppercase" aria-label="Site">
-              <BarMenu label="System" open={openMenu === "system"} onToggle={() => toggleMenu("system")}>
+              <BarMenu label={t("shell.system")} open={openMenu === "system"} onToggle={() => toggleMenu("system")}>
                 <Link role="menuitem" to="/about" className={menuItemClass}>
-                  About
+                  {t("shell.about")}
                 </Link>
                 <button
                   type="button"
@@ -121,38 +129,49 @@ export default function PaperShell() {
                     setTermsOpen(true);
                   }}
                 >
-                  Terms
+                  {t("shell.terms")}
                 </button>
                 <Link role="menuitem" to="/contact" className={menuItemClass}>
-                  Contact
+                  {t("shell.contact")}
                 </Link>
+                <button
+                  type="button"
+                  role="menuitem"
+                  className={menuItemClass}
+                  onClick={() => {
+                    toggleLang();
+                    setOpenMenu(null);
+                  }}
+                >
+                  {lang === "en" ? "中文" : "English"}
+                </button>
               </BarMenu>
               {user ? (
                 <BarMenu
-                  label="Settings"
+                  label={t("shell.settings")}
                   open={openMenu === "settings"}
                   onToggle={() => toggleMenu("settings")}
                 >
                   <Link role="menuitem" to="/me/avatar" className={menuItemClass}>
-                    Avatar
+                    {t("shell.avatar")}
                   </Link>
                   <Link role="menuitem" to="/me/password" className={menuItemClass}>
-                    Password
+                    {t("shell.password")}
                   </Link>
                   {user.role === "super_admin" ? (
                     <Link role="menuitem" to="/admin/users" className={menuItemClass}>
-                      Users
+                      {t("shell.users")}
                     </Link>
                   ) : null}
                 </BarMenu>
               ) : null}
               {user ? (
                 <Link to="/me/posts" className="uppercase">
-                  My Posts
+                  {t("shell.myPosts")}
                 </Link>
               ) : null}
               <Link to="/system" className="uppercase">
-                Notices
+                {t("shell.notices")}
               </Link>
             </nav>
             <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
@@ -166,16 +185,16 @@ export default function PaperShell() {
                     {user.display_name}
                   </Link>
                   <button type="button" onClick={onSignOut} className="uppercase">
-                    Sign Out
+                    {t("shell.signOut")}
                   </button>
                 </>
               ) : (
                 <Link to="/sign-in" className="uppercase">
-                  Sign In
+                  {t("shell.signIn")}
                 </Link>
               )}
               <p className="font-medium tracking-[0.06em] text-[#111111] sm:ml-1 sm:border-l sm:border-black sm:pl-5">
-                Today: {formatToday()}
+                {t("shell.today", { date: formatToday(lang) })}
               </p>
             </div>
           </div>
@@ -184,14 +203,14 @@ export default function PaperShell() {
         <header className="grid grid-cols-[1fr_auto_1fr] items-center gap-6 pb-1 pt-8">
           <form onSubmit={onSearch} className="flex max-w-[13rem] items-end gap-2">
             <label className="sr-only" htmlFor="masthead-search">
-              Search
+              {t("shell.search")}
             </label>
             <SearchIcon />
             <input
               id="masthead-search"
               value={query}
               onChange={(event) => setQuery(event.target.value)}
-              placeholder="Search..."
+              placeholder={t("shell.searchPlaceholder")}
               className="w-full border-0 border-b border-black bg-transparent pb-[3px] font-sans text-[13px] font-normal text-[#111111] outline-none placeholder:text-neutral-400"
             />
           </form>
@@ -206,7 +225,7 @@ export default function PaperShell() {
 
           <div className="text-right">
             <p className="font-sans text-[10px] font-semibold tracking-[0.16em] text-[#1A4FBF]">
-              OWNED BY
+              {t("shell.ownedBy")}
             </p>
             <p className="mt-[3px] font-sans text-[10px] font-normal tracking-[0.01em] text-neutral-500">
               广东智云建材有限公司
@@ -216,34 +235,34 @@ export default function PaperShell() {
 
         <p className="pb-6 pt-4 text-center font-sans text-[13px] font-semibold uppercase tracking-[0.28em] text-[#111111]">
           <Link to="/" className="text-inherit no-underline">
-            Your stories. Your voice. Your page.
+            {t("shell.tagline")}
           </Link>
         </p>
 
         <nav className="flex flex-wrap items-center justify-center gap-x-10 gap-y-2 border-b-[2.5px] border-black pb-[14px]">
           <NavLink to="/" end className={navClass}>
-            News
+            {t("nav.news")}
           </NavLink>
           {canEditNews(user) ? (
             <NavLink to="/news/drafts" className={navClass}>
-              Drafts
+              {t("nav.drafts")}
             </NavLink>
           ) : null}
           {CATEGORY_ROUTES.map((item) => (
             <NavLink key={item.to} to={item.to} className={navClass}>
-              {item.label}
+              {t(NAV_KEYS[item.to] || item.label)}
             </NavLink>
           ))}
         </nav>
 
         {searchNotice ? (
-          <p className="mt-3 font-sans text-sm text-neutral-500">Search comes in a later version.</p>
+          <p className="mt-3 font-sans text-sm text-neutral-500">{t("shell.searchLater")}</p>
         ) : null}
 
         <Outlet />
 
         <p className="mt-16 border-t border-neutral-200 pt-4 font-sans text-[11px] leading-5 text-neutral-500">
-          Owned by 广东智云建材有限公司.
+          {t("shell.footer")}
         </p>
       </div>
       {termsOpen ? <TermsDialog onClose={() => setTermsOpen(false)} /> : null}

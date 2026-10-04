@@ -2,11 +2,13 @@ import { useEffect, useRef, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { ApiError, api, fieldMessage } from "../api";
 import { useAuth } from "../auth";
+import { useI18n } from "../i18n";
 import { Avatar } from "./Avatar";
 import { ErrorBanner, FieldError } from "./ui";
 
 export default function ComposeForm({ category, onPublished, onCancel }) {
   const { user, setUser } = useAuth();
+  const { t } = useI18n();
   const navigate = useNavigate();
   const location = useLocation();
   const isForum = category === "forum";
@@ -79,14 +81,14 @@ export default function ComposeForm({ category, onPublished, onCancel }) {
           <p className="font-sans text-sm">{user.display_name}</p>
           <p className="mt-1 font-sans text-xs text-neutral-500">
             <Link to="/me/avatar" className="text-[#1A4FBF]">
-              Change avatar
+              {t("compose.changeAvatar")}
             </Link>
           </p>
         </div>
       </div>
       <ErrorBanner error={topMessage} />
       <label className="block font-sans text-[11px] uppercase tracking-[0.16em] text-[#1A4FBF]" htmlFor="compose-title">
-        Title
+        {t("compose.title")}
       </label>
       <input
         id="compose-title"
@@ -98,7 +100,7 @@ export default function ComposeForm({ category, onPublished, onCancel }) {
       <FieldError message={fieldMessage(error, "title")} />
 
       <label className="mt-6 block font-sans text-[11px] uppercase tracking-[0.16em] text-[#1A4FBF]" htmlFor="compose-body">
-        Body
+        {t("compose.body")}
       </label>
       <textarea
         id="compose-body"
@@ -112,7 +114,7 @@ export default function ComposeForm({ category, onPublished, onCancel }) {
       {isForum ? (
         <>
           <label className="mt-6 block font-sans text-[11px] uppercase tracking-[0.16em] text-[#1A4FBF]" htmlFor="compose-images">
-            Photos
+            {t("compose.photos")}
           </label>
           <input
             id="compose-images"
@@ -122,7 +124,7 @@ export default function ComposeForm({ category, onPublished, onCancel }) {
             onChange={onFiles}
             className="mt-2 block font-sans text-sm"
           />
-          <p className="mt-1 font-sans text-xs text-neutral-500">Up to 4 jpeg, png, or webp files, 2MB each.</p>
+          <p className="mt-1 font-sans text-xs text-neutral-500">{t("compose.photoHint")}</p>
           {images.length ? (
             <ul className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
               {images.map((item, index) => (
@@ -133,7 +135,7 @@ export default function ComposeForm({ category, onPublished, onCancel }) {
                     onClick={() => removeImage(index)}
                     className="mt-1 font-sans text-[11px] uppercase tracking-[0.14em] text-[#1A4FBF]"
                   >
-                    Remove
+                    {t("compose.remove")}
                   </button>
                 </li>
               ))}
@@ -150,10 +152,10 @@ export default function ComposeForm({ category, onPublished, onCancel }) {
           disabled={submitting || user.muted}
           className="rounded-[2px] bg-black px-5 py-2 font-sans text-[11px] uppercase tracking-[0.18em] text-white"
         >
-          Publish
+          {t("compose.publish")}
         </button>
         {user.muted ? (
-          <p className="font-sans text-sm text-red-700">This account is muted and cannot publish.</p>
+          <p className="font-sans text-sm text-red-700">{t("compose.muted")}</p>
         ) : null}
         {onCancel ? (
           <button
@@ -161,7 +163,7 @@ export default function ComposeForm({ category, onPublished, onCancel }) {
             onClick={onCancel}
             className="font-sans text-[11px] uppercase tracking-[0.18em] text-neutral-500"
           >
-            Cancel
+            {t("compose.cancel")}
           </button>
         ) : null}
       </div>

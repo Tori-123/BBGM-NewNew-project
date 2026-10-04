@@ -2,8 +2,10 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import { api, fieldMessage } from "../api";
 import { ErrorBanner, FieldError, FrontPageLink, ManualPasswordInput, SectionRule } from "../components/ui";
+import { useI18n } from "../i18n";
 
 export default function ResetPassword() {
+  const { t } = useI18n();
   const [email, setEmail] = useState("");
   const [code, setCode] = useState("");
   const [password, setPassword] = useState("");
@@ -47,11 +49,11 @@ export default function ResetPassword() {
     return (
       <div className="mx-auto mt-10 max-w-md">
         <FrontPageLink />
-        <SectionRule>Reset password</SectionRule>
-        <p className="font-sans text-sm text-neutral-700">Your password was updated.</p>
+        <SectionRule>{t("reset.title")}</SectionRule>
+        <p className="font-sans text-sm text-neutral-700">{t("reset.updated")}</p>
         <p className="mt-4 font-sans text-sm">
           <Link to="/sign-in" className="text-[#1A4FBF]">
-            Sign in
+            {t("signIn.submit")}
           </Link>
         </p>
       </div>
@@ -61,12 +63,12 @@ export default function ResetPassword() {
   return (
     <div className="mx-auto mt-10 max-w-md">
       <FrontPageLink />
-      <SectionRule>Reset password</SectionRule>
+      <SectionRule>{t("reset.title")}</SectionRule>
       <ErrorBanner error={banner} />
       <form onSubmit={onSubmit} autoComplete="off" className="space-y-5">
         <div>
           <label className="block font-sans text-[11px] uppercase tracking-[0.16em] text-[#1A4FBF]" htmlFor="email">
-            School email
+            {t("reset.email")}
           </label>
           <input
             id="email"
@@ -83,7 +85,7 @@ export default function ResetPassword() {
         </div>
         <div>
           <label className="block font-sans text-[11px] uppercase tracking-[0.16em] text-[#1A4FBF]" htmlFor="code">
-            Verification code
+            {t("reset.code")}
           </label>
           <div className="mt-2 flex items-end gap-3">
             <input
@@ -100,17 +102,17 @@ export default function ResetPassword() {
               onClick={onSendCode}
               className="shrink-0 border border-black px-3 py-2 font-sans text-[11px] uppercase tracking-[0.16em]"
             >
-              {sendingCode ? "Sending" : "Send code"}
+              {sendingCode ? t("register.sending") : t("register.send")}
             </button>
           </div>
           <FieldError message={fieldMessage(error, "code")} />
           {codeSent && !fieldMessage(error, "code") && !fieldMessage(error, "email") ? (
-            <p className="mt-2 font-sans text-sm text-neutral-500">If that email has an account, a code was sent.</p>
+            <p className="mt-2 font-sans text-sm text-neutral-500">{t("reset.sent")}</p>
           ) : null}
         </div>
         <div>
           <label className="block font-sans text-[11px] uppercase tracking-[0.16em] text-[#1A4FBF]" htmlFor="password">
-            New password
+            {t("reset.new")}
           </label>
           <ManualPasswordInput id="password" value={password} onChange={(event) => setPassword(event.target.value)} />
           <FieldError message={fieldMessage(error, "password")} />
@@ -120,12 +122,12 @@ export default function ResetPassword() {
           disabled={submitting}
           className="rounded-[2px] bg-black px-5 py-2 font-sans text-[11px] uppercase tracking-[0.18em] text-white"
         >
-          Update password
+          {t("reset.submit")}
         </button>
       </form>
       <p className="mt-6 font-sans text-sm text-neutral-500">
         <Link to="/sign-in" className="text-[#1A4FBF]">
-          Back to sign in
+          {t("reset.back")}
         </Link>
       </p>
     </div>

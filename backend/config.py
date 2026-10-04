@@ -20,6 +20,7 @@ class Settings:
     smtp_user: str
     smtp_password: str
     smtp_from: str
+    cj_admin_code: str
 
 
 def _load_env_file(path: Path) -> None:
@@ -64,4 +65,5 @@ def load_settings() -> Settings:
         smtp_user=smtp_user,
         smtp_password=os.environ.get("SMTP_PASSWORD") or "",
         smtp_from=smtp_from,
+        cj_admin_code=(os.environ.get("CJ_ADMIN_CODE") or "").strip(),
     )

@@ -4,6 +4,7 @@ import { ApiError, api } from "../api";
 import { useAuth } from "../auth";
 import { uploadSrc } from "../avatar";
 import { formatRelative } from "../format";
+import { useI18n } from "../i18n";
 import { TitleLine } from "./ui";
 import { Avatar } from "./Avatar";
 
@@ -40,6 +41,7 @@ function LikeIcon({ filled }) {
 
 export function CommunityCard({ post }) {
   const { user } = useAuth();
+  const { lang, t } = useI18n();
   const navigate = useNavigate();
   const [likeCount, setLikeCount] = useState(post.like_count ?? 0);
   const [liked, setLiked] = useState(Boolean(post.liked));
@@ -78,7 +80,7 @@ export function CommunityCard({ post }) {
         <Avatar avatar={post.author?.avatar} size={44} className="rounded-full" />
         <div className="min-w-0 flex-1">
           <p className="font-sans text-sm font-medium text-[#111111]">{post.author?.display_name}</p>
-          <p className="mt-0.5 font-sans text-xs text-neutral-500">{formatRelative(post.created_at)}</p>
+          <p className="mt-0.5 font-sans text-xs text-neutral-500">{formatRelative(post.created_at, lang)}</p>
           <Link to={`/posts/${post.id}`} className="mt-3 block font-sans text-[15px] font-medium leading-6 text-[#111111]">
             {post.title}
           </Link>
@@ -96,7 +98,7 @@ export function CommunityCard({ post }) {
             <Link
               to={`/posts/${post.id}`}
               className="flex items-center gap-1.5 font-sans text-sm"
-              aria-label={`${replies} comments`}
+              aria-label={t("forum.comments", { count: replies })}
             >
               <CommentIcon />
               <span>{replies}</span>
@@ -106,7 +108,7 @@ export function CommunityCard({ post }) {
               onClick={onLike}
               disabled={saving}
               className={`flex items-center gap-1.5 font-sans text-sm ${liked ? "text-[#1A4FBF]" : ""}`}
-              aria-label={liked ? "Unlike" : "Like"}
+              aria-label={liked ? t("forum.unlike") : t("forum.like")}
               aria-pressed={liked}
             >
               <LikeIcon filled={liked} />

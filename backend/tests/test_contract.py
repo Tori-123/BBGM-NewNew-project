@@ -1051,3 +1051,50 @@ def test_news_block_position(tmp_path, monkeypatch):
         assert again.status_code == 422
         assert again.json()["error"]["fields"][0]["field"] == "position"
     app.state.engine.dispose()
+
+
+def test_cj_is_public_and_writes_need_the_admin_code(tmp_path, monkeypatch):
+    monkeypatch.setenv("CJ_ADMIN_CODE", "CJ-DEMO")
+    app = _make_app(tmp_path, monkeypatch)
+    with TestClient(app) as client:
+        missing = client.get("/api/v1/cj")
+        assert missing.status_code == 422
+
+        week = client.get("/api/v1/cj?week_start=2026-10-05")
+        assert week.status_code == 200, week.text
+        body = week.json()
+        assert body["week_start"] == "2026-10-05"
+        assert body["subjects"]
+        assert body["entries"]
+        subject_id = body["subjects"][0]["id"]
+
+        denied = client.put(
+            "/api/v1/cj",
+            json={
+                "week_start": "2026-10-05",
+                "day_index": 0,
+                "subject_id": subject_id,
+                "ic": "Updated",
+                "hw": "Page 1",
+                "announcement": "",
+            },
+        )
+        assert denied.status_code == 401
+
+        saved = client.put(
+            "/api/v1/cj",
+            headers={"X-CJ-Admin-Code": "CJ-DEMO"},
+            json={
+                "week_start": "2026-10-05",
+                "day_index": 0,
+                "subject_id": subject_id,
+                "ic": "Updated",
+                "hw": "Page 1",
+                "announcement": "Bring a pencil",
+            },
+        )
+        assert saved.status_code == 200, saved.text
+        again = client.get("/api/v1/cj?week_start=2026-10-05")
+        match = next(item for item in again.json()["entries"] if item["subject_id"] == subject_id and item["day_index"] == 0)
+        assert match["ic"] == "Updated"
+    app.state.engine.dispose()

@@ -1,4 +1,5 @@
 import { Link } from "react-router-dom";
+import { useI18n } from "../i18n";
 import { Dateline, Dek, Headline, ImageWell, Kicker, TitleLine } from "./ui";
 
 export function StoryRow({ post }) {
@@ -30,13 +31,14 @@ export function StoryRowSkeleton() {
 }
 
 export function EmptyCategory({ name }) {
+  const { t } = useI18n();
   return (
     <div className="mt-6">
       <ImageWell className="h-40 max-w-md" />
-      <p className="mt-4 font-serif text-2xl">No stories in {name} yet.</p>
+      <p className="mt-4 font-serif text-2xl">{t("empty.category", { name })}</p>
       <p className="mt-2 font-sans text-sm">
         <Link to="/" className="text-[#1A4FBF]">
-          Back to the front page
+          {t("empty.back")}
         </Link>
       </p>
     </div>

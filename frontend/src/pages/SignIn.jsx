@@ -3,9 +3,11 @@ import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { api, fieldMessage, safeNext } from "../api";
 import { useAuth } from "../auth";
 import { ErrorBanner, FieldError, FrontPageLink, SectionRule } from "../components/ui";
+import { useI18n } from "../i18n";
 
 export default function SignIn() {
   const { signIn } = useAuth();
+  const { t } = useI18n();
   const navigate = useNavigate();
   const [params] = useSearchParams();
   const [email, setEmail] = useState("");
@@ -34,12 +36,12 @@ export default function SignIn() {
   return (
     <div className="mx-auto mt-10 max-w-md">
       <FrontPageLink />
-      <SectionRule>Sign In</SectionRule>
+      <SectionRule>{t("signIn.title")}</SectionRule>
       <ErrorBanner error={banner} />
       <form onSubmit={onSubmit} className="space-y-5">
         <div>
           <label className="block font-sans text-[11px] uppercase tracking-[0.16em] text-[#1A4FBF]" htmlFor="email">
-            Email
+            {t("signIn.email")}
           </label>
           <input
             id="email"
@@ -53,7 +55,7 @@ export default function SignIn() {
         </div>
         <div>
           <label className="block font-sans text-[11px] uppercase tracking-[0.16em] text-[#1A4FBF]" htmlFor="password">
-            Password
+            {t("signIn.password")}
           </label>
           <input
             id="password"
@@ -70,21 +72,21 @@ export default function SignIn() {
           disabled={submitting}
           className="rounded-[2px] bg-black px-5 py-2 font-sans text-[11px] uppercase tracking-[0.18em] text-white"
         >
-          Sign in
+          {t("signIn.submit")}
         </button>
       </form>
       <p className="mt-6 font-sans text-sm text-neutral-500">
-        New to Elegram?{" "}
+        {t("signIn.new")}{" "}
         <Link to={`/register${params.get("next") ? `?next=${encodeURIComponent(params.get("next"))}` : ""}`} className="text-[#1A4FBF]">
-          Create an account
+          {t("signIn.create")}
         </Link>
         {" · "}
         <Link to="/reset-password" className="text-[#1A4FBF]">
-          Forgot password
+          {t("signIn.forgot")}
         </Link>
         {" · "}
         <Link to="/" className="text-[#1A4FBF]">
-          Front page
+          {t("link.frontPage")}
         </Link>
       </p>
     </div>

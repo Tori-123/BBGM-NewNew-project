@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { ApiError, api } from "../api";
 import { useAuth } from "../auth";
 import { ErrorBanner, FrontPageLink, SectionRule } from "../components/ui";
+import { useI18n } from "../i18n";
 import { useLiveRefresh } from "../live";
 
 const ROLES = [
@@ -13,6 +14,7 @@ const ROLES = [
 
 export default function AdminUsers() {
   const { user, ready, setUser } = useAuth();
+  const { t } = useI18n();
   const navigate = useNavigate();
   const [items, setItems] = useState([]);
   const [error, setError] = useState(null);
@@ -86,7 +88,7 @@ export default function AdminUsers() {
   }
 
   async function removeUser(target) {
-    if (!window.confirm(`Delete ${target.display_name}? Their posts will be removed.`)) return;
+    if (!window.confirm(t("users.deleteConfirm", { name: target.display_name }))) return;
     setError(null);
     try {
       await api.deleteUser(target.id);
@@ -101,17 +103,17 @@ export default function AdminUsers() {
   return (
     <div className="mt-8">
       <FrontPageLink />
-      <SectionRule>Users</SectionRule>
+      <SectionRule>{t("users.title")}</SectionRule>
       <ErrorBanner error={error} />
       {loading ? (
-        <p className="font-sans text-sm text-neutral-500">Loading accounts.</p>
+        <p className="font-sans text-sm text-neutral-500">{t("users.loading")}</p>
       ) : (
         <table className="w-full border-t border-black font-sans text-sm">
           <thead>
             <tr className="border-b border-black text-left text-[11px] uppercase tracking-[0.14em]">
-              <th className="py-3 font-medium">Name</th>
-              <th className="py-3 font-medium">Email</th>
-              <th className="py-3 font-medium">Role</th>
+              <th className="py-3 font-medium">{t("users.name")}</th>
+              <th className="py-3 font-medium">{t("users.email")}</th>
+              <th className="py-3 font-medium">{t("users.role")}</th>
               <th className="py-3 font-medium"> </th>
             </tr>
           </thead>
@@ -133,7 +135,7 @@ export default function AdminUsers() {
                             onClick={() => setRole(item, role.value)}
                             className="uppercase tracking-[0.12em] text-[#1A4FBF]"
                           >
-                            {role.label}
+                            {t(`users.${role.value}`)}
                           </button>
                         ))}
                         <button
@@ -141,14 +143,14 @@ export default function AdminUsers() {
                           onClick={() => setMuted(item, !item.muted)}
                           className="uppercase tracking-[0.12em] text-[#1A4FBF]"
                         >
-                          {item.muted ? "Unmute" : "Mute"}
+                          {item.muted ? t("users.unmute") : t("users.mute")}
                         </button>
                         <button
                           type="button"
                           onClick={() => removeUser(item)}
                           className="uppercase tracking-[0.12em] text-red-700"
                         >
-                          Delete user
+                          {t("users.delete")}
                         </button>
                       </div>
                     )}

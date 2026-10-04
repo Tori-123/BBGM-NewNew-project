@@ -1,11 +1,15 @@
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { AuthProvider } from "./auth";
+import { I18nProvider } from "./i18n";
 import PaperShell from "./components/PaperShell";
 import About from "./pages/About";
 import AdminUsers from "./pages/AdminUsers";
 import AvatarSettings from "./pages/AvatarSettings";
 import ChangePassword from "./pages/ChangePassword";
 import Category, { StaticCategory } from "./pages/Category";
+import CjAdmin from "./pages/CjAdmin";
+import CjDay, { CjWeekRedirect } from "./pages/CjDay";
+import CjMonth from "./pages/CjMonth";
 import Contact from "./pages/Contact";
 import Home from "./pages/Home";
 import MyPosts from "./pages/MyPosts";
@@ -20,6 +24,7 @@ import SignIn from "./pages/SignIn";
 export default function App() {
   return (
     <BrowserRouter>
+      <I18nProvider>
       <AuthProvider>
         <Routes>
           <Route element={<PaperShell />}>
@@ -28,6 +33,10 @@ export default function App() {
             <Route path="/news" element={<Navigate to="/" replace />} />
             <Route path="/sports" element={<Navigate to="/" replace />} />
             <Route path="/forum" element={<Category category="forum" title="Forum" />} />
+            <Route path="/cj" element={<CjMonth />} />
+            <Route path="/cj/day" element={<CjDay />} />
+            <Route path="/cj/week" element={<CjWeekRedirect />} />
+            <Route path="/cj/admin" element={<CjAdmin />} />
             <Route path="/opinion" element={<StaticCategory title="Opinion" />} />
             <Route path="/community" element={<Navigate to="/forum" replace />} />
             <Route path="/submit" element={<Navigate to="/forum" replace />} />
@@ -51,6 +60,7 @@ export default function App() {
           </Route>
         </Routes>
       </AuthProvider>
+      </I18nProvider>
     </BrowserRouter>
   );
 }

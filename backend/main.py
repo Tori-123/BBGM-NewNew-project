@@ -8,6 +8,7 @@ from errors import register_exception_handlers
 from models import init_db, make_engine, make_session_factory
 from routers.admin import router as admin_router
 from routers.auth import router as auth_router
+from routers.cj import router as cj_router
 from routers.news import router as news_router
 from routers.posts import router as posts_router
 
@@ -32,6 +33,7 @@ def create_app() -> FastAPI:
     register_exception_handlers(app)
     app.include_router(auth_router, prefix="/api/v1")
     app.include_router(posts_router, prefix="/api/v1")
+    app.include_router(cj_router, prefix="/api/v1")
     app.include_router(news_router, prefix="/api/v1")
     app.include_router(admin_router, prefix="/api/v1")
     app.mount("/uploads", StaticFiles(directory=str(ensure_avatar_dir().parent)), name="uploads")
