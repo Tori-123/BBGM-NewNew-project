@@ -4,10 +4,12 @@ from pydantic import BaseModel, ConfigDict
 NEWSPAPER_CATEGORIES = ("news",)
 CATEGORIES = (*NEWSPAPER_CATEGORIES, "forum")
 CATEGORY_MESSAGE = "Must be one of: news, forum."
-ROLES = ("student", "editor", "admin", "super_admin")
+ROLES = ("student", "teacher", "editor", "admin", "super_admin")
 NEWSROOM_ROLES = ("editor", "super_admin")
 MODERATOR_ROLES = ("admin", "super_admin")
-ASSIGNABLE_ROLES = ("student", "editor", "admin")
+ASSIGNABLE_ROLES = ("student", "teacher", "editor", "admin")
+CJ_VIEWER_ROLES = ("student", "teacher", "super_admin")
+CJ_EDITOR_ROLES = ("teacher", "super_admin")
 REVIEW_STATUSES = ("editing", "pending", "published")
 AVATAR_PRESETS = ("oak", "gym", "book", "dorm", "bus", "night")
 DEFAULT_AVATAR = "preset:oak"

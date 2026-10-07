@@ -62,7 +62,7 @@ export default function CjMonth() {
       <div className="mt-8 border border-black">
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-black px-4 py-3">
           <p className="font-serif text-2xl">{monthTitle}</p>
-          <Link to={`/cj/day?date=${todayIso}`} className="font-sans text-[11px] uppercase tracking-[0.14em] text-[#1A4FBF]">
+          <Link to={`/cj/student/week?start=${isoDate(mondayOf(today))}`} className="font-sans text-[11px] uppercase tracking-[0.14em] text-[#1A4FBF]">
             {t("cj.today")}
           </Link>
         </div>
@@ -77,19 +77,19 @@ export default function CjMonth() {
           const start = week[0];
           const currentWeek = isoDate(mondayOf(today)) === isoDate(start);
           return (
-            <div
+            <Link
               key={isoDate(start)}
-              className={`grid grid-cols-7 border-b border-neutral-200 last:border-b-0 ${currentWeek ? "bg-neutral-50" : ""}`}
+              to={`/cj/student/week?start=${isoDate(start)}`}
+              aria-label={t("cj.viewWeek", { date: isoDate(start) })}
+              className={`group grid grid-cols-7 border-b border-neutral-200 text-inherit no-underline last:border-b-0 hover:bg-[#f3f6fd] ${currentWeek ? "bg-neutral-50" : ""}`}
             >
               {week.map((date, dayIndex) => {
                 const inMonth = date.getMonth() === month.getMonth();
                 const isToday = isoDate(date) === todayIso;
                 return (
-                  <Link
+                  <span
                     key={isoDate(date)}
-                    to={`/cj/day?date=${isoDate(date)}`}
-                    aria-label={t("cj.viewDay", { date: isoDate(date) })}
-                    className={`px-2 py-3 text-center font-sans text-sm no-underline ${
+                    className={`px-2 py-3 text-center font-sans text-sm transition-colors ${
                       inMonth ? "text-neutral-900" : "text-neutral-300"
                     }`}
                   >
@@ -99,18 +99,13 @@ export default function CjMonth() {
                         {t("cj.weekLabel", { index: weekIndexOf(date) })}
                       </small>
                     ) : null}
-                  </Link>
+                  </span>
                 );
               })}
-            </div>
+            </Link>
           );
         })}
       </div>
-      <p className="mt-4 font-sans text-sm">
-        <Link to="/cj/admin" className="text-[#1A4FBF]">
-          {t("cj.admin")}
-        </Link>
-      </p>
     </section>
   );
 }

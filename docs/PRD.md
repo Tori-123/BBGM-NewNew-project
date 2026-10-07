@@ -5,7 +5,7 @@
 默认决策（可被后续 1.2 推翻）：
 
 - 账号：站点自建注册 / 登录；仅 `@basischina.com`。注册须邮箱验证码通过后才建账号。登录用邮箱 + 密码。忘记密码用同一套验证码重置。不接校园 SSO、不发短信。
-- 角色：注册默认为 `student`；`ADMIN_EMAIL` 匹配的账号为 `super_admin`。超级管理员可授予或取消 `editor` 与 `admin`，不能再造一个 `super_admin`。
+- 角色：注册默认为 `student`；`ADMIN_EMAIL` 匹配的账号为 `super_admin`。超级管理员可授予或取消 `teacher`、`editor` 与 `admin`，不能再造一个 `super_admin`。
 - 发帖：Forum 发布即公开。News 以分板块草稿存在，超级管理员同意的板块才出现在 News 上。没有 Sports 栏目，也没有把 Forum 帖直接复制上 News 的精选。
 - 无活动帖：帖子不带开始时间与地点字段。
 
@@ -72,7 +72,7 @@ Must 服务主故事 P1-US1（Forum 发帖被看见）以及角色、跟帖、Ne
 | M23 | 找回密码 | 登录页可走忘记密码。校内邮箱收验证码后设新密码，再用登录接口进站。非 `@basischina.com` 当场拒绝，不发信。 |
 | M24 | 登录后改密码 | 顶栏账号旁可改密码：校验当前密码后设新密码，无需再发验证码。 |
 | M2 | 鉴权与权限 | 未登录可读已发布内容与 Forum 评论；仅登录用户可发帖 / 跟帖；直接发 News 被拒绝；用户不能改删自己的帖或评论。被禁言者仍可登录阅读。 |
-| M3 | 多页面 | 至少：News（`/` 报头版式，不再单列 News 列表页）、Forum、CJ（月历、学生端单日、管理端按周）、帖子详情（Forum 含评论）、登录/注册/找回密码、登录后改密码、用户协议、我的帖子、News 草稿、System 通知、超级管理员用户列表。Forum 发帖在栏目页内，无独立 Submit 页。 |
+| M3 | 多页面 | 至少：News（`/` 报头版式，不再单列 News 列表页）、Forum、CJ（月历、学生端五日周视图、管理端按周）、帖子详情（Forum 含评论）、登录/注册/找回密码、登录后改密码、用户协议、我的帖子、News 草稿、System 通知、超级管理员用户列表。Forum 发帖在栏目页内，无独立 Submit 页。 |
 | M4 | 发帖 | Forum：标题、正文必填，发布后 `published`，作者绑定当前用户，可附带最多 4 张图。News 不经此接口公开。 |
 | M6 | 按栏目阅读 | 栏目页只列出该栏目已发布帖。News 详情只展示已同意板块。 |
 | M7 | News 露出 | `/` 的报头版式展示近期已发布 **News**，不含 Forum，不含尚无已同意板块的草稿。导航第一项是 News，没有单独的 News 列表页。 |
@@ -80,11 +80,11 @@ Must 服务主故事 P1-US1（Forum 发帖被看见）以及角色、跟帖、Ne
 | M9 | 关键错误处理 | 密码错误、未登录发帖/跟帖、缺必填、非法栏目、非法配图、无权限、存储失败：均返回明确失败，不创建半截已发布帖或评论。 |
 | M10 | 写操作留痕 | Forum 发帖或创建 News 草稿成功时记录 `author_id`、`created_at`；服务端另写一条审计记录（谁、何时、创建了哪篇帖）。 |
 | M11 | Forum | 与 News、CJ 平级的单一讨论区；一个列表，不是用户自建多吧。 |
-| M26 | CJ | 与 Forum 平级的课表栏。公开月历；学生点某一天只看那一天的课程和当天考试，没有前一天 / 下一天。仍请求该日所在周的 `GET /api/v1/cj?week_start=`（周一），前端按 `day_index` 过滤。Period 1–8 自选学科留在单日页，选择只存在浏览器本地。管理端继续按周编辑。写入 CJ 与考试需要管理员口令，不走登录会话。 |
+| M26 | CJ | 与 Forum 平级的课表栏，必须登录并按角色进入三个独立入口。学生端从月历按整周进入周一至周五五列只读视图，Period 1–8 自选学科只存在浏览器本地；每位老师由超级管理员分配一个 CJ 学科，只能读取和更新该学科的 CJ 与考试；`super_admin` 管理端可读取和修改全部 CJ、考试以及老师学科分配。考试必须选择学科，学生端自动显示学科前缀。`editor` 与普通 `admin` 不自动获得 CJ 权限。 |
 | M12 | Forum 评论 | 仅 Forum 详情：帖子下的评论。未登录可读；登录可写。不新增楼层，不写楼中楼。校报详情不加评论。 |
-| M13 | 角色 | `student` / `editor` / `admin` / `super_admin`。`ADMIN_EMAIL` 在注册或登录时升为 `super_admin`。 |
+| M13 | 角色 | `student` / `teacher` / `editor` / `admin` / `super_admin`。`ADMIN_EMAIL` 在注册或登录时升为 `super_admin`。 |
 | M14 | News 分板块草稿 | `editor` 与 `super_admin` 在 `/news/drafts` 新建稿并按板块保存、提交。`super_admin` 可同意或退回单个板块。公开 News 只含已同意板块。已上线板块再改，仍须再次同意后才替换线上正文。 |
-| M15 | 超级管理员用户列表 | 仅 `super_admin` 查看用户，并可设为 `student` / `editor` / `admin`、禁言或解除、删除用户。不能改、禁言或删除自己，也不能动另一个 `super_admin`，不能授予 `super_admin`。 |
+| M15 | 超级管理员用户列表 | 仅 `super_admin` 查看用户，并可设为 `student` / `teacher` / `editor` / `admin`、禁言或解除、删除用户。不能改、禁言或删除自己，也不能动另一个 `super_admin`，不能授予 `super_admin`。 |
 | M16 | 头像 | 自带预设（`preset:oak` 等）或上传一张图；出现在顶栏、Forum 帖/楼、栏目内发帖表。校报栏目没有封面图字段。 |
 | M17 | Forum 卡片 | `/forum` 每条为独立模块卡：头像、展示名、时间、标题、`excerpt`、有则 `images[0]`；底栏气泡（`reply_count`，点进详情）与拇指（`like_count`）。列表不展开楼层预览。校报列表仍用原印刷行。 |
 | M18 | Forum 配图 | Forum 主帖作者可在发帖时或之后上传最多 4 张 jpeg/png/webp（每张 ≤2MB），存在 `images[]`。News 的 `images` 恒为 `[]`。跟帖不传图。 |
@@ -209,8 +209,9 @@ Elegram 应用（Web 页面 + 服务端）
 | Comment | id, post_id, author_id, parent_id, body, created_at | 仅 Forum；新评论 `parent_id` 为空。写入不接受楼层或楼中楼 |
 | AuditEvent | id, actor_id, action, post_id, at | Forum 发帖或创建 News 草稿成功时追加；只增不改 |
 | Subject | id, name, short_name, color, period, sort_order | CJ 学科目录。学生端不按 `period` 固定排课 |
+| CJTeacherSubject | id, user_id, subject_id | 超级管理员给每位老师分配的唯一 CJ 学科；老师端据此过滤 CJ 与考试的读取和写入 |
 | CJEntry | id, week_start, day_index, period, subject_id, ic, hw, announcement, updated_at | 某一周、某一天、某一学科的 IC / HW / A |
-| Exam | id, week_start, day_index, title, time, location, note, updated_at | 某一周的考试安排 |
+| Exam | id, week_start, day_index, subject_id, title, time, location, note, updated_at | 某一周、某一学科的考试安排；前端用学科目录自动补显示前缀 |
 
 `category` 枚举：`news`、`forum`。无 `category` 的列表只含 `news`。
 
@@ -245,7 +246,7 @@ Comment（新评论不挂到另一条评论下）
 | 跟帖 | User、Post（须 Forum，且未禁言） | Comment |
 | 我的帖子 | Post where author = 当前用户且 `published` | 无 |
 | System | SystemNotice where user = 当前用户 | 无（删帖时由服务端写入） |
-| 超级管理员改角色 / 禁言 | User 列表 | User.role（`student` / `editor` / `admin`）或 `muted`。禁言不废除会话 |
+| 超级管理员改角色 / 禁言 | User 列表 | User.role（`student` / `teacher` / `editor` / `admin`）或 `muted`。禁言不废除会话 |
 | 超级管理员删用户 | User | 删除 User、Session、其 Post、Comment、PostLike、NewsBlock |
 | 删帖 | Post | 先写 SystemNotice 给作者，再删除 Post 及其 Comment、NewsBlock、PostLike、配图与该帖 AuditEvent |
 

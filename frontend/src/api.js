@@ -193,17 +193,21 @@ export const api = {
     const query = new URLSearchParams({ week_start: weekStart });
     return request(`/cj?${query}`);
   },
-  saveCj: (body, adminCode) =>
+  saveCj: (body) =>
     request("/cj", {
       method: "PUT",
-      headers: { "X-CJ-Admin-Code": adminCode },
       body: JSON.stringify(body),
     }),
-  saveExam: (body, adminCode) =>
+  saveExam: (body) =>
     request("/cj/exams", {
       method: "PUT",
-      headers: { "X-CJ-Admin-Code": adminCode },
       body: JSON.stringify(body),
+    }),
+  listCjTeachers: () => request("/cj/teachers"),
+  assignCjTeacherSubjects: (teacherId, subjectIds) =>
+    request(`/cj/teachers/${encodeURIComponent(teacherId)}`, {
+      method: "PUT",
+      body: JSON.stringify({ subject_ids: subjectIds }),
     }),
   likePost: (postId) => request(`/posts/${encodeURIComponent(postId)}/likes`, { method: "POST" }),
   unlikePost: (postId) => request(`/posts/${encodeURIComponent(postId)}/likes`, { method: "DELETE" }),

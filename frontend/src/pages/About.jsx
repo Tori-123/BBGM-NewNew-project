@@ -22,7 +22,7 @@ export default function About() {
       <p className="mt-4 font-sans text-[15px] leading-7 text-neutral-500">{t("about.not")}</p>
       <SectionRule>{t("about.contributors")}</SectionRule>
       <p className="mt-4 font-sans text-[15px] leading-7">
-        本网站是由 Tori zhao, Leo Gao, Ben lu, Dewey Peng 制作的。
+        This website was created by Tori Zhao, Leo Gao, Ben Lu, and Dewey Peng.
       </p>
     </div>
   );

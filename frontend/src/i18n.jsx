@@ -1,6 +1,4 @@
-import { createContext, useContext, useEffect, useMemo, useState } from "react";
-
-const STORAGE_KEY = "elegram_lang";
+import { createContext, useContext, useEffect, useMemo } from "react";
 
 const COPY = {
   en: {
@@ -22,7 +20,7 @@ const COPY = {
     "shell.searchLater": "Search comes in a later version.",
     "shell.ownedBy": "OWNED BY",
     "shell.tagline": "Your stories. Your voice. Your page.",
-    "shell.footer": "Owned by 广东智云建材有限公司.",
+    "shell.footer": "Owned by Guangdong Zhiyun Building Materials Co., Ltd.",
     "nav.news": "News",
     "nav.drafts": "Drafts",
     "nav.forum": "Forum",
@@ -139,6 +137,7 @@ const COPY = {
     "users.email": "Email",
     "users.role": "Role",
     "users.student": "Student",
+    "users.teacher": "Teacher",
     "users.editor": "Editor",
     "users.admin": "Admin",
     "users.mute": "Mute",
@@ -164,17 +163,17 @@ const COPY = {
     "terms.agree": "I agree",
     "terms.dialog": "User agreement",
     "about.kicker": "About",
-    "about.lead": "Elegram is owned by 广东智云建材有限公司.",
-    "about.body": "广东智云建材有限公司 owns and operates this site. Its registered address is 珠海市横琴新区港澳大道88号2栋1507. People sign in and write in Forum. Editors draft News in sections, and a super admin approves each section before it appears on the News page.",
+    "about.lead": "Elegram is owned by Guangdong Zhiyun Building Materials Co., Ltd.",
+    "about.body": "Guangdong Zhiyun Building Materials Co., Ltd. owns and operates this site. Its registered address is Building 2, No. 88 Gang'ao Avenue, Hengqin New Area, Zhuhai. People sign in and write in Forum. Editors draft News in sections, and a super admin approves each section before it appears on the News page.",
     "about.reach": "To reach the company, write to",
-    "about.not": "The owner is 广东智云建材有限公司. This site is not a ticket office, and not a recommendation engine.",
+    "about.not": "The owner is Guangdong Zhiyun Building Materials Co., Ltd. This site is not a ticket office, and not a recommendation engine.",
     "about.contributors": "Contributors",
     "contact.kicker": "Contact",
-    "contact.lead": "Write to 广东智云建材有限公司.",
-    "contact.body": "Elegram is owned by 广东智云建材有限公司, 珠海市横琴新区港澳大道88号2栋1507. Tips, corrections, and section questions go to the company.",
+    "contact.lead": "Write to Guangdong Zhiyun Building Materials Co., Ltd.",
+    "contact.body": "Elegram is owned by Guangdong Zhiyun Building Materials Co., Ltd., Building 2, No. 88 Gang'ao Avenue, Hengqin New Area, Zhuhai. Tips, corrections, and section questions go to the company.",
     "cj.directory": "Monthly directory",
-    "cj.pickWeek": "Pick a day",
-    "cj.pickHint": "Click a day to read that day's CJ.",
+    "cj.pickWeek": "Pick a week",
+    "cj.pickHint": "Choose any calendar row to open the full Monday–Friday CJ.",
     "cj.prevMonth": "Previous month",
     "cj.thisMonth": "This month",
     "cj.nextMonth": "Next month",
@@ -195,6 +194,22 @@ const COPY = {
     "cj.examsLoading": "Loading exams…",
     "cj.examsEmpty": "No exams on this day.",
     "cj.viewDay": "Open CJ for {date}",
+    "cj.viewWeek": "Open the week beginning {date}",
+    "cj.weekKicker": "{year} · Week {week}",
+    "cj.weekTitle": "Weekly CJ",
+    "cj.weekSummary": "{range} · {count} courses",
+    "cj.prevWeek": "Previous week",
+    "cj.chooseWeek": "Choose another week",
+    "cj.nextWeek": "Next week",
+    "cj.weekday.0": "Monday",
+    "cj.weekday.1": "Tuesday",
+    "cj.weekday.2": "Wednesday",
+    "cj.weekday.3": "Thursday",
+    "cj.weekday.4": "Friday",
+    "cj.weekExamsTitle": "This week's exams",
+    "cj.weekExamsEmpty": "No exams are scheduled for this week.",
+    "cj.studentPreview": "Student view",
+    "cj.studentPreviewKicker": "Student view preview",
     "cj.wd.0": "Mon",
     "cj.wd.1": "Tue",
     "cj.wd.2": "Wed",
@@ -207,7 +222,6 @@ const COPY = {
     "cj.adminKicker": "Admin",
     "cj.adminTitle": "Content",
     "cj.adminLead": "Update CJ by date and subject. Students read it on their own schedule.",
-    "cj.code": "Admin code",
     "cj.monday": "Monday",
     "cj.daily": "Daily CJ",
     "cj.examTab": "Exams",
@@ -220,6 +234,7 @@ const COPY = {
     "cj.noIc": "No IC",
     "cj.updateExam": "Update exam",
     "cj.addExam": "Add exam",
+    "cj.newExam": "New exam",
     "cj.time": "Time",
     "cj.examName": "Exam name",
     "cj.location": "Location",
@@ -227,6 +242,10 @@ const COPY = {
     "cj.saveExam": "Save exam",
     "cj.weekExams": "This week's exams",
     "cj.noLocation": "No location",
+    "cj.unassignedSubject": "Unassigned subject",
+    "cj.assignedSubject": "Assigned CJ subject",
+    "cj.noAssignedSubject": "No subject assigned",
+    "cj.legacyMultipleSubjects": "This account has an older multi-subject assignment. Choose one subject and save to replace it.",
     "cj.date": "Date",
     "cj.reading": "Loading…",
     "cj.saved": "CJ saved",
@@ -234,6 +253,20 @@ const COPY = {
     "cj.saveFailed": "Could not save.",
     "cj.loadFailed": "Could not load.",
     "cj.offDay": "No CJ on this day.",
+    "cj.checkingAccess": "Checking CJ access…",
+    "cj.teacherKicker": "Teacher portal",
+    "cj.teacherTitle": "My CJ subjects",
+    "cj.teacherLead": "Update only the subjects assigned to your account. Exams and other subjects stay outside this portal.",
+    "cj.noAssignedSubjects": "No subjects assigned",
+    "cj.askAdminAssignment": "Ask the super-admin to assign your subjects before editing CJ.",
+    "cj.myWeekEntries": "My week's CJ",
+    "cj.superAdminOnly": "This complete view is available only to the super-admin account.",
+    "cj.teacherAssignments": "Teachers",
+    "cj.teacherAssignmentSaved": "Teacher subjects saved",
+    "cj.noTeachers": "No teacher accounts yet",
+    "cj.createTeacherHint": "Open Users and change an account's role to Teacher first.",
+    "cj.openUsers": "Open user management",
+    "cj.saveAssignment": "Save subjects",
     "drafts.viewLive": "View live",
     "drafts.status.draft": "Draft",
     "drafts.status.published": "Published",
@@ -376,6 +409,7 @@ const COPY = {
     "users.email": "邮箱",
     "users.role": "角色",
     "users.student": "学生",
+    "users.teacher": "老师",
     "users.editor": "编辑",
     "users.admin": "管理员",
     "users.mute": "禁言",
@@ -410,8 +444,8 @@ const COPY = {
     "contact.lead": "写信给广东智云建材有限公司。",
     "contact.body": "Elegram 由广东智云建材有限公司所有，地址珠海市横琴新区港澳大道88号2栋1507。建议、更正和板块问题都发给公司。",
     "cj.directory": "月历",
-    "cj.pickWeek": "选择一天",
-    "cj.pickHint": "点某一天，只看这一天的 CJ。",
+    "cj.pickWeek": "选择一周",
+    "cj.pickHint": "点击日历中的任意一行，查看周一到周五的完整 CJ。",
     "cj.prevMonth": "上个月",
     "cj.thisMonth": "回到本月",
     "cj.nextMonth": "下个月",
@@ -432,6 +466,22 @@ const COPY = {
     "cj.examsLoading": "正在读取考试安排…",
     "cj.examsEmpty": "这一天没有考试安排。",
     "cj.viewDay": "查看 {date} 的 CJ",
+    "cj.viewWeek": "查看从 {date} 开始的一周 CJ",
+    "cj.weekKicker": "{year} · 第 {week} 周",
+    "cj.weekTitle": "本周 CJ",
+    "cj.weekSummary": "{range} · 我的课表 {count} 门",
+    "cj.prevWeek": "上一周",
+    "cj.chooseWeek": "选择其他周",
+    "cj.nextWeek": "下一周",
+    "cj.weekday.0": "周一",
+    "cj.weekday.1": "周二",
+    "cj.weekday.2": "周三",
+    "cj.weekday.3": "周四",
+    "cj.weekday.4": "周五",
+    "cj.weekExamsTitle": "本周考试时间",
+    "cj.weekExamsEmpty": "这一周暂时没有考试安排。",
+    "cj.studentPreview": "学生端预览",
+    "cj.studentPreviewKicker": "学生端预览",
     "cj.wd.0": "周一",
     "cj.wd.1": "周二",
     "cj.wd.2": "周三",
@@ -444,7 +494,6 @@ const COPY = {
     "cj.adminKicker": "管理",
     "cj.adminTitle": "内容管理",
     "cj.adminLead": "按日期和学科更新 CJ。学生在自己的课表里查看。",
-    "cj.code": "管理员口令",
     "cj.monday": "周一日期",
     "cj.daily": "每日 CJ",
     "cj.examTab": "考试安排",
@@ -457,6 +506,7 @@ const COPY = {
     "cj.noIc": "暂无 IC",
     "cj.updateExam": "更新考试安排",
     "cj.addExam": "添加考试安排",
+    "cj.newExam": "新建考试",
     "cj.time": "时间",
     "cj.examName": "考试名称",
     "cj.location": "地点",
@@ -464,6 +514,10 @@ const COPY = {
     "cj.saveExam": "保存考试安排",
     "cj.weekExams": "本周考试",
     "cj.noLocation": "未填写地点",
+    "cj.unassignedSubject": "未分配学科",
+    "cj.assignedSubject": "负责的 CJ 学科",
+    "cj.noAssignedSubject": "未分配学科",
+    "cj.legacyMultipleSubjects": "这个账号仍有旧版多学科分配，请选择一个学科并保存。",
     "cj.date": "日期",
     "cj.reading": "正在读取…",
     "cj.saved": "CJ 已保存",
@@ -471,6 +525,20 @@ const COPY = {
     "cj.saveFailed": "保存失败",
     "cj.loadFailed": "加载失败",
     "cj.offDay": "这一天没有课。",
+    "cj.checkingAccess": "正在检查 CJ 访问权限…",
+    "cj.teacherKicker": "老师端",
+    "cj.teacherTitle": "我的 CJ 学科",
+    "cj.teacherLead": "这里只能更新分配给你的学科；考试和其他学科不会出现在老师端。",
+    "cj.noAssignedSubjects": "尚未分配学科",
+    "cj.askAdminAssignment": "请让超级管理员先为你的账号分配学科，再编辑 CJ。",
+    "cj.myWeekEntries": "我负责的本周 CJ",
+    "cj.superAdminOnly": "只有超级管理员账号可以使用这个完整管理界面。",
+    "cj.teacherAssignments": "老师分配",
+    "cj.teacherAssignmentSaved": "老师学科分配已保存",
+    "cj.noTeachers": "还没有老师账号",
+    "cj.createTeacherHint": "请先到用户管理，把相应账号的角色改为老师。",
+    "cj.openUsers": "打开用户管理",
+    "cj.saveAssignment": "保存学科分配",
     "drafts.viewLive": "查看线上",
     "drafts.status.draft": "草稿",
     "drafts.status.published": "已发布",
@@ -482,7 +550,7 @@ const COPY = {
 const TERMS = {
   en: {
     title: "Terms",
-    lead: "Elegram is owned and operated by 广东智云建材有限公司. It is not a ticket office, and not a recommendation engine. Creating an account means you accept this agreement.",
+    lead: "Elegram is owned and operated by Guangdong Zhiyun Building Materials Co., Ltd. It is not a ticket office, and not a recommendation engine. Creating an account means you accept this agreement.",
     sections: [
       {
         heading: "Account and cybersecurity",
@@ -567,31 +635,18 @@ const TERMS = {
   },
 };
 
-function readLang() {
-  try {
-    return localStorage.getItem(STORAGE_KEY) === "zh" ? "zh" : "en";
-  } catch {
-    return "en";
-  }
-}
-
 const I18nContext = createContext(null);
 
 export function I18nProvider({ children }) {
-  const [lang, setLang] = useState(readLang);
+  const lang = "en";
 
   useEffect(() => {
-    document.documentElement.lang = lang === "zh" ? "zh-CN" : "en";
-    try {
-      localStorage.setItem(STORAGE_KEY, lang);
-    } catch {
-      /* private mode */
-    }
-  }, [lang]);
+    document.documentElement.lang = "en";
+  }, []);
 
   const value = useMemo(() => {
     function t(key, vars) {
-      const table = COPY[lang] || COPY.en;
+      const table = COPY.en;
       let text = table[key] ?? COPY.en[key] ?? key;
       if (vars) {
         for (const [name, value] of Object.entries(vars)) {
@@ -600,11 +655,8 @@ export function I18nProvider({ children }) {
       }
       return text;
     }
-    function toggleLang() {
-      setLang((current) => (current === "en" ? "zh" : "en"));
-    }
-    return { lang, t, toggleLang, terms: TERMS[lang] };
-  }, [lang]);
+    return { lang, t, terms: TERMS.en };
+  }, []);
 
   return <I18nContext.Provider value={value}>{children}</I18nContext.Provider>;
 }

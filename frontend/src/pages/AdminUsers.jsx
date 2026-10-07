@@ -8,6 +8,7 @@ import { useLiveRefresh } from "../live";
 
 const ROLES = [
   { value: "student", label: "Student" },
+  { value: "teacher", label: "Teacher" },
   { value: "editor", label: "Editor" },
   { value: "admin", label: "Admin" },
 ];

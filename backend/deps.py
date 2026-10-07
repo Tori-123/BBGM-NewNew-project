@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 
 from errors import StorageError, account_muted, forbidden, unauthenticated
 from models import User
-from schemas import MODERATOR_ROLES, NEWSROOM_ROLES
+from schemas import CJ_EDITOR_ROLES, CJ_VIEWER_ROLES, MODERATOR_ROLES, NEWSROOM_ROLES
 from security import COOKIE_NAME, unsign_cookie_value
 from store import get_session_by_token
 
@@ -72,5 +72,17 @@ def get_moderator(user: User = Depends(get_current_user)) -> User:
 
 def get_newsroom_user(user: User = Depends(get_current_user)) -> User:
     if user.role not in NEWSROOM_ROLES:
+        raise forbidden()
+    return user
+
+
+def get_cj_viewer(user: User = Depends(get_current_user)) -> User:
+    if user.role not in CJ_VIEWER_ROLES:
+        raise forbidden()
+    return user
+
+
+def get_cj_editor(user: User = Depends(get_current_user)) -> User:
+    if user.role not in CJ_EDITOR_ROLES:
         raise forbidden()
     return user

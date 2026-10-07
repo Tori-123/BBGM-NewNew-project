@@ -1053,48 +1053,141 @@ def test_news_block_position(tmp_path, monkeypatch):
     app.state.engine.dispose()
 
 
-def test_cj_is_public_and_writes_need_the_admin_code(tmp_path, monkeypatch):
-    monkeypatch.setenv("CJ_ADMIN_CODE", "CJ-DEMO")
-    app = _make_app(tmp_path, monkeypatch)
-    with TestClient(app) as client:
-        missing = client.get("/api/v1/cj")
-        assert missing.status_code == 422
+def test_cj_role_portals_and_subject_scoping(tmp_path, monkeypatch):
+    super_email = "sasha.lin@basischina.com"
+    app = _make_app(tmp_path, monkeypatch, admin_email=super_email)
+    with (
+        TestClient(app) as anonymous,
+        TestClient(app) as super_client,
+        TestClient(app) as student_client,
+        TestClient(app) as teacher_client,
+        TestClient(app) as admin_client,
+    ):
+        super_user = _register(super_client, super_email, "super-desk-41", "Sasha Lin")
+        student_user = _register(student_client, "mia.chen@basischina.com", "student-hall-42", "Mia Chen")
+        teacher_user = _register(teacher_client, "evan.wu@basischina.com", "teacher-lab-43", "Evan Wu")
+        admin_user = _register(admin_client, "noah.zhou@basischina.com", "admin-office-44", "Noah Zhou")
+        assert super_user.json()["role"] == "super_admin"
+        assert student_user.json()["role"] == "student"
 
-        week = client.get("/api/v1/cj?week_start=2026-10-05")
-        assert week.status_code == 200, week.text
-        body = week.json()
-        assert body["week_start"] == "2026-10-05"
-        assert body["subjects"]
-        assert body["entries"]
-        subject_id = body["subjects"][0]["id"]
-
-        denied = client.put(
-            "/api/v1/cj",
-            json={
-                "week_start": "2026-10-05",
-                "day_index": 0,
-                "subject_id": subject_id,
-                "ic": "Updated",
-                "hw": "Page 1",
-                "announcement": "",
-            },
+        teacher_id = teacher_user.json()["id"]
+        admin_id = admin_user.json()["id"]
+        promoted_teacher = super_client.patch(
+            f"/api/v1/admin/users/{teacher_id}", json={"role": "teacher"}
         )
-        assert denied.status_code == 401
+        promoted_admin = super_client.patch(
+            f"/api/v1/admin/users/{admin_id}", json={"role": "admin"}
+        )
+        assert promoted_teacher.status_code == 200, promoted_teacher.text
+        assert promoted_teacher.json()["role"] == "teacher"
+        assert promoted_admin.status_code == 200, promoted_admin.text
 
-        saved = client.put(
+        for client, email, password, expected_role in (
+            (student_client, "mia.chen@basischina.com", "student-hall-42", "student"),
+            (teacher_client, "evan.wu@basischina.com", "teacher-lab-43", "teacher"),
+            (admin_client, "noah.zhou@basischina.com", "admin-office-44", "admin"),
+        ):
+            assert client.post("/api/v1/auth/logout").status_code == 204
+            login = client.post("/api/v1/auth/login", json={"email": email, "password": password})
+            assert login.status_code == 200, login.text
+            assert login.json()["role"] == expected_role
+
+        assert anonymous.get("/api/v1/cj?week_start=2026-10-05").status_code == 401
+        assert admin_client.get("/api/v1/cj?week_start=2026-10-05").status_code == 403
+        assert admin_client.get("/api/v1/cj/teachers").status_code == 403
+        assert anonymous.put(
             "/api/v1/cj",
             headers={"X-CJ-Admin-Code": "CJ-DEMO"},
+            json={"week_start": "2026-10-05"},
+        ).status_code == 401
+
+        all_cj = super_client.get("/api/v1/cj?week_start=2026-10-05")
+        assert all_cj.status_code == 200, all_cj.text
+        all_subjects = all_cj.json()["subjects"]
+        assert len(all_subjects) > 1
+        assigned_subject = all_subjects[0]["id"]
+        other_subject = all_subjects[1]["id"]
+
+        assigned = super_client.put(
+            f"/api/v1/cj/teachers/{teacher_id}",
+            json={"subject_ids": [assigned_subject]},
+        )
+        assert assigned.status_code == 200, assigned.text
+        assert assigned.json()["subject_ids"] == [assigned_subject]
+
+        student_view = student_client.get("/api/v1/cj?week_start=2026-10-05")
+        teacher_view = teacher_client.get("/api/v1/cj?week_start=2026-10-05")
+        assert student_view.status_code == 200, student_view.text
+        assert teacher_view.status_code == 200, teacher_view.text
+        assert len(student_view.json()["subjects"]) == len(all_subjects)
+        assert [subject["id"] for subject in teacher_view.json()["subjects"]] == [assigned_subject]
+        assert all(exam["subject_id"] == assigned_subject for exam in teacher_view.json()["exams"])
+        assert all(entry["subject_id"] == assigned_subject for entry in teacher_view.json()["entries"])
+
+        multiple_assignment = super_client.put(
+            f"/api/v1/cj/teachers/{teacher_id}",
+            json={"subject_ids": [assigned_subject, other_subject]},
+        )
+        assert multiple_assignment.status_code == 422
+
+        entry = {
+            "week_start": "2026-10-05",
+            "day_index": 0,
+            "subject_id": assigned_subject,
+            "ic": "Role-scoped update",
+            "hw": "Page 1",
+            "announcement": "Bring a pencil",
+        }
+        assert student_client.put("/api/v1/cj", json=entry).status_code == 403
+        teacher_saved = teacher_client.put("/api/v1/cj", json=entry)
+        assert teacher_saved.status_code == 200, teacher_saved.text
+        assert teacher_client.put(
+            "/api/v1/cj", json={**entry, "subject_id": other_subject}
+        ).status_code == 403
+        teacher_exam = teacher_client.put(
+            "/api/v1/cj/exams",
             json={
                 "week_start": "2026-10-05",
-                "day_index": 0,
-                "subject_id": subject_id,
-                "ic": "Updated",
-                "hw": "Page 1",
-                "announcement": "Bring a pencil",
+                "day_index": 2,
+                "subject_id": assigned_subject,
+                "title": "Teacher subject quiz",
+                "time": "09:30",
+                "location": "Room 101",
+                "note": "",
             },
         )
-        assert saved.status_code == 200, saved.text
-        again = client.get("/api/v1/cj?week_start=2026-10-05")
-        match = next(item for item in again.json()["entries"] if item["subject_id"] == subject_id and item["day_index"] == 0)
-        assert match["ic"] == "Updated"
+        assert teacher_exam.status_code == 200, teacher_exam.text
+        assert teacher_client.put(
+            "/api/v1/cj/exams",
+            json={
+                "week_start": "2026-10-05",
+                "day_index": 2,
+                "subject_id": other_subject,
+                "title": "Outside assignment",
+                "time": "09:30",
+                "location": "Room 101",
+                "note": "",
+            },
+        ).status_code == 403
+
+        super_saved = super_client.put(
+            "/api/v1/cj", json={**entry, "subject_id": other_subject, "ic": "Super-admin update"}
+        )
+        assert super_saved.status_code == 200, super_saved.text
+        exam_saved = super_client.put(
+            "/api/v1/cj/exams",
+            json={
+                "week_start": "2026-10-05",
+                "day_index": 2,
+                "subject_id": other_subject,
+                "title": "Super-admin exam",
+                "time": "09:30",
+                "location": "Room 101",
+                "note": "Bring a calculator",
+            },
+        )
+        assert exam_saved.status_code == 200, exam_saved.text
+        refreshed_student = student_client.get("/api/v1/cj?week_start=2026-10-05")
+        assert any(exam["subject_id"] == assigned_subject for exam in refreshed_student.json()["exams"])
+        assert any(exam["subject_id"] == other_subject for exam in refreshed_student.json()["exams"])
     app.state.engine.dispose()

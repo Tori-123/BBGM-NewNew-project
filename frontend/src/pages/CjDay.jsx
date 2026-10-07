@@ -17,8 +17,8 @@ const ISO = /^\d{4}-\d{2}-\d{2}$/;
 export function CjWeekRedirect() {
   const [params] = useSearchParams();
   const start = params.get("start") || "";
-  const date = ISO.test(start) ? start : isoDate(new Date());
-  return <Navigate to={`/cj/day?date=${date}`} replace />;
+  const weekStart = ISO.test(start) ? isoDate(mondayOf(dateFromIso(start))) : isoDate(mondayOf(new Date()));
+  return <Navigate to={`/cj/student/week?start=${weekStart}`} replace />;
 }
 
 export default function CjDay() {
@@ -72,6 +72,7 @@ export default function CjDay() {
     [selected, subjectMap],
   );
   const exams = (data?.exams || []).filter((exam) => exam.day_index === dayIndex);
+  const examSubjectMap = new Map((data?.subjects || []).map((subject) => [subject.id, subject]));
 
   function saveSelection() {
     const next = normalizeSchedule(draftSelection, data?.subjects || []);
@@ -96,7 +97,7 @@ export default function CjDay() {
           <p className="mt-2 font-sans text-sm text-neutral-600">{t("cj.courses", { count: selectedSubjects.length })}</p>
         </div>
         <div className="flex flex-wrap items-center gap-3 font-sans text-[11px] uppercase tracking-[0.14em]">
-          <Link to="/cj" className="border border-black px-3 py-2 text-inherit no-underline">
+          <Link to="/cj/student" className="border border-black px-3 py-2 text-inherit no-underline">
             {t("cj.back")}
           </Link>
           <button
@@ -162,7 +163,9 @@ export default function CjDay() {
                   {exam.time}
                   {exam.location ? ` · ${exam.location}` : ""}
                 </p>
-                <h3 className="mt-1 font-sans text-sm font-semibold">{exam.title}</h3>
+                <h3 className="mt-1 font-sans text-sm font-semibold">
+                  {examTitle(exam, examSubjectMap)}
+                </h3>
                 {exam.note ? <p className="mt-1 font-sans text-sm text-neutral-600">{exam.note}</p> : null}
               </article>
             ))}
@@ -217,4 +220,11 @@ function Info({ label, value }) {
       <p className="whitespace-pre-wrap font-sans text-sm leading-5">{value || "—"}</p>
     </div>
   );
+}
+
+function examTitle(exam, subjectMap) {
+  const subject = subjectMap.get(exam.subject_id);
+  if (!subject) return exam.title;
+  if (exam.title.startsWith(subject.name) || exam.title.startsWith(subject.short_name)) return exam.title;
+  return `${subject.short_name} · ${exam.title}`;
 }

@@ -9,14 +9,16 @@ import {
   dateForDay,
   dateFromIso,
   defaultSchedule,
-  formatRange,
   isoDate,
   mondayIso,
   normalizeSchedule,
   weekNumber,
 } from "../cjDates";
+import { useI18n } from "../i18n";
+import { useLiveRefresh } from "../live";
 
-export default function CjWeek() {
+export default function CjWeek({ calendarPath = "/cj/student", previewMode = false }) {
+  const { lang, t } = useI18n();
   const [params, setParams] = useSearchParams();
   const startParam = params.get("start") || "";
   const initial = /^\d{4}-\d{2}-\d{2}$/.test(startParam) ? startParam : mondayIso();
@@ -40,15 +42,22 @@ export default function CjWeek() {
       setSelected(next);
       setDraftSelection(next);
     } catch (loadError) {
-      setError(loadError instanceof Error ? loadError.message : "CJ 暂时无法加载");
+      setError(loadError instanceof Error ? loadError.message : t("cj.loadError"));
     } finally {
       setLoading(false);
     }
-  }, [weekStart]);
+  }, [weekStart, t]);
 
   useEffect(() => {
     loadWeek();
   }, [loadWeek]);
+
+  const refreshWeek = useCallback(async () => {
+    const payload = await api.readCj(isoDate(weekStart));
+    setData(payload);
+  }, [weekStart]);
+
+  useLiveRefresh(Boolean(data) && !pickerOpen, refreshWeek);
 
   const subjectMap = useMemo(
     () => new Map((data?.subjects || []).map((subject) => [subject.id, subject])),
@@ -78,27 +87,30 @@ export default function CjWeek() {
     setPickerOpen(false);
   }
 
+  const range = formatWeekRange(weekStart, lang);
+
   return (
-    <section className="mt-8">
+    <section className="cj-week mt-8">
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <p className="font-sans text-[11px] uppercase tracking-[0.16em] text-[#1A4FBF]">
-            {weekStart.getFullYear()} · 第 {weekNumber(weekStart)} 周
+            {previewMode ? `${t("cj.studentPreviewKicker")} · ` : ""}
+            {t("cj.weekKicker", { year: weekStart.getFullYear(), week: weekNumber(weekStart) })}
           </p>
-          <h1 className="mt-2 font-serif text-4xl">本周 CJ</h1>
+          <h1 className="mt-2 font-serif text-4xl">{t("cj.weekTitle")}</h1>
           <p className="mt-2 font-sans text-sm text-neutral-600">
-            {formatRange(weekStart)} · 我的课表 {selectedSubjects.length} 门
+            {t("cj.weekSummary", { range, count: selectedSubjects.length })}
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-3 font-sans text-[11px] uppercase tracking-[0.14em]">
           <button type="button" onClick={() => moveWeek(-1)} className="border border-black px-3 py-2">
-            上一周
+            {t("cj.prevWeek")}
           </button>
-          <Link to="/cj" className="border border-black px-3 py-2 text-inherit no-underline">
-            选择其他周
+          <Link to={calendarPath} className="border border-black px-3 py-2 text-inherit no-underline">
+            {previewMode ? t("cj.adminKicker") : t("cj.chooseWeek")}
           </Link>
           <button type="button" onClick={() => moveWeek(1)} className="border border-black px-3 py-2">
-            下一周
+            {t("cj.nextWeek")}
           </button>
           <button
             type="button"
@@ -106,15 +118,15 @@ export default function CjWeek() {
             onClick={() => setPickerOpen((open) => !open)}
             className="bg-black px-3 py-2 text-white disabled:opacity-40"
           >
-            我的课程
+            {t("cj.myCourses")}
           </button>
         </div>
       </div>
 
       {pickerOpen ? (
         <div className="mt-6 border border-black p-4">
-          <h2 className="font-serif text-2xl">设置我的课表</h2>
-          <p className="mt-1 font-sans text-sm text-neutral-600">为 Period 1–8 分别选择课程。</p>
+          <h2 className="font-serif text-2xl">{t("cj.scheduleTitle")}</h2>
+          <p className="mt-1 font-sans text-sm text-neutral-600">{t("cj.scheduleHint")}</p>
           <div className="mt-4 grid gap-4 sm:grid-cols-2">
             {Array.from({ length: PERIOD_COUNT }, (_, index) => {
               const period = index + 1;
@@ -141,27 +153,27 @@ export default function CjWeek() {
             })}
           </div>
           <button type="button" onClick={saveSelection} className="mt-4 bg-black px-5 py-2 font-sans text-[11px] uppercase tracking-[0.16em] text-white">
-            保存课表
+            {t("cj.saveSchedule")}
           </button>
         </div>
       ) : null}
 
-      <ExamList exams={data?.exams || []} weekStart={weekStart} loading={loading} />
+      <ExamList exams={data?.exams || []} subjects={data?.subjects || []} weekStart={weekStart} loading={loading} />
 
       {error ? (
         <div className="mt-6 border border-black p-4">
           <p className="font-sans text-sm">{error}</p>
           <button type="button" onClick={loadWeek} className="mt-3 font-sans text-[11px] uppercase tracking-[0.14em] text-[#1A4FBF]">
-            重新加载
+            {t("cj.reload")}
           </button>
         </div>
       ) : (
-        <div className="mt-6 overflow-x-auto">
-          <div className="grid min-w-[880px] grid-cols-5 gap-3">
+        <div className="mt-6 overflow-x-auto border-y-2 border-black py-3">
+          <div className="grid min-w-[940px] grid-cols-5 gap-px bg-black">
             {WEEKDAYS.slice(0, 5).map((day, dayIndex) => (
               <DayColumn
                 key={day}
-                day={day}
+                day={t(`cj.weekday.${dayIndex}`)}
                 englishDay={WEEKDAY_SHORT[dayIndex]}
                 date={dateForDay(weekStart, dayIndex)}
                 dayIndex={dayIndex}
@@ -179,15 +191,15 @@ export default function CjWeek() {
 
 function DayColumn({ day, englishDay, date, dayIndex, subjects, entries, loading }) {
   return (
-    <section className="border border-black">
-      <header className="border-b border-black px-3 py-3">
+    <section className="bg-white">
+      <header className="border-b border-black px-3 py-2.5">
         <p className="font-sans text-[10px] uppercase tracking-[0.16em] text-[#1A4FBF]">{englishDay}</p>
         <h2 className="font-serif text-2xl">{day}</h2>
         <p className="font-sans text-xs text-neutral-500">
           {date.getMonth() + 1}/{date.getDate()}
         </p>
       </header>
-      <div className="grid gap-3 p-3">
+      <div className="grid gap-px bg-neutral-200">
         {loading
           ? Array.from({ length: 4 }, (_, index) => <div key={index} className="h-24 border border-neutral-200" />)
           : subjects.map((subject) => {
@@ -201,7 +213,7 @@ function DayColumn({ day, englishDay, date, dayIndex, subjects, entries, loading
 
 function CourseCard({ subject, entry }) {
   return (
-    <article className="border border-neutral-300 p-3">
+    <article className="min-h-[142px] bg-white p-3">
       <div className="flex items-start gap-2">
         <span className="bg-black px-1.5 py-0.5 font-sans text-[10px] text-white">P{subject.period}</span>
         <div>
@@ -225,13 +237,15 @@ function Info({ label, value }) {
   );
 }
 
-function ExamList({ exams, weekStart, loading }) {
+function ExamList({ exams, subjects, weekStart, loading }) {
+  const { t } = useI18n();
+  const subjectMap = new Map(subjects.map((subject) => [subject.id, subject]));
   return (
     <section className="mt-6 border border-black p-4">
       <p className="font-sans text-[11px] uppercase tracking-[0.16em] text-[#1A4FBF]">Exams</p>
-      <h2 className="font-serif text-2xl">本周考试时间</h2>
+      <h2 className="font-serif text-2xl">{t("cj.weekExamsTitle")}</h2>
       {loading ? (
-        <p className="mt-3 font-sans text-sm text-neutral-500">正在读取考试安排…</p>
+        <p className="mt-3 font-sans text-sm text-neutral-500">{t("cj.examsLoading")}</p>
       ) : exams.length ? (
         <div className="mt-4 grid gap-3">
           {exams.map((exam) => {
@@ -239,18 +253,34 @@ function ExamList({ exams, weekStart, loading }) {
             return (
               <article key={exam.id} className="border-t border-neutral-200 pt-3">
                 <p className="font-sans text-[11px] uppercase tracking-[0.14em] text-neutral-500">
-                  {WEEKDAYS[exam.day_index]} · {date.getMonth() + 1}/{date.getDate()} · {exam.time}
+                  {t(`cj.weekday.${exam.day_index}`)} · {date.getMonth() + 1}/{date.getDate()} · {exam.time}
                   {exam.location ? ` · ${exam.location}` : ""}
                 </p>
-                <h3 className="mt-1 font-sans text-sm font-semibold">{exam.title}</h3>
+                <h3 className="mt-1 font-sans text-sm font-semibold">{examDisplayTitle(exam, subjectMap)}</h3>
                 {exam.note ? <p className="mt-1 font-sans text-sm text-neutral-600">{exam.note}</p> : null}
               </article>
             );
           })}
         </div>
       ) : (
-        <p className="mt-3 font-sans text-sm text-neutral-500">这一周暂时没有考试安排</p>
+        <p className="mt-3 font-sans text-sm text-neutral-500">{t("cj.weekExamsEmpty")}</p>
       )}
     </section>
   );
+}
+
+function examDisplayTitle(exam, subjectMap) {
+  const subject = subjectMap.get(exam.subject_id);
+  if (!subject) return exam.title;
+  if (exam.title.startsWith(subject.name) || exam.title.startsWith(subject.short_name)) return exam.title;
+  return `${subject.short_name} · ${exam.title}`;
+}
+
+function formatWeekRange(weekStart, lang) {
+  const end = dateForDay(weekStart, 4);
+  if (lang === "zh") {
+    return `${weekStart.getMonth() + 1}月${weekStart.getDate()}日 – ${end.getMonth() + 1}月${end.getDate()}日`;
+  }
+  const formatter = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric" });
+  return `${formatter.format(weekStart)} – ${formatter.format(end)}`;
 }

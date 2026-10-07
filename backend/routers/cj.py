@@ -1,20 +1,18 @@
-import hmac
 import re
 from uuid import uuid4
 
-from fastapi import APIRouter, Depends, Header, Request
-from sqlalchemy import func, select
+from fastapi import APIRouter, Depends
+from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session
 
-from deps import get_db
-from errors import ApiError, validation_error
-from models import CJEntry, Exam, Subject, to_iso, utc_now
+from deps import get_cj_editor, get_cj_viewer, get_db, get_super_admin
+from errors import ApiError, forbidden, validation_error
+from models import CJEntry, CJTeacherSubject, Exam, Subject, User, to_iso, utc_now
 
 router = APIRouter()
 
 _WEEK = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 _TIME = re.compile(r"^\d{2}:\d{2}$")
-_LOCAL_CODE = "CJ-DEMO"
 
 _SUBJECTS = [
     ("ap-calculus", "AP Calculus AB", "AP Cal AB", "#2563eb", 1, 1),
@@ -62,27 +60,9 @@ _SAMPLE_ENTRIES = [
 ]
 
 _SAMPLE_EXAMS = [
-    (2, "AP Calculus AB · Unit Quiz", "10:05", "Room 402", "Related rates and implicit differentiation"),
-    (4, "AP Economics · Unit 2 Exam", "13:35", "Room 305", "Bring a calculator"),
+    (2, "ap-calculus", "Unit Quiz", "10:05", "Room 402", "Related rates and implicit differentiation"),
+    (4, "ap-economics", "Unit 2 Exam", "13:35", "Room 305", "Bring a calculator"),
 ]
-
-
-def _same(left: str, right: str) -> bool:
-    if len(left) != len(right):
-        return False
-    return hmac.compare_digest(left, right)
-
-
-def _require_admin(request: Request, code: str | None) -> None:
-    provided = (code or "").strip()
-    configured = request.app.state.settings.cj_admin_code
-    if configured:
-        ok = _same(provided, configured)
-    else:
-        host = request.url.hostname
-        ok = host in {"localhost", "127.0.0.1"} and _same(provided, _LOCAL_CODE)
-    if not ok:
-        raise ApiError(401, "unauthenticated", "The CJ admin code is incorrect.")
 
 
 def _week_or_error(value: str) -> str:
@@ -166,12 +146,13 @@ def _ensure_seed(db: Session, week_start: str) -> None:
     exam_total = db.scalar(select(func.count()).select_from(Exam)) or 0
     if exam_total == 0:
         for index, exam in enumerate(_SAMPLE_EXAMS):
-            day_index, title, time, location, note = exam
+            day_index, subject_id, title, time, location, note = exam
             db.add(
                 Exam(
                     id=f"exam-sample-{index + 1}",
                     week_start=week_start,
                     day_index=day_index,
+                    subject_id=subject_id,
                     title=title,
                     time=time,
                     location=location,
@@ -210,6 +191,7 @@ def _exam_payload(row: Exam) -> dict:
         "id": row.id,
         "week_start": row.week_start,
         "day_index": row.day_index,
+        "subject_id": row.subject_id,
         "title": row.title,
         "time": row.time,
         "location": row.location,
@@ -218,19 +200,58 @@ def _exam_payload(row: Exam) -> dict:
     }
 
 
+def _teacher_subject_ids(db: Session, user_id: str) -> list[str]:
+    return list(
+        db.scalars(
+            select(CJTeacherSubject.subject_id)
+            .where(CJTeacherSubject.user_id == user_id)
+            .order_by(CJTeacherSubject.subject_id)
+        ).all()
+    )
+
+
+def _teacher_payload(db: Session, user: User) -> dict:
+    return {
+        "id": user.id,
+        "email": user.email,
+        "display_name": user.display_name,
+        "subject_ids": _teacher_subject_ids(db, user.id),
+    }
+
+
 @router.get("/cj")
-def read_cj(week_start: str = "", db: Session = Depends(get_db)):
+def read_cj(
+    week_start: str = "",
+    user: User = Depends(get_cj_viewer),
+    db: Session = Depends(get_db),
+):
     week = _week_or_error(week_start)
     _ensure_seed(db, week)
-    subjects = db.scalars(select(Subject).order_by(Subject.sort_order, Subject.name)).all()
-    entries = db.scalars(
+    subject_query = select(Subject).order_by(Subject.sort_order, Subject.name)
+    entry_query = (
         select(CJEntry)
         .where(CJEntry.week_start == week)
         .order_by(CJEntry.day_index, CJEntry.period)
-    ).all()
-    exams = db.scalars(
-        select(Exam).where(Exam.week_start == week).order_by(Exam.day_index, Exam.time)
-    ).all()
+    )
+    if user.role == "teacher":
+        subject_ids = _teacher_subject_ids(db, user.id)
+        if subject_ids:
+            subjects = db.scalars(subject_query.where(Subject.id.in_(subject_ids))).all()
+            entries = db.scalars(entry_query.where(CJEntry.subject_id.in_(subject_ids))).all()
+        else:
+            subjects = []
+            entries = []
+        exams = db.scalars(
+            select(Exam)
+            .where(Exam.week_start == week, Exam.subject_id.in_(subject_ids))
+            .order_by(Exam.day_index, Exam.time)
+        ).all() if subject_ids else []
+    else:
+        subjects = db.scalars(subject_query).all()
+        entries = db.scalars(entry_query).all()
+        exams = db.scalars(
+            select(Exam).where(Exam.week_start == week).order_by(Exam.day_index, Exam.time)
+        ).all()
     return {
         "week_start": week,
         "subjects": [_subject_payload(row) for row in subjects],
@@ -241,12 +262,10 @@ def read_cj(week_start: str = "", db: Session = Depends(get_db)):
 
 @router.put("/cj")
 def save_cj(
-    request: Request,
     body: dict,
+    user: User = Depends(get_cj_editor),
     db: Session = Depends(get_db),
-    x_cj_admin_code: str | None = Header(default=None),
 ):
-    _require_admin(request, x_cj_admin_code)
     week = _week_or_error(str(body.get("week_start") or ""))
     subject_id = str(body.get("subject_id") or "").strip()
     day_index = body.get("day_index")
@@ -266,6 +285,8 @@ def save_cj(
     subject = db.get(Subject, subject_id)
     if subject is None:
         raise ApiError(404, "not_found", "Subject not found.")
+    if user.role == "teacher" and subject_id not in _teacher_subject_ids(db, user.id):
+        raise forbidden("Teachers may only update subjects assigned to them.")
     existing = _slot(db, week, day_index, subject.period, subject_id)
     updated_at = to_iso(utc_now())
     if existing is None:
@@ -292,19 +313,20 @@ def save_cj(
 
 @router.put("/cj/exams")
 def save_exam(
-    request: Request,
     body: dict,
+    user: User = Depends(get_cj_editor),
     db: Session = Depends(get_db),
-    x_cj_admin_code: str | None = Header(default=None),
 ):
-    _require_admin(request, x_cj_admin_code)
     week = _week_or_error(str(body.get("week_start") or ""))
     day_index = body.get("day_index")
+    subject_id = str(body.get("subject_id") or "").strip()
     title = str(body.get("title") or "").strip()
     time = str(body.get("time") or "").strip()
     location = str(body.get("location") or "").strip()
     note = str(body.get("note") or "").strip()
     fields = []
+    if not subject_id:
+        fields.append({"field": "subject_id", "message": "Choose a subject."})
     if not isinstance(day_index, int) or isinstance(day_index, bool) or day_index < 0 or day_index > 4:
         fields.append({"field": "day_index", "message": "Choose Monday through Friday."})
     if not title:
@@ -316,14 +338,24 @@ def save_exam(
     if fields:
         raise validation_error(fields)
 
+    subject = db.get(Subject, subject_id)
+    if subject is None:
+        raise ApiError(404, "not_found", "Subject not found.")
+    assigned_ids = _teacher_subject_ids(db, user.id) if user.role == "teacher" else []
+    if user.role == "teacher" and subject_id not in assigned_ids:
+        raise forbidden("Teachers may only manage exams for their assigned subject.")
+
     exam_id = str(body.get("id") or "").strip() or str(uuid4())
     updated_at = to_iso(utc_now())
     row = db.get(Exam, exam_id)
+    if row is not None and user.role == "teacher" and row.subject_id not in assigned_ids:
+        raise forbidden("Teachers may only update exams for their assigned subject.")
     if row is None:
         row = Exam(
             id=exam_id,
             week_start=week,
             day_index=day_index,
+            subject_id=subject_id,
             title=title,
             time=time,
             location=location,
@@ -334,6 +366,7 @@ def save_exam(
     else:
         row.week_start = week
         row.day_index = day_index
+        row.subject_id = subject_id
         row.title = title
         row.time = time
         row.location = location
@@ -341,3 +374,50 @@ def save_exam(
         row.updated_at = updated_at
     db.flush()
     return {"id": row.id, "updated_at": updated_at}
+
+
+@router.get("/cj/teachers")
+def list_cj_teachers(
+    _: User = Depends(get_super_admin),
+    db: Session = Depends(get_db),
+):
+    teachers = db.scalars(
+        select(User).where(User.role == "teacher").order_by(User.display_name, User.email)
+    ).all()
+    return {"items": [_teacher_payload(db, teacher) for teacher in teachers]}
+
+
+@router.put("/cj/teachers/{teacher_id}")
+def assign_cj_teacher_subjects(
+    teacher_id: str,
+    body: dict,
+    _: User = Depends(get_super_admin),
+    db: Session = Depends(get_db),
+):
+    teacher = db.get(User, teacher_id)
+    if teacher is None or teacher.role != "teacher":
+        raise ApiError(404, "not_found", "Teacher not found.")
+
+    raw_ids = body.get("subject_ids")
+    if not isinstance(raw_ids, list) or any(not isinstance(value, str) for value in raw_ids):
+        raise validation_error([{"field": "subject_ids", "message": "Choose one subject."}])
+    subject_ids = list(dict.fromkeys(value.strip() for value in raw_ids if value.strip()))
+    if len(subject_ids) > 1:
+        raise validation_error([{"field": "subject_ids", "message": "Each teacher can manage one CJ subject."}])
+    existing_ids = set(
+        db.scalars(select(Subject.id).where(Subject.id.in_(subject_ids))).all()
+    ) if subject_ids else set()
+    if len(existing_ids) != len(subject_ids):
+        raise validation_error([{"field": "subject_ids", "message": "One or more subjects do not exist."}])
+
+    db.execute(delete(CJTeacherSubject).where(CJTeacherSubject.user_id == teacher.id))
+    for subject_id in subject_ids:
+        db.add(
+            CJTeacherSubject(
+                id=str(uuid4()),
+                user_id=teacher.id,
+                subject_id=subject_id,
+            )
+        )
+    db.flush()
+    return _teacher_payload(db, teacher)

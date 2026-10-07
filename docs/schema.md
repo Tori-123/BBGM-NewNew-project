@@ -103,7 +103,7 @@ Content-Type: application/json
 | `id` | string | |
 | `email` | string | |
 | `display_name` | string | |
-| `role` | string | `student` \| `editor` \| `admin` \| `super_admin` |
+| `role` | string | `student` \| `teacher` \| `editor` \| `admin` \| `super_admin` |
 | `avatar` | string | 同 AuthorPublic |
 | `muted` | boolean | 是否禁言。注册默认为 `false`。禁言后仍可登录 |
 | `terms_accepted_at` | string \| null | 同意用户协议的时间，UTC ISO 8601 带 `Z`。注册成功时由服务端写入。协议上线前已存在的账号为 `null`。客户端不能指定该时间 |
@@ -720,13 +720,13 @@ Forum 详情停留时可重复请求本接口（间隔与列表相同），合�
 #### `PATCH /api/v1/admin/users/{user_id}`
 
 - **鉴权：** 是（须 `super_admin`）
-- **职责：** 将目标设为 `student`、`editor` 或 `admin`，和 / 或禁言、解除。不废除会话。
+- **职责：** 将目标设为 `student`、`teacher`、`editor` 或 `admin`，和 / 或禁言、解除。不废除会话。
 
 **Request body**
 
 | 字段 | 类型 | 必填 | 约束 |
 | --- | --- | --- | --- |
-| `role` | string | 否 | 若出现：仅 `student` \| `editor` \| `admin` |
+| `role` | string | 否 | 若出现：仅 `student` \| `teacher` \| `editor` \| `admin` |
 | `muted` | boolean | 否 | `true` 禁言；`false` 解除。与 `role` 至少出现一个 |
 
 **Response**
@@ -776,7 +776,12 @@ Forum 详情停留时可重复请求本接口（间隔与列表相同），合�
 
 ### 1.7 CJ
 
-与 Forum 平级的课表，不是帖子栏目。`category` 枚举不含 `cj`。读接口公开。写接口不看 `scoop_session`，看请求头 `X-CJ-Admin-Code`。口令来自环境变量 `CJ_ADMIN_CODE`。该变量为空且请求主机是 `localhost` 或 `127.0.0.1` 时，本地口令 `CJ-DEMO` 可用。
+与 Forum 平级的课表，不是帖子栏目。`category` 枚举不含 `cj`。全部接口使用 `scoop_session` 登录会话，不再使用共享 CJ 口令。
+
+- `student`：读取全部学科、CJ 与考试，用于组成自己的 Period 1–8；不能写。
+- `teacher`：只读取和更新 `CJTeacherSubject` 分配给自己的唯一学科，包括该学科的 CJ 与考试。
+- `super_admin`：读取和修改全部 CJ、考试与老师学科分配。
+- `editor` / 普通 `admin`：无 CJ 接口权限。
 
 学科目录由服务端准备。学生把学科放进 Period 1–8 的选择只留在浏览器，不写入本接口。
 
@@ -811,7 +816,8 @@ Forum 详情停留时可重复请求本接口（间隔与列表相同），合�
     "id": "exam-sample-1",
     "week_start": "2026-10-05",
     "day_index": 2,
-    "title": "AP Calculus AB · Unit Quiz",
+    "subject_id": "ap-calculus",
+    "title": "Unit Quiz",
     "time": "10:05",
     "location": "Room 402",
     "note": "Related rates",
@@ -822,6 +828,8 @@ Forum 详情停留时可重复请求本接口（间隔与列表相同），合�
 
 `day_index`：0 周一 … 4 周五。
 
+- `401` `unauthenticated`
+- `403` `forbidden`（角色无 CJ 权限）
 - `422` `validation_error`（`week_start` 非法或缺失）
 - `503` `storage_unavailable`
 
@@ -843,7 +851,8 @@ Forum 详情停留时可重复请求本接口（间隔与列表相同），合�
 **Response**
 
 - `200` `{ "id", "updated_at" }`
-- `401` `unauthenticated`（口令不对）
+- `401` `unauthenticated`
+- `403` `forbidden`（学生、普通管理角色，或老师写未分配学科）
 - `404` `not_found`（学科不存在）
 - `422` `validation_error`
 - `503` `storage_unavailable`
@@ -857,6 +866,7 @@ Forum 详情停留时可重复请求本接口（间隔与列表相同），合�
 | `id` | string | 否 | 空则新建；有则覆盖该条 |
 | `week_start` | string | 是 | `YYYY-MM-DD` |
 | `day_index` | integer | 是 | 0–4 |
+| `subject_id` | string | 是 | 已有学科；老师只能选分配给自己的学科 |
 | `title` | string | 是 | 去空白后 1–800 |
 | `time` | string | 是 | `HH:MM` |
 | `location` | string | 否 | ≤800 |
@@ -866,8 +876,24 @@ Forum 详情停留时可重复请求本接口（间隔与列表相同），合�
 
 - `200` `{ "id", "updated_at" }`
 - `401` `unauthenticated`
+- `403` `forbidden`（学生、普通管理角色，或老师写入未分配学科）
+- `404` `not_found`（学科不存在）
 - `422` `validation_error`
 - `503` `storage_unavailable`
+
+#### `GET /api/v1/cj/teachers`
+
+仅 `super_admin`。返回所有 `teacher` 账号以及每人的 `subject_ids`，供完整管理端配置。
+
+#### `PUT /api/v1/cj/teachers/{teacher_id}`
+
+仅 `super_admin`。Body 为 `{ "subject_ids": ["ap-calculus"] }`，整体替换该老师唯一可读写的 CJ 学科；数组允许为空，但最多一个元素。
+
+- `200` `{ "id", "email", "display_name", "subject_ids" }`
+- `401` `unauthenticated`
+- `403` `forbidden`
+- `404` `not_found`（账号不存在或不是老师）
+- `422` `validation_error`（学科不存在或格式错误）
 
 ---
 

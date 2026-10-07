@@ -15,6 +15,7 @@ from models import (
     Post,
     PostLike,
     SessionRecord,
+    CJTeacherSubject,
     SystemNotice,
     User,
     utc_now,
@@ -307,6 +308,7 @@ def delete_user_account(db: Session, user: User) -> list[str]:
             db.execute(delete(Comment).where(Comment.id.in_(floor_ids)))
         db.execute(delete(PostLike).where(PostLike.user_id == user_id))
         db.execute(delete(AuditEvent).where(AuditEvent.actor_id == user_id))
+        db.execute(delete(CJTeacherSubject).where(CJTeacherSubject.user_id == user_id))
         db.execute(delete(SessionRecord).where(SessionRecord.user_id == user_id))
         db.delete(user)
         db.flush()

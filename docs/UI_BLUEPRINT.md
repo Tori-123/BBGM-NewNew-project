@@ -15,10 +15,14 @@
 | `/news/drafts` | News 草稿 | 需 `editor` 或 `super_admin` | `GET/POST /api/v1/news/drafts` 与板块提交、同意、退回 |
 | `/sports` | 旧路径 | — | 重定向到 `/` |
 | `/forum` | Forum 卡片列表 | 公开 | `GET /api/v1/posts?category=forum`；绑 `author.avatar` `title` `author.display_name` `excerpt` `created_at` `images[0]` `reply_count` `like_count` `liked`。气泡进详情；拇指赞/取消 |
-| `/cj` | CJ 月历 | 公开 | 不请求帖子。每一天单独链到 `/cj/day?date=`。「查看今天」打开当天 |
-| `/cj/day` | CJ 单日 | 公开 | `GET /api/v1/cj?week_start=` 取该日所在周的周一，只渲染这一天的课程和当天考试。没有前一天 / 下一天。Period 选择存在浏览器本地，不进接口 |
-| `/cj/week` | 旧路径 | — | 转到 `/cj/day?date=`，`start` 作为那一天；没有 `start` 时用今天 |
-| `/cj/admin` | CJ 管理 | 口令，不要求登录 | 读同上。`PUT /api/v1/cj` 与 `PUT /api/v1/cj/exams`，请求头 `X-CJ-Admin-Code` |
+| `/cj` | CJ 角色入口 | 需登录 | `student` → `/cj/student`；`teacher` → `/cj/teacher`；`super_admin` → `/cj/admin`；其他角色回首页 |
+| `/cj/student` | 学生端月历 | 需 `student` | 每一行整周链到 `/cj/student/week?start=`；Period 选择存在浏览器本地 |
+| `/cj/student/week` | 学生端周视图 | 需 `student` | `GET /api/v1/cj?week_start=`，周一至周五五列同时展示 Period 1–8，并单列考试安排 |
+| `/cj/student/day` | 学生端旧单日页 | 需 `student` | 保留旧链接兼容，不作为月历主入口 |
+| `/cj/teacher` | 老师端 | 需 `teacher` | 只读取和写入超级管理员分配给该老师的唯一学科，包括该学科 CJ 与考试；不显示其他学科 |
+| `/cj/admin` | CJ 完整管理端 | 仅 `super_admin` | 管理全部 CJ、考试与老师学科分配；不再使用共享口令 |
+| `/cj/admin/student-preview` | 学生端只读预览 | 仅 `super_admin` | 与学生周视图读取同一份 CJ，供管理端在独立标签页验证保存结果；不放宽学生端路由权限 |
+| `/cj/day` `/cj/week` | 旧路径 | 需 `student` | `/cj/week` 转到学生端周视图；`/cj/day` 保留单日兼容页 |
 | `/opinion` | 栏目占位 | 公开 | **不请求** `category=opinion`（枚举外会 422）。固定空态。 |
 | `/community` `/submit` | 旧路径 | — | 重定向到 `/forum` |
 | `/dorm-life` `/events` `/photo` | 旧路径 | — | 重定向到 `/` |
@@ -203,7 +207,7 @@ Photo of the Day / Track of the Day / Student Art：静态标题+空图框+固�
 
 | 状态 | 表现 |
 | --- | --- |
-| 成功 | 行：`display_name` `email` `role` `muted`。不展示 `terms_accepted_at`。不是自己、也不是 `super_admin` 时：可设为 Student / Editor / Admin，显示 `Mute` 或 `Unmute`（看 `muted`），以及 `Delete user`。 |
+| 成功 | 行：`display_name` `email` `role` `muted`。不展示 `terms_accepted_at`。不是自己、也不是 `super_admin` 时：可设为 Student / Teacher / Editor / Admin，显示 `Mute` 或 `Unmute`（看 `muted`），以及 `Delete user`。 |
 | 禁言 | `PATCH` body `{ "muted": true }`。成功行更新。对方仍可登录；发帖时见 `account_muted`。 |
 | 删除 | 确认后 `DELETE /api/v1/admin/users/{id}`。成功后该行消失。 |
 | 错误 | `ErrorBanner` ← `error.message`。 |

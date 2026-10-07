@@ -148,6 +148,17 @@ class Subject(Base):
     sort_order: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
 
 
+class CJTeacherSubject(Base):
+    __tablename__ = "cj_teacher_subjects"
+    __table_args__ = (
+        UniqueConstraint("user_id", "subject_id", name="uq_cj_teacher_subject"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id"), nullable=False)
+    subject_id: Mapped[str] = mapped_column(ForeignKey("subjects.id"), nullable=False)
+
+
 class Exam(Base):
     __tablename__ = "exams"
     __table_args__ = (Index("idx_exams_week_day", "week_start", "day_index"),)
@@ -155,6 +166,7 @@ class Exam(Base):
     id: Mapped[str] = mapped_column(String(36), primary_key=True)
     week_start: Mapped[str] = mapped_column(String(10), nullable=False)
     day_index: Mapped[int] = mapped_column(Integer, nullable=False)
+    subject_id: Mapped[str | None] = mapped_column(ForeignKey("subjects.id"), nullable=True)
     title: Mapped[str] = mapped_column(Text, nullable=False)
     time: Mapped[str] = mapped_column(String(5), nullable=False)
     location: Mapped[str] = mapped_column(Text, nullable=False, default="")
@@ -323,6 +335,18 @@ def migrate_schema(engine) -> None:
                     "WHERE is_activity != 0 OR starts_at IS NOT NULL OR location IS NOT NULL"
                 )
                 _drop_sports_and_backfill_blocks(conn)
+            if "exams" in tables:
+                exam_cols = {
+                    row[1] for row in conn.exec_driver_sql("PRAGMA table_info(exams)").fetchall()
+                }
+                if "subject_id" not in exam_cols:
+                    conn.exec_driver_sql("ALTER TABLE exams ADD COLUMN subject_id VARCHAR(64)")
+                conn.exec_driver_sql(
+                    "UPDATE exams SET subject_id='ap-calculus' "
+                    "WHERE subject_id IS NULL AND title LIKE 'AP Calculus AB%'")
+                conn.exec_driver_sql(
+                    "UPDATE exams SET subject_id='ap-economics' "
+                    "WHERE subject_id IS NULL AND title LIKE 'AP Economics%'")
 
 
 def init_db(engine) -> None:

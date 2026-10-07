@@ -78,7 +78,7 @@ def patch_user_role(
         )
     if body.role is not None and body.role not in ASSIGNABLE_ROLES:
         raise validation_error(
-            [{"field": "role", "message": "Must be one of: student, editor, admin."}]
+            [{"field": "role", "message": "Must be one of: student, teacher, editor, admin."}]
         )
     target = _load_target(db, user_id)
     if target.role == "super_admin":

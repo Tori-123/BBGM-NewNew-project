@@ -63,7 +63,7 @@ const NAV_KEYS = {
 
 export default function PaperShell() {
   const { user, signOut } = useAuth();
-  const { lang, t, toggleLang } = useI18n();
+  const { lang, t } = useI18n();
   const location = useLocation();
   const barRef = useRef(null);
   const [query, setQuery] = useState("");
@@ -134,17 +134,6 @@ export default function PaperShell() {
                 <Link role="menuitem" to="/contact" className={menuItemClass}>
                   {t("shell.contact")}
                 </Link>
-                <button
-                  type="button"
-                  role="menuitem"
-                  className={menuItemClass}
-                  onClick={() => {
-                    toggleLang();
-                    setOpenMenu(null);
-                  }}
-                >
-                  {lang === "en" ? "中文" : "English"}
-                </button>
               </BarMenu>
               {user ? (
                 <BarMenu
@@ -228,7 +217,7 @@ export default function PaperShell() {
               {t("shell.ownedBy")}
             </p>
             <p className="mt-[3px] font-sans text-[10px] font-normal tracking-[0.01em] text-neutral-500">
-              广东智云建材有限公司
+              Guangdong Zhiyun Building Materials Co., Ltd.
             </p>
           </div>
         </header>
