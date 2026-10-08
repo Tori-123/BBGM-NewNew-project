@@ -1104,7 +1104,11 @@ def test_cj_role_portals_and_subject_scoping(tmp_path, monkeypatch):
         all_cj = super_client.get("/api/v1/cj?week_start=2026-10-05")
         assert all_cj.status_code == 200, all_cj.text
         all_subjects = all_cj.json()["subjects"]
-        assert len(all_subjects) > 1
+        assert len(all_subjects) == 19
+        assert {subject["grade"] for subject in all_subjects} == {11}
+        assert {subject["class_section"] for subject in all_subjects} == {"Ac", "Mc", "All"}
+        assert any(subject["default_period"] == 11 for subject in all_subjects)
+        assert all("teacher" in subject and "room" in subject for subject in all_subjects)
         assigned_subject = all_subjects[0]["id"]
         other_subject = all_subjects[1]["id"]
 
@@ -1190,4 +1194,20 @@ def test_cj_role_portals_and_subject_scoping(tmp_path, monkeypatch):
         refreshed_student = student_client.get("/api/v1/cj?week_start=2026-10-05")
         assert any(exam["subject_id"] == assigned_subject for exam in refreshed_student.json()["exams"])
         assert any(exam["subject_id"] == other_subject for exam in refreshed_student.json()["exams"])
+
+        new_course = {
+            "name": "AP Environmental Science",
+            "short_name": "APES",
+            "grade": 11,
+            "class_section": "All",
+            "default_period": 9,
+            "teacher": "Demo Teacher",
+            "room": "E401",
+        }
+        assert teacher_client.post("/api/v1/cj/subjects", json=new_course).status_code == 403
+        created_course = super_client.post("/api/v1/cj/subjects", json=new_course)
+        assert created_course.status_code == 201, created_course.text
+        assert created_course.json()["is_custom"] is True
+        after_course = student_client.get("/api/v1/cj?week_start=2026-10-05")
+        assert any(subject["short_name"] == "APES" for subject in after_course.json()["subjects"])
     app.state.engine.dispose()

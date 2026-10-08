@@ -9,7 +9,8 @@ import ChangePassword from "./pages/ChangePassword";
 import Category, { StaticCategory } from "./pages/Category";
 import CjAdmin from "./pages/CjAdmin";
 import CjPortal, { RequireCjRole } from "./pages/CjAccess";
-import CjDay, { CjWeekRedirect } from "./pages/CjDay";
+import CjCourseDetail from "./pages/CjCourseDetail";
+import CjDay from "./pages/CjDay";
 import CjMonth from "./pages/CjMonth";
 import CjTeacher from "./pages/CjTeacher";
 import CjWeek from "./pages/CjWeek";
@@ -37,14 +38,17 @@ export default function App() {
             <Route path="/sports" element={<Navigate to="/" replace />} />
             <Route path="/forum" element={<Category category="forum" title="Forum" />} />
             <Route path="/cj" element={<CjPortal />} />
-            <Route path="/cj/student" element={<RequireCjRole roles={["student"]}><CjMonth /></RequireCjRole>} />
+            <Route path="/cj/student" element={<RequireCjRole roles={["student"]}><CjWeek /></RequireCjRole>} />
+            <Route path="/cj/student/calendar" element={<RequireCjRole roles={["student"]}><CjMonth /></RequireCjRole>} />
             <Route path="/cj/student/week" element={<RequireCjRole roles={["student"]}><CjWeek /></RequireCjRole>} />
             <Route path="/cj/student/day" element={<RequireCjRole roles={["student"]}><CjDay /></RequireCjRole>} />
+            <Route path="/cj/student/course" element={<RequireCjRole roles={["student"]}><CjCourseDetail /></RequireCjRole>} />
             <Route path="/cj/day" element={<RequireCjRole roles={["student"]}><CjDay /></RequireCjRole>} />
-            <Route path="/cj/week" element={<RequireCjRole roles={["student"]}><CjWeekRedirect /></RequireCjRole>} />
+            <Route path="/cj/week" element={<RequireCjRole roles={["student"]}><CjWeek /></RequireCjRole>} />
             <Route path="/cj/teacher" element={<RequireCjRole roles={["teacher"]}><CjTeacher /></RequireCjRole>} />
             <Route path="/cj/admin" element={<RequireCjRole roles={["super_admin"]}><CjAdmin /></RequireCjRole>} />
-            <Route path="/cj/admin/student-preview" element={<RequireCjRole roles={["super_admin"]}><CjWeek calendarPath="/cj/admin" previewMode /></RequireCjRole>} />
+            <Route path="/cj/admin/student-preview" element={<RequireCjRole roles={["super_admin"]}><CjDay portal="admin" calendarPath="/cj/admin" weekPath="/cj/admin" detailPath="/cj/admin/student-preview/course" /></RequireCjRole>} />
+            <Route path="/cj/admin/student-preview/course" element={<RequireCjRole roles={["super_admin"]}><CjCourseDetail portal="admin" backPath="/cj/admin/student-preview" /></RequireCjRole>} />
             <Route path="/opinion" element={<StaticCategory title="Opinion" />} />
             <Route path="/community" element={<Navigate to="/forum" replace />} />
             <Route path="/submit" element={<Navigate to="/forum" replace />} />

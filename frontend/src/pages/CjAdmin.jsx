@@ -1,11 +1,13 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "../api";
+import CjPortalBadge from "../components/CjPortalBadge";
 import { dateForDay, dateFromIso, isoDate, mondayIso } from "../cjDates";
 import { useI18n } from "../i18n";
 
-export default function CjAdmin() {
+export default function CjAdmin({ portal = "admin" }) {
   const { t } = useI18n();
+  const teacherMode = portal === "teacher";
   const [weekStart, setWeekStart] = useState(mondayIso);
   const [data, setData] = useState(null);
   const [tab, setTab] = useState("cj");
@@ -21,6 +23,13 @@ export default function CjAdmin() {
   const [examTime, setExamTime] = useState("09:00");
   const [examLocation, setExamLocation] = useState("");
   const [examNote, setExamNote] = useState("");
+  const [courseName, setCourseName] = useState("");
+  const [courseShortName, setCourseShortName] = useState("");
+  const [courseGrade, setCourseGrade] = useState(11);
+  const [courseSection, setCourseSection] = useState("All");
+  const [coursePeriod, setCoursePeriod] = useState(1);
+  const [courseTeacher, setCourseTeacher] = useState("");
+  const [courseRoom, setCourseRoom] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -32,8 +41,12 @@ export default function CjAdmin() {
     try {
       const payload = await api.readCj(weekStart);
       setData(payload);
-      setSubjectId((current) => current || payload.subjects[0]?.id || "");
-      setExamSubjectId((current) => current || payload.subjects[0]?.id || "");
+      setSubjectId((current) => (
+        payload.subjects.some((subject) => subject.id === current) ? current : payload.subjects[0]?.id || ""
+      ));
+      setExamSubjectId((current) => (
+        payload.subjects.some((subject) => subject.id === current) ? current : payload.subjects[0]?.id || ""
+      ));
     } catch (loadError) {
       setError(loadError instanceof Error ? loadError.message : "load");
     } finally {
@@ -101,6 +114,33 @@ export default function CjAdmin() {
     }
   }
 
+  async function handleCourseSave(event) {
+    event.preventDefault();
+    setSaving(true);
+    setNotice("");
+    try {
+      const created = await api.createCjSubject({
+        name: courseName,
+        short_name: courseShortName,
+        grade: courseGrade,
+        class_section: courseSection,
+        default_period: coursePeriod,
+        teacher: courseTeacher,
+        room: courseRoom,
+      });
+      setNotice(`${created.name} added.`);
+      setCourseName("");
+      setCourseShortName("");
+      setCourseTeacher("");
+      setCourseRoom("");
+      await loadWeek();
+    } catch (saveError) {
+      setNotice(saveError instanceof Error ? saveError.message : "Could not add course.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
   function resetExamForm() {
     setExamId("");
     setExamTitle("");
@@ -122,16 +162,21 @@ export default function CjAdmin() {
 
   return (
     <section className="mt-8">
-      <p className="font-sans text-[11px] uppercase tracking-[0.16em] text-[#1A4FBF]">{t("cj.adminKicker")}</p>
-      <h1 className="mt-2 font-serif text-4xl">{t("cj.adminTitle")}</h1>
-      <p className="mt-2 font-sans text-sm text-neutral-600">{t("cj.adminLead")}</p>
+      <CjPortalBadge portal={portal} />
+      <p className="font-sans text-[11px] uppercase tracking-[0.16em] text-[#1A4FBF]">{teacherMode ? "Teacher workspace" : "Administration"}</p>
+      <h1 className="mt-2 font-serif text-4xl">CJ content</h1>
+      <p className="mt-2 font-sans text-sm text-neutral-600">
+        {teacherMode ? "Update CJ and exams for your assigned subject." : "Update all CJ entries and exams by date and subject."}
+      </p>
       <p className="mt-3 flex flex-wrap gap-4 font-sans text-sm">
         <Link to="/" className="text-[#1A4FBF]">
           {t("link.frontPage")}
         </Link>
-        <Link to={`/cj/admin/student-preview?start=${weekStart}`} className="text-[#1A4FBF]">
-          {t("cj.studentPreview")}
-        </Link>
+        {!teacherMode ? (
+          <Link to={`/cj/admin/student-preview?date=${weekStart}`} className="text-[#1A4FBF]">
+            {t("cj.studentPreview")}
+          </Link>
+        ) : null}
       </p>
 
       {notice ? <p className="mt-3 font-sans text-sm">{notice}</p> : null}
@@ -143,6 +188,11 @@ export default function CjAdmin() {
         <button type="button" onClick={() => setTab("exams")} className={tab === "exams" ? "border-b-2 border-black pb-1" : "pb-1 text-neutral-500"}>
           {t("cj.examTab")}
         </button>
+        {!teacherMode ? (
+          <button type="button" onClick={() => setTab("courses")} className={tab === "courses" ? "border-b-2 border-black pb-1" : "pb-1 text-neutral-500"}>
+            Courses
+          </button>
+        ) : null}
       </div>
 
       {tab === "cj" ? (
@@ -193,7 +243,7 @@ export default function CjAdmin() {
             }))}
           />
         </div>
-      ) : (
+      ) : tab === "exams" ? (
         <div className="mt-6 grid gap-6 lg:grid-cols-2">
           <form onSubmit={handleExamSave} className="border border-black p-4">
             <div className="flex items-center justify-between gap-4">
@@ -260,6 +310,38 @@ export default function CjAdmin() {
             }))}
           />
         </div>
+      ) : (
+        <div className="mt-6 grid gap-6 lg:grid-cols-2">
+          <form onSubmit={handleCourseSave} className="border border-black p-4">
+            <h2 className="font-serif text-2xl">Add course</h2>
+            <p className="mt-1 font-sans text-sm text-neutral-500">Admin only · new courses become available in Course setup.</p>
+            <LineField label="Course name" value={courseName} onChange={setCourseName} />
+            <LineField label="Short name" value={courseShortName} onChange={setCourseShortName} />
+            <div className="mt-4 grid gap-4 sm:grid-cols-3">
+              <SelectField label="Grade" value={courseGrade} onChange={(value) => setCourseGrade(Number(value))} options={[9, 10, 11]} />
+              <SelectField label="Class" value={courseSection} onChange={setCourseSection} options={["All", "Ac", "Mc"]} />
+              <SelectField label="Default period" value={coursePeriod} onChange={(value) => setCoursePeriod(Number(value))} options={Array.from({ length: 11 }, (_, index) => index + 1)} />
+            </div>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <LineField label="Teacher" value={courseTeacher} onChange={setCourseTeacher} />
+              <LineField label="Room" value={courseRoom} onChange={setCourseRoom} />
+            </div>
+            <button type="submit" disabled={saving || !courseName.trim() || !courseShortName.trim()} className="mt-4 bg-black px-5 py-2 font-sans text-[11px] uppercase tracking-[0.16em] text-white disabled:opacity-40">
+              {saving ? "Adding…" : "Add course"}
+            </button>
+          </form>
+          <aside className="border border-black p-4">
+            <h2 className="font-serif text-2xl">Course catalog</h2>
+            <div className="mt-3 grid gap-2">
+              {(data?.subjects || []).map((subject) => (
+                <div key={subject.id} className="flex items-center justify-between gap-3 border-b border-neutral-200 py-2 font-sans text-sm">
+                  <span>{subject.name}</span>
+                  <span className="text-xs text-neutral-500">G{subject.grade} · {subject.class_section} · P{subject.default_period}</span>
+                </div>
+              ))}
+            </div>
+          </aside>
+        </div>
       )}
     </section>
   );
@@ -312,6 +394,17 @@ function LineField({ label, value, onChange }) {
         onChange={(event) => onChange(event.target.value)}
         className="mt-2 w-full border border-black p-2 font-sans text-sm normal-case tracking-normal text-neutral-900"
       />
+    </label>
+  );
+}
+
+function SelectField({ label, value, onChange, options }) {
+  return (
+    <label className="block font-sans text-[11px] uppercase tracking-[0.14em] text-[#1A4FBF]">
+      {label}
+      <select value={value} onChange={(event) => onChange(event.target.value)} className="mt-2 w-full border border-black bg-white p-2 font-sans text-sm normal-case tracking-normal text-neutral-900">
+        {options.map((option) => <option key={option} value={option}>{option}</option>)}
+      </select>
     </label>
   );
 }

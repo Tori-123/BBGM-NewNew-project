@@ -146,6 +146,12 @@ class Subject(Base):
     color: Mapped[str] = mapped_column(String(16), nullable=False)
     period: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
     sort_order: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    grade: Mapped[int] = mapped_column(Integer, nullable=False, default=11)
+    class_section: Mapped[str] = mapped_column(String(16), nullable=False, default="All")
+    teacher: Mapped[str] = mapped_column(String(120), nullable=False, default="To be confirmed")
+    room: Mapped[str] = mapped_column(String(80), nullable=False, default="To be confirmed")
+    required: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    is_custom: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
 
 
 class CJTeacherSubject(Base):
@@ -317,6 +323,18 @@ def migrate_schema(engine) -> None:
                 conn.exec_driver_sql(
                     "ALTER TABLE posts ADD COLUMN images TEXT NOT NULL DEFAULT '[]'"
                 )
+            subject_cols = {row[1] for row in conn.exec_driver_sql("PRAGMA table_info(subjects)").fetchall()}
+            subject_columns = {
+                "grade": "INTEGER NOT NULL DEFAULT 11",
+                "class_section": "VARCHAR(16) NOT NULL DEFAULT 'All'",
+                "teacher": "VARCHAR(120) NOT NULL DEFAULT 'To be confirmed'",
+                "room": "VARCHAR(80) NOT NULL DEFAULT 'To be confirmed'",
+                "required": "INTEGER NOT NULL DEFAULT 0",
+                "is_custom": "INTEGER NOT NULL DEFAULT 0",
+            }
+            for column, definition in subject_columns.items():
+                if subject_cols and column not in subject_cols:
+                    conn.exec_driver_sql(f"ALTER TABLE subjects ADD COLUMN {column} {definition}")
     Base.metadata.create_all(engine)
     if engine.dialect.name == "sqlite":
         with engine.begin() as conn:

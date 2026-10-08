@@ -15,53 +15,80 @@ _WEEK = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 _TIME = re.compile(r"^\d{2}:\d{2}$")
 
 _SUBJECTS = [
-    ("ap-calculus", "AP Calculus AB", "AP Cal AB", "#2563eb", 1, 1),
-    ("biology", "Biology", "Biology", "#0891b2", 1, 2),
-    ("ap-physics", "AP Physics 1", "AP Physics", "#3b82f6", 2, 3),
-    ("chinese", "Chinese", "Chinese", "#6366f1", 3, 4),
-    ("ap-language", "AP English Language", "AP Lang", "#1d4ed8", 4, 5),
-    ("world-history", "World History", "History", "#0e7490", 4, 6),
-    ("ap-economics", "AP Economics", "AP Eco", "#0284c7", 5, 7),
-    ("ap-csa", "AP Computer Science A", "AP CSA", "#4f46e5", 7, 8),
+    ("advisory-11ac", "Morning Advisory · 11Ac", "Advisory", "#1d4ed8", 1, 1),
+    ("advisory-11mc", "Morning Advisory · 11Mc", "Advisory", "#1d4ed8", 1, 2),
+    ("chinese-11ac", "Chinese 11 · Ac", "Chinese 11", "#2563eb", 2, 3),
+    ("chinese-11mc", "Chinese 11 · Mc", "Chinese 11", "#2563eb", 5, 4),
+    ("ap-lang-11ac", "AP English Language & Composition · 11Ac", "AP Lang", "#315fbd", 5, 5),
+    ("ap-lang-11mc", "AP English Language & Composition · 11Mc", "AP Lang", "#315fbd", 3, 6),
+    ("ap-euro-11ac", "AP European History · 11Ac", "AP Euro", "#0e7490", 6, 7),
+    ("ap-euro-11mc", "AP European History · 11Mc", "AP Euro", "#0e7490", 2, 8),
+    ("lunch-11ac", "Lunch · 11Ac", "Lunch", "#64748b", 7, 9),
+    ("lunch-11mc", "Lunch · 11Mc", "Lunch", "#64748b", 7, 10),
+    ("ae-11ac", "AE · 11Ac", "AE", "#475569", 8, 11),
+    ("ae-11mc", "AE · 11Mc", "AE", "#475569", 8, 12),
+    ("ap-calculus-11ac", "AP Calculus AB · 11Ac", "AP Calculus AB", "#1a4fbf", 10, 13),
+    ("ap-calculus-11mc", "AP Calculus AB · 11Mc", "AP Calculus AB", "#1a4fbf", 4, 14),
+    ("ap-micro-macro", "AP Microeconomics / AP Macroeconomics", "AP Economics", "#0284c7", 3, 15),
+    ("study-hall", "Study Hall", "Study Hall", "#64748b", 4, 16),
+    ("ap-physics", "AP Physics 1", "AP Physics 1", "#3b82f6", 9, 17),
+    ("ap-stats", "AP Statistics", "AP Statistics", "#4f46e5", 8, 18),
+    ("ap-csa", "AP Computer Science A", "AP CSA", "#4338ca", 11, 19),
 ]
+
+_SUBJECT_DETAILS = {
+    "advisory-11ac": {"grade": 11, "class_section": "Ac", "teacher": "Rudi Herman Scheepers", "room": "E307", "required": True},
+    "advisory-11mc": {"grade": 11, "class_section": "Mc", "teacher": "To be confirmed", "room": "To be confirmed", "required": True},
+    "chinese-11ac": {"grade": 11, "class_section": "Ac", "teacher": "Niu Weijia", "room": "E529", "required": True},
+    "chinese-11mc": {"grade": 11, "class_section": "Mc", "teacher": "Winifred", "room": "E529", "required": True},
+    "ap-lang-11ac": {"grade": 11, "class_section": "Ac", "teacher": "Vivian Chong", "room": "E525", "required": True},
+    "ap-lang-11mc": {"grade": 11, "class_section": "Mc", "teacher": "To be confirmed", "room": "To be confirmed", "required": True},
+    "ap-euro-11ac": {"grade": 11, "class_section": "Ac", "teacher": "Stewart Mark Smith", "room": "E528", "required": True},
+    "ap-euro-11mc": {"grade": 11, "class_section": "Mc", "teacher": "To be confirmed", "room": "To be confirmed", "required": True},
+    "lunch-11ac": {"grade": 11, "class_section": "Ac", "teacher": "—", "room": "Canteen", "required": True},
+    "lunch-11mc": {"grade": 11, "class_section": "Mc", "teacher": "—", "room": "Canteen", "required": True},
+    "ae-11ac": {"grade": 11, "class_section": "Ac", "teacher": "Rudi Herman Scheepers", "room": "E307", "required": True},
+    "ae-11mc": {"grade": 11, "class_section": "Mc", "teacher": "To be confirmed", "room": "To be confirmed", "required": True},
+    "ap-calculus-11ac": {"grade": 11, "class_section": "Ac", "teacher": "Kyle Sheldon Manzoni", "room": "E522", "required": True},
+    "ap-calculus-11mc": {"grade": 11, "class_section": "Mc", "teacher": "Kyle Sheldon Manzoni", "room": "E522", "required": True},
+    "ap-micro-macro": {"grade": 11, "class_section": "All", "teacher": "Andrew Mark Peterson", "room": "E530", "required": False},
+    "study-hall": {"grade": 11, "class_section": "All", "teacher": "—", "room": "Collaboratory", "required": False},
+    "ap-physics": {"grade": 11, "class_section": "All", "teacher": "Chantal Eloise Rudman", "room": "E302", "required": False},
+    "ap-stats": {"grade": 11, "class_section": "All", "teacher": "Herman", "room": "BBGM", "required": False},
+    "ap-csa": {"grade": 11, "class_section": "All", "teacher": "Chantal Eloise Rudman", "room": "E302", "required": False},
+}
 
 # day_index, period, subject_id, ic, hw, announcement
 _SAMPLE_ENTRIES = [
-    (0, 1, "ap-calculus", "Limits and continuity review", "Complete FRQ Set 2 · Q1–4", "Quiz on Wednesday"),
-    (0, 1, "biology", "Cellular respiration overview", "Complete lab analysis questions 1–5", "Bring safety goggles Wednesday"),
-    (0, 2, "ap-physics", "Newton’s 3rd Law", "ES 7 · Q3, 5, 38, 46", "Lab groups posted"),
-    (0, 4, "ap-language", "Rhetorical situation & audience", "Annotate ‘The Gettysburg Address’", "Bring the blue reader"),
-    (0, 5, "ap-economics", "Demand shifts and market equilibrium", "Module 3.2 practice", "Unit 2 exam Friday"),
-    (0, 7, "ap-csa", "String methods and immutability", "CodingBat String-1 · 1–8", "Office hour 16:20"),
-    (1, 1, "ap-calculus", "Implicit differentiation", "RB 3.2 · #7–12", ""),
-    (1, 1, "biology", "Aerobic and anaerobic respiration", "Read 6.3 and complete notes", ""),
-    (1, 2, "ap-physics", "Free-body diagrams", "Finish cart lab analysis", "Lab report due Thursday"),
-    (1, 4, "ap-language", "Claims, evidence, commentary", "Draft body paragraph", "Peer review next class"),
-    (1, 5, "ap-economics", "Price elasticity of demand", "3.3 guided notes", "Bring calculator"),
-    (1, 7, "ap-csa", "Nested loops", "Program: pattern printer", "Check rubric before upload"),
-    (2, 1, "ap-calculus", "Related rates", "Worksheet · #1–6", "Quiz today"),
-    (2, 1, "biology", "Mitosis and the cell cycle", "Cell cycle diagram", "Lab next class"),
-    (2, 2, "ap-physics", "Friction and inclined planes", "ES 8 · odd questions", ""),
-    (2, 4, "ap-language", "Synthesis source evaluation", "Read sources A–D", "Timed write Friday"),
-    (2, 5, "ap-economics", "Tax incidence", "Graph 4 market scenarios", "Unit 2 review opens"),
-    (2, 7, "ap-csa", "ArrayList traversal", "Lab checkpoint 1", "Commit before 20:00"),
-    (3, 1, "ap-calculus", "Linearization", "Textbook 4.1 · #9–21 odd", ""),
-    (3, 1, "biology", "DNA replication", "Complete replication worksheet", ""),
-    (3, 2, "ap-physics", "Circular motion introduction", "Lab report final draft", "Lab report due 22:00"),
-    (3, 4, "ap-language", "Counterargument workshop", "Revise thesis + outline", "Conference sign-up"),
-    (3, 5, "ap-economics", "Government intervention", "Unit 2 review sheet", "Exam tomorrow"),
-    (3, 7, "ap-csa", "2D arrays", "GridWalker methods", ""),
-    (4, 1, "ap-calculus", "Optimization", "Weekend mixed practice", "Corrections due Monday"),
-    (4, 1, "biology", "Protein synthesis", "Transcription practice", ""),
-    (4, 2, "ap-physics", "Centripetal force", "Read 6.2 + notes", ""),
-    (4, 4, "ap-language", "Timed synthesis essay", "Reflection form", "Submit by 18:00"),
-    (4, 5, "ap-economics", "Unit 2 assessment", "No HW", "Assessment in class"),
-    (4, 7, "ap-csa", "2D array algorithms", "Finish GridWalker", "Demo next Monday"),
+    (0, 2, "chinese-11ac", "Classical Chinese reading and annotation", "Finish the vocabulary sheet", "Bring the course reader"),
+    (0, 3, "ap-micro-macro", "Demand shifts and market equilibrium", "Module 3.2 practice", "Unit quiz Friday"),
+    (0, 5, "ap-lang-11ac", "Rhetorical situation and audience", "Annotate the assigned speech", "Bring the blue reader"),
+    (0, 6, "ap-euro-11ac", "The French Revolution: causes", "Read pages 214–226", "Seminar Wednesday"),
+    (0, 9, "ap-physics", "Newton's third law", "Problems 3, 5, 38 and 46", "Lab groups posted"),
+    (0, 10, "ap-calculus-11ac", "Limits and continuity review", "Complete FRQ Set 2 · Q1–4", "Quiz on Wednesday"),
+    (0, 11, "ap-csa", "String methods and immutability", "CodingBat String-1 · 1–8", "Office hour 16:20"),
+    (1, 2, "chinese-11ac", "Modern prose close reading", "Draft the response paragraph", ""),
+    (1, 5, "ap-lang-11ac", "Claims, evidence and commentary", "Draft one body paragraph", "Peer review next class"),
+    (1, 6, "ap-euro-11ac", "Revolutionary France", "Complete source comparison", ""),
+    (1, 9, "ap-physics", "Free-body diagrams", "Finish cart lab analysis", "Lab report due Thursday"),
+    (1, 10, "ap-calculus-11ac", "Implicit differentiation", "Practice 3.2 · #7–12", ""),
+    (2, 5, "ap-lang-11ac", "Synthesis source evaluation", "Read sources A–D", "Timed write Friday"),
+    (2, 6, "ap-euro-11ac", "Napoleonic Europe", "Timeline checkpoint", ""),
+    (2, 9, "ap-physics", "Friction and inclined planes", "Odd-numbered practice", ""),
+    (2, 10, "ap-calculus-11ac", "Related rates", "Worksheet · #1–6", "Quiz today"),
+    (3, 5, "ap-lang-11ac", "Counterargument workshop", "Revise thesis and outline", "Conference sign-up"),
+    (3, 6, "ap-euro-11ac", "Congress of Vienna", "Primary-source notes", ""),
+    (3, 9, "ap-physics", "Circular motion introduction", "Lab report final draft", "Due 22:00"),
+    (3, 10, "ap-calculus-11ac", "Linearization", "Textbook 4.1 · #9–21 odd", ""),
+    (4, 5, "ap-lang-11ac", "Timed synthesis essay", "Reflection form", "Submit by 18:00"),
+    (4, 6, "ap-euro-11ac", "Unit review", "Prepare two discussion questions", "Assessment next week"),
+    (4, 9, "ap-physics", "Centripetal force", "Read 6.2 and take notes", ""),
+    (4, 10, "ap-calculus-11ac", "Optimization", "Weekend mixed practice", "Corrections due Monday"),
 ]
 
 _SAMPLE_EXAMS = [
-    (2, "ap-calculus", "Unit Quiz", "10:05", "Room 402", "Related rates and implicit differentiation"),
-    (4, "ap-economics", "Unit 2 Exam", "13:35", "Room 305", "Bring a calculator"),
+    (2, "ap-calculus-11ac", "Unit Quiz", "14:25", "E522", "Related rates and implicit differentiation"),
+    (4, "ap-micro-macro", "Unit 2 Exam", "09:05", "E530", "Bring a calculator"),
 ]
 
 
@@ -85,6 +112,7 @@ def _slot(db: Session, week_start: str, day_index: int, period: int, subject_id:
 def _ensure_seed(db: Session, week_start: str) -> None:
     now = to_iso(utc_now())
     for subject_id, name, short_name, color, period, sort_order in _SUBJECTS:
+        details = _SUBJECT_DETAILS[subject_id]
         row = db.get(Subject, subject_id)
         if row is None:
             db.add(
@@ -95,6 +123,12 @@ def _ensure_seed(db: Session, week_start: str) -> None:
                     color=color,
                     period=period,
                     sort_order=sort_order,
+                    grade=details["grade"],
+                    class_section=details["class_section"],
+                    teacher=details["teacher"],
+                    room=details["room"],
+                    required=details["required"],
+                    is_custom=False,
                 )
             )
         else:
@@ -103,35 +137,20 @@ def _ensure_seed(db: Session, week_start: str) -> None:
             row.color = color
             row.period = period
             row.sort_order = sort_order
+            row.grade = details["grade"]
+            row.class_section = details["class_section"]
+            row.teacher = details["teacher"]
+            row.room = details["room"]
+            row.required = details["required"]
+            row.is_custom = False
     db.flush()
 
-    total = db.scalar(select(func.count()).select_from(CJEntry)) or 0
-    if total == 0:
-        for index, entry in enumerate(_SAMPLE_ENTRIES):
-            day_index, period, subject_id, ic, hw, announcement = entry
-            db.add(
-                CJEntry(
-                    id=f"sample-{index + 1}",
-                    week_start=week_start,
-                    day_index=day_index,
-                    period=period,
-                    subject_id=subject_id,
-                    ic=ic,
-                    hw=hw,
-                    announcement=announcement,
-                    updated_at=now,
-                )
-            )
-        db.flush()
-
-    for entry in _SAMPLE_ENTRIES:
-        if entry[2] != "biology":
-            continue
+    for index, entry in enumerate(_SAMPLE_ENTRIES):
         day_index, period, subject_id, ic, hw, announcement = entry
         if _slot(db, week_start, day_index, period, subject_id) is None:
             db.add(
                 CJEntry(
-                    id=f"biology-v2-{day_index}",
+                    id=f"catalog-v4-{week_start}-{index + 1}",
                     week_start=week_start,
                     day_index=day_index,
                     period=period,
@@ -143,13 +162,20 @@ def _ensure_seed(db: Session, week_start: str) -> None:
                 )
             )
 
-    exam_total = db.scalar(select(func.count()).select_from(Exam)) or 0
-    if exam_total == 0:
-        for index, exam in enumerate(_SAMPLE_EXAMS):
-            day_index, subject_id, title, time, location, note = exam
+    for index, exam in enumerate(_SAMPLE_EXAMS):
+        day_index, subject_id, title, time, location, note = exam
+        existing_exam = db.scalar(
+            select(Exam).where(
+                Exam.week_start == week_start,
+                Exam.day_index == day_index,
+                Exam.subject_id == subject_id,
+                Exam.title == title,
+            )
+        )
+        if existing_exam is None:
             db.add(
                 Exam(
-                    id=f"exam-sample-{index + 1}",
+                    id=f"exam-catalog-v4-{week_start}-{index + 1}",
                     week_start=week_start,
                     day_index=day_index,
                     subject_id=subject_id,
@@ -169,6 +195,13 @@ def _subject_payload(row: Subject) -> dict:
         "name": row.name,
         "short_name": row.short_name,
         "color": row.color,
+        "default_period": row.period,
+        "grade": row.grade,
+        "class_section": row.class_section,
+        "teacher": row.teacher,
+        "room": row.room,
+        "required": row.required,
+        "is_custom": row.is_custom,
     }
 
 
@@ -227,10 +260,17 @@ def read_cj(
 ):
     week = _week_or_error(week_start)
     _ensure_seed(db, week)
-    subject_query = select(Subject).order_by(Subject.sort_order, Subject.name)
+    catalog_ids = list(_SUBJECT_DETAILS) + list(
+        db.scalars(select(Subject.id).where(Subject.is_custom.is_(True))).all()
+    )
+    subject_query = (
+        select(Subject)
+        .where(Subject.id.in_(catalog_ids))
+        .order_by(Subject.sort_order, Subject.name)
+    )
     entry_query = (
         select(CJEntry)
-        .where(CJEntry.week_start == week)
+        .where(CJEntry.week_start == week, CJEntry.subject_id.in_(catalog_ids))
         .order_by(CJEntry.day_index, CJEntry.period)
     )
     if user.role == "teacher":
@@ -250,7 +290,9 @@ def read_cj(
         subjects = db.scalars(subject_query).all()
         entries = db.scalars(entry_query).all()
         exams = db.scalars(
-            select(Exam).where(Exam.week_start == week).order_by(Exam.day_index, Exam.time)
+            select(Exam)
+            .where(Exam.week_start == week, Exam.subject_id.in_(catalog_ids))
+            .order_by(Exam.day_index, Exam.time)
         ).all()
     return {
         "week_start": week,
@@ -258,6 +300,57 @@ def read_cj(
         "entries": [_entry_payload(row) for row in entries],
         "exams": [_exam_payload(row) for row in exams],
     }
+
+
+@router.post("/cj/subjects", status_code=201)
+def create_cj_subject(
+    body: dict,
+    _: User = Depends(get_super_admin),
+    db: Session = Depends(get_db),
+):
+    name = str(body.get("name") or "").strip()
+    short_name = str(body.get("short_name") or "").strip()
+    teacher = str(body.get("teacher") or "").strip() or "To be confirmed"
+    room = str(body.get("room") or "").strip() or "To be confirmed"
+    class_section = str(body.get("class_section") or "All").strip()
+    grade = body.get("grade", 11)
+    period = body.get("default_period", 1)
+    fields = []
+    if not name or len(name) > 120:
+        fields.append({"field": "name", "message": "Enter a course name up to 120 characters."})
+    if not short_name or len(short_name) > 40:
+        fields.append({"field": "short_name", "message": "Enter a short name up to 40 characters."})
+    if not isinstance(grade, int) or isinstance(grade, bool) or grade not in (9, 10, 11):
+        fields.append({"field": "grade", "message": "Choose grade 9, 10 or 11."})
+    if class_section not in ("All", "Ac", "Mc"):
+        fields.append({"field": "class_section", "message": "Choose All, Ac or Mc."})
+    if not isinstance(period, int) or isinstance(period, bool) or period < 1 or period > 11:
+        fields.append({"field": "default_period", "message": "Choose period 1 through 11."})
+    if len(teacher) > 120 or len(room) > 80:
+        fields.append({"field": "teacher", "message": "Teacher or room is too long."})
+    if db.scalar(select(Subject.id).where(func.lower(Subject.name) == name.lower())):
+        fields.append({"field": "name", "message": "A course with this name already exists."})
+    if fields:
+        raise validation_error(fields)
+
+    slug = re.sub(r"[^a-z0-9]+", "-", name.lower()).strip("-")[:42] or "course"
+    subject = Subject(
+        id=f"custom-{slug}-{uuid4().hex[:6]}",
+        name=name,
+        short_name=short_name,
+        color="#1A4FBF",
+        period=period,
+        sort_order=1000 + (db.scalar(select(func.count()).select_from(Subject).where(Subject.is_custom.is_(True))) or 0),
+        grade=grade,
+        class_section=class_section,
+        teacher=teacher,
+        room=room,
+        required=False,
+        is_custom=True,
+    )
+    db.add(subject)
+    db.flush()
+    return _subject_payload(subject)
 
 
 @router.put("/cj")

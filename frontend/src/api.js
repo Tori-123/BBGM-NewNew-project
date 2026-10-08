@@ -1,4 +1,4 @@
-const BASE = import.meta.env.VITE_API_BASE || "http://localhost:8000/api/v1";
+const BASE = import.meta.env.VITE_API_BASE || "/api/v1";
 
 export class ApiError extends Error {
   constructor(status, error) {
@@ -201,6 +201,11 @@ export const api = {
   saveExam: (body) =>
     request("/cj/exams", {
       method: "PUT",
+      body: JSON.stringify(body),
+    }),
+  createCjSubject: (body) =>
+    request("/cj/subjects", {
+      method: "POST",
       body: JSON.stringify(body),
     }),
   listCjTeachers: () => request("/cj/teachers"),
