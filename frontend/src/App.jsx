@@ -14,6 +14,7 @@ import CjDay from "./pages/CjDay";
 import CjMonth from "./pages/CjMonth";
 import CjTeacher from "./pages/CjTeacher";
 import CjWeek from "./pages/CjWeek";
+import CjYear from "./pages/CjYear";
 import Contact from "./pages/Contact";
 import Home from "./pages/Home";
 import MyPosts from "./pages/MyPosts";
@@ -40,6 +41,7 @@ export default function App() {
             <Route path="/cj" element={<CjPortal />} />
             <Route path="/cj/student" element={<RequireCjRole roles={["student"]}><CjWeek /></RequireCjRole>} />
             <Route path="/cj/student/calendar" element={<RequireCjRole roles={["student"]}><CjMonth /></RequireCjRole>} />
+            <Route path="/cj/student/year" element={<RequireCjRole roles={["student"]}><CjYear /></RequireCjRole>} />
             <Route path="/cj/student/week" element={<RequireCjRole roles={["student"]}><CjWeek /></RequireCjRole>} />
             <Route path="/cj/student/day" element={<RequireCjRole roles={["student"]}><CjDay /></RequireCjRole>} />
             <Route path="/cj/student/course" element={<RequireCjRole roles={["student"]}><CjCourseDetail /></RequireCjRole>} />

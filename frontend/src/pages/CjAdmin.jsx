@@ -141,6 +141,37 @@ export default function CjAdmin({ portal = "admin" }) {
     }
   }
 
+  async function handleExamDelete() {
+    if (!examId || !window.confirm("Delete this exam? Students will no longer see it.")) return;
+    setSaving(true);
+    setNotice("");
+    try {
+      await api.deleteExam(examId);
+      setNotice("Exam deleted.");
+      resetExamForm();
+      await loadWeek();
+    } catch (deleteError) {
+      setNotice(deleteError instanceof Error ? deleteError.message : "Could not delete exam.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleCourseDelete(subject) {
+    if (!window.confirm(`Delete ${subject.name}? Its CJ entries and exams will also be removed.`)) return;
+    setSaving(true);
+    setNotice("");
+    try {
+      await api.deleteCjSubject(subject.id);
+      setNotice(`${subject.name} deleted.`);
+      await loadWeek();
+    } catch (deleteError) {
+      setNotice(deleteError instanceof Error ? deleteError.message : "Could not delete course.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
   function resetExamForm() {
     setExamId("");
     setExamTitle("");
@@ -166,7 +197,7 @@ export default function CjAdmin({ portal = "admin" }) {
       <p className="font-sans text-[11px] uppercase tracking-[0.16em] text-[#1A4FBF]">{teacherMode ? "Teacher workspace" : "Administration"}</p>
       <h1 className="mt-2 font-serif text-4xl">CJ content</h1>
       <p className="mt-2 font-sans text-sm text-neutral-600">
-        {teacherMode ? "Update CJ and exams for your assigned subject." : "Update all CJ entries and exams by date and subject."}
+        {teacherMode ? "Update CJ, exams, and courses across the complete school catalog." : "Update all CJ entries, exams, and courses."}
       </p>
       <p className="mt-3 flex flex-wrap gap-4 font-sans text-sm">
         <Link to="/" className="text-[#1A4FBF]">
@@ -188,11 +219,9 @@ export default function CjAdmin({ portal = "admin" }) {
         <button type="button" onClick={() => setTab("exams")} className={tab === "exams" ? "border-b-2 border-black pb-1" : "pb-1 text-neutral-500"}>
           {t("cj.examTab")}
         </button>
-        {!teacherMode ? (
-          <button type="button" onClick={() => setTab("courses")} className={tab === "courses" ? "border-b-2 border-black pb-1" : "pb-1 text-neutral-500"}>
-            Courses
-          </button>
-        ) : null}
+        <button type="button" onClick={() => setTab("courses")} className={tab === "courses" ? "border-b-2 border-black pb-1" : "pb-1 text-neutral-500"}>
+          Courses
+        </button>
       </div>
 
       {tab === "cj" ? (
@@ -285,9 +314,16 @@ export default function CjAdmin({ portal = "admin" }) {
             <LineField label={t("cj.examName")} value={examTitle} onChange={setExamTitle} />
             <LineField label={t("cj.location")} value={examLocation} onChange={setExamLocation} />
             <TextField label={t("cj.note")} value={examNote} onChange={setExamNote} />
-            <button type="submit" disabled={saving || loading || !examSubjectId || !examTitle.trim()} className="mt-4 bg-black px-5 py-2 font-sans text-[11px] uppercase tracking-[0.16em] text-white disabled:opacity-40">
-              {saving ? t("cj.saving") : t("cj.saveExam")}
-            </button>
+            <div className="mt-4 flex flex-wrap gap-2">
+              <button type="submit" disabled={saving || loading || !examSubjectId || !examTitle.trim()} className="bg-black px-5 py-2 font-sans text-[11px] uppercase tracking-[0.16em] text-white disabled:opacity-40">
+                {saving ? t("cj.saving") : t("cj.saveExam")}
+              </button>
+              {examId ? (
+                <button type="button" disabled={saving} onClick={handleExamDelete} className="border border-red-700 px-5 py-2 font-sans text-[11px] uppercase tracking-[0.16em] text-red-700 disabled:opacity-40">
+                  Delete exam
+                </button>
+              ) : null}
+            </div>
           </form>
           <EntryList
             title={t("cj.weekExams")}
@@ -314,7 +350,7 @@ export default function CjAdmin({ portal = "admin" }) {
         <div className="mt-6 grid gap-6 lg:grid-cols-2">
           <form onSubmit={handleCourseSave} className="border border-black p-4">
             <h2 className="font-serif text-2xl">Add course</h2>
-            <p className="mt-1 font-sans text-sm text-neutral-500">Admin only · new courses become available in Course setup.</p>
+            <p className="mt-1 font-sans text-sm text-neutral-500">New courses become available immediately in Course setup.</p>
             <LineField label="Course name" value={courseName} onChange={setCourseName} />
             <LineField label="Short name" value={courseShortName} onChange={setCourseShortName} />
             <div className="mt-4 grid gap-4 sm:grid-cols-3">
@@ -335,8 +371,17 @@ export default function CjAdmin({ portal = "admin" }) {
             <div className="mt-3 grid gap-2">
               {(data?.subjects || []).map((subject) => (
                 <div key={subject.id} className="flex items-center justify-between gap-3 border-b border-neutral-200 py-2 font-sans text-sm">
-                  <span>{subject.name}</span>
-                  <span className="text-xs text-neutral-500">G{subject.grade} · {subject.class_section} · P{subject.default_period}</span>
+                  <div>
+                    <span className="block">{subject.name}</span>
+                    <span className="text-xs text-neutral-500">G{subject.grade} · {subject.class_section} · P{subject.default_period}</span>
+                  </div>
+                  {!teacherMode && subject.is_custom ? (
+                    <button type="button" disabled={saving} onClick={() => handleCourseDelete(subject)} className="border border-red-700 px-2 py-1 text-[10px] uppercase tracking-[0.12em] text-red-700 disabled:opacity-40">
+                      Delete
+                    </button>
+                  ) : (
+                    <span className="text-[10px] uppercase tracking-[0.1em] text-neutral-400">{subject.is_custom ? "Custom" : "School"}</span>
+                  )}
                 </div>
               ))}
             </div>

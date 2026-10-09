@@ -1,7 +1,9 @@
 import { useMemo } from "react";
 import { Link, useSearchParams } from "react-router-dom";
+import CjDateNavigation from "../components/CjDateNavigation";
 import CjPortalBadge from "../components/CjPortalBadge";
-import { WEEKDAYS, isoDate, mondayIso, monthWeeks } from "../cjDates";
+import CjStudentActions from "../components/CjStudentActions";
+import { WEEKDAYS, isoDate, monthWeeks } from "../cjDates";
 
 const MONTHS = [
   "January", "February", "March", "April", "May", "June",
@@ -12,32 +14,43 @@ export default function CjMonth() {
   const today = useMemo(() => new Date(), []);
   const [params, setParams] = useSearchParams();
   const requestedMonth = params.get("month") || "";
+  const requestedDate = params.get("date") || "";
   const month = useMemo(() => {
     const match = /^(\d{4})-(\d{2})$/.exec(requestedMonth);
     return match ? new Date(Number(match[1]), Number(match[2]) - 1, 1, 12) : new Date(today.getFullYear(), today.getMonth(), 1, 12);
   }, [requestedMonth, today]);
+  const referenceDate = useMemo(() => {
+    const parsed = /^\d{4}-\d{2}-\d{2}$/.test(requestedDate) ? new Date(`${requestedDate}T12:00:00`) : null;
+    return parsed && !Number.isNaN(parsed.getTime()) && parsed.getFullYear() === month.getFullYear() && parsed.getMonth() === month.getMonth()
+      ? parsed
+      : month;
+  }, [month, requestedDate]);
   const weeks = useMemo(() => monthWeeks(month), [month]);
   const todayIso = isoDate(today);
 
   function moveMonth(offset) {
     const next = new Date(month.getFullYear(), month.getMonth() + offset, 1, 12);
-    setParams({ month: `${next.getFullYear()}-${String(next.getMonth() + 1).padStart(2, "0")}` });
+    setParams({
+      month: `${next.getFullYear()}-${String(next.getMonth() + 1).padStart(2, "0")}`,
+      date: isoDate(next),
+    });
   }
 
   return (
     <section className="mt-8">
       <CjPortalBadge portal="student" />
       <div className="flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <p className="font-sans text-[10px] uppercase tracking-[0.16em] text-[#1A4FBF]">Calendar</p>
-          <h1 className="mt-1 font-sans text-2xl font-semibold">Choose a day</h1>
-        </div>
-        <div className="flex items-center gap-3 font-sans text-[11px] uppercase tracking-[0.14em]">
-          <button type="button" aria-label="Previous month" onClick={() => moveMonth(-1)} className="h-9 w-9 border border-black text-lg">‹</button>
-          <Link aria-label="Weekly view" title="Weekly view" to={`/cj/student/week?start=${mondayIso(today)}`} className="flex h-9 w-9 items-center justify-center border border-black text-inherit no-underline">▦</Link>
-          <button type="button" aria-label="This month" onClick={() => setParams({ month: `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}` })} className="border border-black px-3 py-2">Today</button>
-          <button type="button" aria-label="Next month" onClick={() => moveMonth(1)} className="h-9 w-9 border border-black text-lg">›</button>
-        </div>
+        <CjDateNavigation
+          date={referenceDate}
+          mode="month"
+          eyebrow="Calendar"
+          detail="Choose a day"
+          onPrevious={() => moveMonth(-1)}
+          onNext={() => moveMonth(1)}
+        />
+        <CjStudentActions
+          onToday={() => setParams({ month: `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}`, date: todayIso })}
+        />
       </div>
 
       <div className="mt-8 border border-black">

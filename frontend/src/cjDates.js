@@ -2,8 +2,8 @@ export const SCHOOL_NAME = "BASIS Bilingual School Guangming Shenzhen";
 export const WEEKDAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
 export const WEEKDAY_SHORT = ["MON", "TUE", "WED", "THU", "FRI"];
 export const PERIOD_COUNT = 11;
-export const SCHEDULE_KEY = "cj-schedule-v4";
-export const SCHEDULE_PROFILE_KEY = "cj-schedule-profile-v1";
+export const SCHEDULE_KEY = "cj-schedule-v5";
+export const SCHEDULE_PROFILE_KEY = "cj-schedule-profile-v2";
 
 export const PERIOD_TIMES = [
   { period: 1, start: "08:00", end: "08:10" },
@@ -128,20 +128,21 @@ export function dateForDay(weekStart, index) {
 }
 
 export function weekNumber(date) {
-  const utc = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
-  const day = utc.getUTCDay() || 7;
-  utc.setUTCDate(utc.getUTCDate() + 4 - day);
-  const yearStart = new Date(Date.UTC(utc.getUTCFullYear(), 0, 1));
-  return Math.ceil(((utc.getTime() - yearStart.getTime()) / 86400000 + 1) / 7);
+  const schoolYearStart = new Date(date.getFullYear(), 7, 17, 12);
+  if (date < schoolYearStart) schoolYearStart.setFullYear(schoolYearStart.getFullYear() - 1);
+  const firstMonday = mondayOf(schoolYearStart);
+  const currentMonday = mondayOf(date);
+  return Math.floor((currentMonday.getTime() - firstMonday.getTime()) / (7 * 86400000)) + 1;
 }
 
-export function defaultSchedule(subjects, profile = "11Ac") {
+export function defaultSchedule(subjects, profile = "custom") {
   const validIds = new Set(subjects.map((subject) => subject.id));
-  const bundle = CLASS_BUNDLES[profile] || CLASS_BUNDLES["11Ac"];
+  const bundle = CLASS_BUNDLES[profile];
+  if (!bundle) return Array(PERIOD_COUNT).fill("");
   return bundle.schedule.map((id) => (validIds.has(id) ? id : ""));
 }
 
-export function normalizeSchedule(savedIds, subjects, profile = "11Ac") {
+export function normalizeSchedule(savedIds, subjects, profile = "custom") {
   const validIds = new Set(subjects.map((subject) => subject.id));
   const fallback = defaultSchedule(subjects, profile);
   const source = Array.isArray(savedIds) ? savedIds : [];
@@ -160,6 +161,9 @@ export function normalizeSchedule(savedIds, subjects, profile = "11Ac") {
 }
 
 export function subjectsForProfile(subjects, profile) {
+  if (!CLASS_BUNDLES[profile]) {
+    return subjects.filter((subject) => Number(subject.grade) === 11);
+  }
   const section = profile === "11Mc" ? "Mc" : "Ac";
   return subjects.filter(
     (subject) => Number(subject.grade) === 11 && ["All", section].includes(subject.class_section),

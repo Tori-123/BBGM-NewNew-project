@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { api } from "../api";
+import CjDateNavigation from "../components/CjDateNavigation";
 import CjPortalBadge from "../components/CjPortalBadge";
+import CjTooltip from "../components/CjTooltip";
 import { dateFromIso, isoDate, mondayOf, periodTimeLabel } from "../cjDates";
 
 const ISO = /^\d{4}-\d{2}-\d{2}$/;
@@ -33,9 +35,15 @@ export default function CjCourseDetail({ portal = "student", backPath = "/cj/stu
   return (
     <section className="mt-8">
       <CjPortalBadge portal={portal} />
-      <Link to={`${backPath}?date=${safeDate}`} className="inline-flex border border-black px-3 py-2 font-sans text-[10px] uppercase tracking-[0.14em] text-inherit no-underline">
-        ← Back to daily CJ
-      </Link>
+      {portal === "student" ? (
+        <CjDateNavigation date={date} mode="day" eyebrow="Course details" detail={heading} />
+      ) : (
+        <CjTooltip label="Back to daily CJ" align="left">
+          <Link to={`${backPath}?date=${safeDate}`} aria-label="Back to daily CJ" className="inline-flex border border-black px-3 py-2 font-sans text-[10px] uppercase tracking-[0.14em] text-inherit no-underline">
+            ← Back
+          </Link>
+        </CjTooltip>
+      )}
 
       {error ? <p className="mt-6 border border-red-700 p-4 font-sans text-sm text-red-700">{error}</p> : null}
       {!data && !error ? <p className="mt-6 font-sans text-sm text-neutral-500">Loading course details…</p> : null}

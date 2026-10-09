@@ -3,6 +3,8 @@ import { Link, useSearchParams } from "react-router-dom";
 import { api } from "../api";
 import CjPortalBadge from "../components/CjPortalBadge";
 import CjSchedulePicker from "../components/CjSchedulePicker";
+import CjStudentActions from "../components/CjStudentActions";
+import CjDateNavigation from "../components/CjDateNavigation";
 import {
   PERIOD_COUNT,
   SCHEDULE_KEY,
@@ -17,26 +19,29 @@ import {
   periodTimeLabel,
 } from "../cjDates";
 import { useLiveRefresh } from "../live";
+import { isExamComplete, useHomeworkProgress } from "../cjProgress";
+import { colorTint, courseColor, DEFAULT_CJ_COLOR, FIXED_PERIODS } from "../cjColors";
 
 function readSchedule(subjects) {
-  const profile = window.localStorage.getItem(SCHEDULE_PROFILE_KEY) || "11Ac";
+  const profile = window.localStorage.getItem(SCHEDULE_PROFILE_KEY) || "custom";
   let saved;
   try { saved = JSON.parse(window.localStorage.getItem(SCHEDULE_KEY) || "null"); } catch { saved = null; }
   return { profile, schedule: normalizeSchedule(saved || defaultSchedule(subjects, profile), subjects, profile) };
 }
 
-export default function CjWeek({ portal = "student", calendarPath = "/cj/student/calendar" }) {
+export default function CjWeek({ portal = "student" }) {
   const [params, setParams] = useSearchParams();
   const start = /^\d{4}-\d{2}-\d{2}$/.test(params.get("start") || "") ? params.get("start") : mondayIso();
   const weekStart = useMemo(() => dateFromIso(start), [start]);
   const [data, setData] = useState(null);
   const [selection, setSelection] = useState([]);
   const [draftSelection, setDraftSelection] = useState([]);
-  const [profile, setProfile] = useState("11Ac");
-  const [draftProfile, setDraftProfile] = useState("11Ac");
+  const [profile, setProfile] = useState("custom");
+  const [draftProfile, setDraftProfile] = useState("custom");
   const [coursesOpen, setCoursesOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const homeworkProgress = useHomeworkProgress();
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -56,8 +61,13 @@ export default function CjWeek({ portal = "student", calendarPath = "/cj/student
     }
   }, [weekStart]);
 
+  const refreshWeek = useCallback(async () => {
+    const payload = await api.readCj(isoDate(weekStart));
+    setData(payload);
+  }, [weekStart]);
+
   useEffect(() => { load(); }, [load]);
-  useLiveRefresh(Boolean(data) && !coursesOpen, load);
+  useLiveRefresh(Boolean(data) && !coursesOpen, refreshWeek);
 
   const subjectMap = useMemo(() => new Map((data?.subjects || []).map((subject) => [subject.id, subject])), [data]);
   const rows = useMemo(() => Array.from({ length: PERIOD_COUNT }, (_, index) => ({
@@ -82,27 +92,27 @@ export default function CjWeek({ portal = "student", calendarPath = "/cj/student
   }
 
   const weekEnd = dateForDay(weekStart, 4);
-  const range = `${weekStart.toLocaleDateString("en-US", { month: "short", day: "numeric" })} – ${weekEnd.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}`;
   const homework = (data?.entries || []).filter((entry) => entry.hw && selection.includes(entry.subject_id));
 
   return (
     <section className="mt-5">
       <CjPortalBadge portal={portal} />
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-2">
-          <button type="button" aria-label="Previous week" onClick={() => moveWeek(-1)} className="h-9 w-9 border border-black text-lg">‹</button>
-          <div>
-            <h1 className="font-sans text-xl font-semibold">{range}</h1>
-            <p className="font-sans text-[10px] uppercase tracking-[0.15em] text-[#1A4FBF]">Weekly CJ · {profile}</p>
-          </div>
-          <button type="button" aria-label="Next week" onClick={() => moveWeek(1)} className="h-9 w-9 border border-black text-lg">›</button>
-        </div>
-        <div className="flex items-center gap-2 font-sans text-xs">
-          <button type="button" aria-label="This week" onClick={() => setParams({ start: mondayIso() })} className="border border-black px-3 py-2">Today</button>
-          <button type="button" aria-label="Refresh" onClick={load} className="h-9 w-9 border border-black text-base">↻</button>
-          <Link aria-label="Calendar" title="Calendar" to={calendarPath} className="flex h-9 w-9 items-center justify-center border border-black text-inherit no-underline">▦</Link>
-          <button type="button" onClick={() => setCoursesOpen((open) => !open)} className="bg-black px-3 py-2 text-white">Courses</button>
-        </div>
+        <CjDateNavigation
+          date={weekStart}
+          weekEnd={weekEnd}
+          mode="week"
+          eyebrow={`Weekly CJ · ${profile === "custom" ? "Manual" : profile}`}
+          onPrevious={() => moveWeek(-1)}
+          onNext={() => moveWeek(1)}
+        />
+        <CjStudentActions
+          onToday={() => setParams({ start: mondayIso() })}
+          onRefresh={load}
+          onCourses={() => setCoursesOpen((open) => !open)}
+          coursesOpen={coursesOpen}
+          coursesDisabled={!data}
+        />
       </div>
 
       {coursesOpen ? (
@@ -138,15 +148,23 @@ export default function CjWeek({ portal = "student", calendarPath = "/cj/student
       </div>
 
       <div className="mt-4 grid gap-4 lg:grid-cols-2">
-        <HighlightList icon="✓" title="Homework" empty="No homework posted this week." items={homework.map((entry) => ({
+        <HighlightList icon="✓" title="Homework" empty="No homework posted this week." groupByDay items={homework.map((entry) => ({
           id: entry.id,
-          meta: `${WEEKDAY_SHORT[entry.day_index]} · ${subjectMap.get(entry.subject_id)?.short_name || entry.subject_id}`,
+          dayIndex: entry.day_index,
+          meta: subjectMap.get(entry.subject_id)?.short_name || entry.subject_id,
           text: entry.hw,
+          completed: homeworkProgress.isComplete(entry),
+          checkable: true,
+          onToggle: () => homeworkProgress.toggle(entry),
+          color: courseColor(subjectMap.get(entry.subject_id), entry.period),
+          useCourseColor: !FIXED_PERIODS.has(entry.period),
         }))} />
         <HighlightList icon="!" title="Exams" empty="No exams posted this week." items={(data?.exams || []).map((exam) => ({
           id: exam.id,
           meta: `${WEEKDAY_SHORT[exam.day_index]} ${exam.time} · ${subjectMap.get(exam.subject_id)?.short_name || exam.subject_id}`,
           text: exam.title,
+          note: exam.note,
+          completed: isExamComplete(exam, weekStart),
         }))} />
       </div>
     </section>
@@ -154,6 +172,8 @@ export default function CjWeek({ portal = "student", calendarPath = "/cj/student
 }
 
 function WeekRow({ period, subject, entries, weekStart, loading }) {
+  const accent = courseColor(subject, period);
+  const useCourseColor = Boolean(subject) && !FIXED_PERIODS.has(period);
   return (
     <>
       <div className="flex h-12 flex-col items-center justify-center overflow-hidden bg-white px-1 font-sans">
@@ -167,11 +187,16 @@ function WeekRow({ period, subject, entries, weekStart, loading }) {
         if (!subject) return <div key={day} className="h-12 bg-neutral-50" />;
         const query = new URLSearchParams({ date: isoDate(date), period: String(period), subject: subject.id });
         return (
-          <Link key={day} to={`/cj/student/course?${query}`} className="h-12 overflow-hidden bg-white px-2 py-1 text-inherit no-underline hover:bg-[#edf3ff]">
+          <Link
+            key={day}
+            to={`/cj/student/course?${query}`}
+            className="h-12 overflow-hidden bg-white px-2 py-1 text-inherit no-underline"
+            style={useCourseColor ? { backgroundColor: colorTint(accent), boxShadow: `inset 0 3px 0 ${accent}` } : undefined}
+          >
             <p className="truncate font-sans text-[11px] font-semibold">{subject.short_name}</p>
-            {entry?.ic ? <p className="truncate font-sans text-[9px] text-neutral-600"><b className="text-[#1A4FBF]">IC</b> {entry.ic}</p> : null}
-            {entry?.hw ? <p className="truncate font-sans text-[9px] text-neutral-600"><b className="text-[#1A4FBF]">HW</b> {entry.hw}</p> : null}
-            {entry?.announcement ? <p className="truncate font-sans text-[9px] text-neutral-600"><b className="text-[#1A4FBF]">A</b> {entry.announcement}</p> : null}
+            {entry?.ic ? <p className="truncate font-sans text-[9px] text-neutral-600"><b style={{ color: accent }}>IC</b> {entry.ic}</p> : null}
+            {entry?.hw ? <p className="truncate font-sans text-[9px] text-neutral-600"><b style={{ color: accent }}>HW</b> {entry.hw}</p> : null}
+            {entry?.announcement ? <p className="truncate font-sans text-[9px] text-neutral-600"><b style={{ color: accent }}>A</b> {entry.announcement}</p> : null}
           </Link>
         );
       })}
@@ -179,20 +204,86 @@ function WeekRow({ period, subject, entries, weekStart, loading }) {
   );
 }
 
-function HighlightList({ icon, title, empty, items }) {
+function HighlightList({ icon, title, empty, items, groupByDay = false }) {
+  if (groupByDay) {
+    const dayColumns = WEEKDAY_SHORT.map((_, dayIndex) => items.filter((item) => item.dayIndex === dayIndex));
+    const rowCount = Math.max(...dayColumns.map((column) => column.length), 0);
+    return (
+      <section className="border border-black bg-white p-3">
+        <h2 className="flex items-center gap-2 font-sans text-sm font-semibold"><span className="flex h-6 w-6 items-center justify-center bg-[#1A4FBF] text-white">{icon}</span>{title}</h2>
+        {items.length ? (
+          <div className="mt-2 grid grid-cols-5 gap-x-1.5 gap-y-1.5">
+            {WEEKDAY_SHORT.map((day) => (
+              <p key={day} className="border-b border-neutral-300 pb-1 text-center font-sans text-[9px] font-semibold uppercase tracking-[0.12em] text-neutral-500">{day}</p>
+            ))}
+            {Array.from({ length: rowCount }, (_, rowIndex) => (
+              dayColumns.map((column, dayIndex) => {
+                const item = column[rowIndex];
+                return item
+                  ? <HomeworkCard key={item.id} item={item} />
+                  : <div key={`${dayIndex}-${rowIndex}`} aria-hidden="true" className="min-h-14" />;
+              })
+            ))}
+          </div>
+        ) : <p className="mt-2 font-sans text-xs text-neutral-500">{empty}</p>}
+      </section>
+    );
+  }
+
   return (
     <section className="border border-black bg-white p-3">
       <h2 className="flex items-center gap-2 font-sans text-sm font-semibold"><span className="flex h-6 w-6 items-center justify-center bg-[#1A4FBF] text-white">{icon}</span>{title}</h2>
       {items.length ? (
         <div className="mt-2 grid gap-1.5 sm:grid-cols-2">
           {items.map((item) => (
-            <article key={item.id} className="border-l-2 border-[#1A4FBF] bg-[#f6f8fd] px-2 py-1.5">
-              <p className="font-sans text-[9px] uppercase tracking-[0.1em] text-[#1A4FBF]">{item.meta}</p>
-              <p className="truncate font-sans text-xs">{item.text}</p>
+            <article
+              key={item.id}
+              className={`border-l-2 bg-[#f6f8fd] px-2 py-1.5 ${item.completed ? "opacity-55" : ""}`}
+              style={item.useCourseColor ? { borderColor: item.color, backgroundColor: colorTint(item.color) } : { borderColor: DEFAULT_CJ_COLOR }}
+            >
+              <div className="flex gap-2">
+                {item.checkable ? (
+                  <input
+                    type="checkbox"
+                    checked={item.completed}
+                    onChange={item.onToggle}
+                    aria-label={`Mark ${item.text} complete`}
+                    className="mt-0.5 h-4 w-4 shrink-0"
+                    style={{ accentColor: item.useCourseColor ? item.color : DEFAULT_CJ_COLOR }}
+                  />
+                ) : item.completed ? <span aria-label="Completed" className="text-[#1A4FBF]">✓</span> : null}
+                <div className="min-w-0">
+                  <p className={`font-sans text-[9px] uppercase tracking-[0.1em] ${item.completed ? "line-through" : ""}`} style={{ color: item.useCourseColor ? item.color : DEFAULT_CJ_COLOR }}>{item.meta}</p>
+                  <p className={`truncate font-sans text-xs ${item.completed ? "line-through" : ""}`}>{item.text}</p>
+                  {item.note ? <p className={`mt-0.5 truncate font-sans text-[10px] text-neutral-500 ${item.completed ? "line-through" : ""}`}>{item.note}</p> : null}
+                </div>
+              </div>
             </article>
           ))}
         </div>
       ) : <p className="mt-2 font-sans text-xs text-neutral-500">{empty}</p>}
     </section>
+  );
+}
+
+function HomeworkCard({ item }) {
+  return (
+    <label
+      className={`flex min-h-14 cursor-pointer gap-1.5 border-l-2 bg-[#f6f8fd] px-1.5 py-1.5 ${item.completed ? "opacity-55" : ""}`}
+      style={item.useCourseColor ? { borderColor: item.color, backgroundColor: colorTint(item.color) } : { borderColor: DEFAULT_CJ_COLOR }}
+    >
+      <input
+        type="checkbox"
+        checked={item.completed}
+        onChange={item.onToggle}
+        aria-label={`Mark ${item.text} complete`}
+        className="mt-0.5 h-3.5 w-3.5 shrink-0"
+        style={{ accentColor: item.useCourseColor ? item.color : DEFAULT_CJ_COLOR }}
+      />
+      <span className="min-w-0">
+        <span className={`block truncate font-sans text-[8px] uppercase tracking-[0.08em] ${item.completed ? "line-through" : ""}`} style={{ color: item.useCourseColor ? item.color : DEFAULT_CJ_COLOR }}>{item.meta}</span>
+        <span className={`block font-sans text-[10px] leading-3.5 ${item.completed ? "line-through" : ""}`}>{item.text}</span>
+      </span>
+    </label>
   );
 }

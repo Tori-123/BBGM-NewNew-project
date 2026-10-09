@@ -203,11 +203,15 @@ export const api = {
       method: "PUT",
       body: JSON.stringify(body),
     }),
+  deleteExam: (examId) =>
+    request(`/cj/exams/${encodeURIComponent(examId)}`, { method: "DELETE" }),
   createCjSubject: (body) =>
     request("/cj/subjects", {
       method: "POST",
       body: JSON.stringify(body),
     }),
+  deleteCjSubject: (subjectId) =>
+    request(`/cj/subjects/${encodeURIComponent(subjectId)}`, { method: "DELETE" }),
   listCjTeachers: () => request("/cj/teachers"),
   assignCjTeacherSubjects: (teacherId, subjectIds) =>
     request(`/cj/teachers/${encodeURIComponent(teacherId)}`, {

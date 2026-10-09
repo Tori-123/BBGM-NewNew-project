@@ -6,7 +6,7 @@ from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session
 
 from deps import get_cj_editor, get_cj_viewer, get_db, get_super_admin
-from errors import ApiError, forbidden, validation_error
+from errors import ApiError, validation_error
 from models import CJEntry, CJTeacherSubject, Exam, Subject, User, to_iso, utc_now
 
 router = APIRouter()
@@ -17,24 +17,26 @@ _TIME = re.compile(r"^\d{2}:\d{2}$")
 _SUBJECTS = [
     ("advisory-11ac", "Morning Advisory · 11Ac", "Advisory", "#1d4ed8", 1, 1),
     ("advisory-11mc", "Morning Advisory · 11Mc", "Advisory", "#1d4ed8", 1, 2),
-    ("chinese-11ac", "Chinese 11 · Ac", "Chinese 11", "#2563eb", 2, 3),
-    ("chinese-11mc", "Chinese 11 · Mc", "Chinese 11", "#2563eb", 5, 4),
-    ("ap-lang-11ac", "AP English Language & Composition · 11Ac", "AP Lang", "#315fbd", 5, 5),
-    ("ap-lang-11mc", "AP English Language & Composition · 11Mc", "AP Lang", "#315fbd", 3, 6),
-    ("ap-euro-11ac", "AP European History · 11Ac", "AP Euro", "#0e7490", 6, 7),
-    ("ap-euro-11mc", "AP European History · 11Mc", "AP Euro", "#0e7490", 2, 8),
+    ("chinese-11ac", "Chinese 11 · Ac", "Chinese 11", "#F04444", 2, 3),
+    ("chinese-11mc", "Chinese 11 · Mc", "Chinese 11", "#F04444", 5, 4),
+    ("ap-lang-11ac", "AP English Language & Composition · 11Ac", "AP Lang", "#8B5CF6", 5, 5),
+    ("ap-lang-11mc", "AP English Language & Composition · 11Mc", "AP Lang", "#8B5CF6", 3, 6),
+    ("ap-euro-11ac", "AP European History · 11Ac", "AP Euro", "#F97316", 6, 7),
+    ("ap-euro-11mc", "AP European History · 11Mc", "AP Euro", "#F97316", 2, 8),
     ("lunch-11ac", "Lunch · 11Ac", "Lunch", "#64748b", 7, 9),
     ("lunch-11mc", "Lunch · 11Mc", "Lunch", "#64748b", 7, 10),
     ("ae-11ac", "AE · 11Ac", "AE", "#475569", 8, 11),
     ("ae-11mc", "AE · 11Mc", "AE", "#475569", 8, 12),
-    ("ap-calculus-11ac", "AP Calculus AB · 11Ac", "AP Calculus AB", "#1a4fbf", 10, 13),
-    ("ap-calculus-11mc", "AP Calculus AB · 11Mc", "AP Calculus AB", "#1a4fbf", 4, 14),
-    ("ap-micro-macro", "AP Microeconomics / AP Macroeconomics", "AP Economics", "#0284c7", 3, 15),
-    ("study-hall", "Study Hall", "Study Hall", "#64748b", 4, 16),
-    ("ap-physics", "AP Physics 1", "AP Physics 1", "#3b82f6", 9, 17),
-    ("ap-stats", "AP Statistics", "AP Statistics", "#4f46e5", 8, 18),
-    ("ap-csa", "AP Computer Science A", "AP CSA", "#4338ca", 11, 19),
+    ("ap-calculus-11ac", "AP Calculus AB · 11Ac", "AP Calculus AB", "#1677FF", 10, 13),
+    ("ap-calculus-11mc", "AP Calculus AB · 11Mc", "AP Calculus AB", "#1677FF", 4, 14),
+    ("ap-micro-macro", "AP Microeconomics / AP Macroeconomics", "AP Economics", "#00A86B", 3, 15),
+    ("study-hall", "Study Hall", "Study Hall", "#E6A000", 4, 16),
+    ("ap-physics", "AP Physics 1", "AP Physics 1", "#00AFC1", 9, 17),
+    ("ap-stats", "AP Statistics", "AP Statistics", "#E83E8C", 8, 18),
+    ("ap-csa", "AP Computer Science A", "AP CSA", "#5B4BFF", 11, 19),
 ]
+
+_CUSTOM_COLORS = ["#14B8A6", "#A855F7", "#F97316", "#0EA5E9", "#F43F5E", "#84CC16"]
 
 _SUBJECT_DETAILS = {
     "advisory-11ac": {"grade": 11, "class_section": "Ac", "teacher": "Rudi Herman Scheepers", "room": "E307", "required": True},
@@ -273,27 +275,13 @@ def read_cj(
         .where(CJEntry.week_start == week, CJEntry.subject_id.in_(catalog_ids))
         .order_by(CJEntry.day_index, CJEntry.period)
     )
-    if user.role == "teacher":
-        subject_ids = _teacher_subject_ids(db, user.id)
-        if subject_ids:
-            subjects = db.scalars(subject_query.where(Subject.id.in_(subject_ids))).all()
-            entries = db.scalars(entry_query.where(CJEntry.subject_id.in_(subject_ids))).all()
-        else:
-            subjects = []
-            entries = []
-        exams = db.scalars(
-            select(Exam)
-            .where(Exam.week_start == week, Exam.subject_id.in_(subject_ids))
-            .order_by(Exam.day_index, Exam.time)
-        ).all() if subject_ids else []
-    else:
-        subjects = db.scalars(subject_query).all()
-        entries = db.scalars(entry_query).all()
-        exams = db.scalars(
-            select(Exam)
-            .where(Exam.week_start == week, Exam.subject_id.in_(catalog_ids))
-            .order_by(Exam.day_index, Exam.time)
-        ).all()
+    subjects = db.scalars(subject_query).all()
+    entries = db.scalars(entry_query).all()
+    exams = db.scalars(
+        select(Exam)
+        .where(Exam.week_start == week, Exam.subject_id.in_(catalog_ids))
+        .order_by(Exam.day_index, Exam.time)
+    ).all()
     return {
         "week_start": week,
         "subjects": [_subject_payload(row) for row in subjects],
@@ -305,7 +293,7 @@ def read_cj(
 @router.post("/cj/subjects", status_code=201)
 def create_cj_subject(
     body: dict,
-    _: User = Depends(get_super_admin),
+    _: User = Depends(get_cj_editor),
     db: Session = Depends(get_db),
 ):
     name = str(body.get("name") or "").strip()
@@ -334,13 +322,14 @@ def create_cj_subject(
         raise validation_error(fields)
 
     slug = re.sub(r"[^a-z0-9]+", "-", name.lower()).strip("-")[:42] or "course"
+    custom_count = db.scalar(select(func.count()).select_from(Subject).where(Subject.is_custom.is_(True))) or 0
     subject = Subject(
         id=f"custom-{slug}-{uuid4().hex[:6]}",
         name=name,
         short_name=short_name,
-        color="#1A4FBF",
+        color=_CUSTOM_COLORS[custom_count % len(_CUSTOM_COLORS)],
         period=period,
-        sort_order=1000 + (db.scalar(select(func.count()).select_from(Subject).where(Subject.is_custom.is_(True))) or 0),
+        sort_order=1000 + custom_count,
         grade=grade,
         class_section=class_section,
         teacher=teacher,
@@ -351,6 +340,27 @@ def create_cj_subject(
     db.add(subject)
     db.flush()
     return _subject_payload(subject)
+
+
+@router.delete("/cj/subjects/{subject_id}", status_code=204)
+def delete_cj_subject(
+    subject_id: str,
+    _: User = Depends(get_super_admin),
+    db: Session = Depends(get_db),
+):
+    subject = db.get(Subject, subject_id)
+    if subject is None:
+        raise ApiError(404, "not_found", "Course not found.")
+    if not subject.is_custom:
+        raise validation_error([
+            {"field": "subject_id", "message": "Built-in school courses cannot be deleted."}
+        ])
+    db.execute(delete(CJTeacherSubject).where(CJTeacherSubject.subject_id == subject_id))
+    db.execute(delete(CJEntry).where(CJEntry.subject_id == subject_id))
+    db.execute(delete(Exam).where(Exam.subject_id == subject_id))
+    db.delete(subject)
+    db.flush()
+    return None
 
 
 @router.put("/cj")
@@ -378,8 +388,6 @@ def save_cj(
     subject = db.get(Subject, subject_id)
     if subject is None:
         raise ApiError(404, "not_found", "Subject not found.")
-    if user.role == "teacher" and subject_id not in _teacher_subject_ids(db, user.id):
-        raise forbidden("Teachers may only update subjects assigned to them.")
     existing = _slot(db, week, day_index, subject.period, subject_id)
     updated_at = to_iso(utc_now())
     if existing is None:
@@ -434,15 +442,9 @@ def save_exam(
     subject = db.get(Subject, subject_id)
     if subject is None:
         raise ApiError(404, "not_found", "Subject not found.")
-    assigned_ids = _teacher_subject_ids(db, user.id) if user.role == "teacher" else []
-    if user.role == "teacher" and subject_id not in assigned_ids:
-        raise forbidden("Teachers may only manage exams for their assigned subject.")
-
     exam_id = str(body.get("id") or "").strip() or str(uuid4())
     updated_at = to_iso(utc_now())
     row = db.get(Exam, exam_id)
-    if row is not None and user.role == "teacher" and row.subject_id not in assigned_ids:
-        raise forbidden("Teachers may only update exams for their assigned subject.")
     if row is None:
         row = Exam(
             id=exam_id,
@@ -467,6 +469,20 @@ def save_exam(
         row.updated_at = updated_at
     db.flush()
     return {"id": row.id, "updated_at": updated_at}
+
+
+@router.delete("/cj/exams/{exam_id}", status_code=204)
+def delete_exam(
+    exam_id: str,
+    _: User = Depends(get_cj_editor),
+    db: Session = Depends(get_db),
+):
+    exam = db.get(Exam, exam_id)
+    if exam is None:
+        raise ApiError(404, "not_found", "Exam not found.")
+    db.delete(exam)
+    db.flush()
+    return None
 
 
 @router.get("/cj/teachers")

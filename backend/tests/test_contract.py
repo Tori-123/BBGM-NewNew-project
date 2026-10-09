@@ -1124,9 +1124,11 @@ def test_cj_role_portals_and_subject_scoping(tmp_path, monkeypatch):
         assert student_view.status_code == 200, student_view.text
         assert teacher_view.status_code == 200, teacher_view.text
         assert len(student_view.json()["subjects"]) == len(all_subjects)
-        assert [subject["id"] for subject in teacher_view.json()["subjects"]] == [assigned_subject]
-        assert all(exam["subject_id"] == assigned_subject for exam in teacher_view.json()["exams"])
-        assert all(entry["subject_id"] == assigned_subject for entry in teacher_view.json()["entries"])
+        assert [subject["id"] for subject in teacher_view.json()["subjects"]] == [
+            subject["id"] for subject in all_subjects
+        ]
+        assert teacher_view.json()["entries"] == student_view.json()["entries"]
+        assert teacher_view.json()["exams"] == student_view.json()["exams"]
 
         multiple_assignment = super_client.put(
             f"/api/v1/cj/teachers/{teacher_id}",
@@ -1145,9 +1147,10 @@ def test_cj_role_portals_and_subject_scoping(tmp_path, monkeypatch):
         assert student_client.put("/api/v1/cj", json=entry).status_code == 403
         teacher_saved = teacher_client.put("/api/v1/cj", json=entry)
         assert teacher_saved.status_code == 200, teacher_saved.text
-        assert teacher_client.put(
+        outside_saved = teacher_client.put(
             "/api/v1/cj", json={**entry, "subject_id": other_subject}
-        ).status_code == 403
+        )
+        assert outside_saved.status_code == 200, outside_saved.text
         teacher_exam = teacher_client.put(
             "/api/v1/cj/exams",
             json={
@@ -1161,7 +1164,7 @@ def test_cj_role_portals_and_subject_scoping(tmp_path, monkeypatch):
             },
         )
         assert teacher_exam.status_code == 200, teacher_exam.text
-        assert teacher_client.put(
+        outside_exam = teacher_client.put(
             "/api/v1/cj/exams",
             json={
                 "week_start": "2026-10-05",
@@ -1172,7 +1175,11 @@ def test_cj_role_portals_and_subject_scoping(tmp_path, monkeypatch):
                 "location": "Room 101",
                 "note": "",
             },
-        ).status_code == 403
+        )
+        assert outside_exam.status_code == 200, outside_exam.text
+        assert teacher_client.delete(
+            f"/api/v1/cj/exams/{outside_exam.json()['id']}"
+        ).status_code == 204
 
         super_saved = super_client.put(
             "/api/v1/cj", json={**entry, "subject_id": other_subject, "ic": "Super-admin update"}
@@ -1204,10 +1211,22 @@ def test_cj_role_portals_and_subject_scoping(tmp_path, monkeypatch):
             "teacher": "Demo Teacher",
             "room": "E401",
         }
-        assert teacher_client.post("/api/v1/cj/subjects", json=new_course).status_code == 403
-        created_course = super_client.post("/api/v1/cj/subjects", json=new_course)
+        teacher_course = teacher_client.post("/api/v1/cj/subjects", json=new_course)
+        assert teacher_course.status_code == 201, teacher_course.text
+        assert teacher_course.json()["is_custom"] is True
+        assert teacher_client.delete(
+            f"/api/v1/cj/subjects/{teacher_course.json()['id']}"
+        ).status_code == 403
+
+        admin_course = {**new_course, "name": "Environmental Science Lab", "short_name": "ES Lab"}
+        created_course = super_client.post("/api/v1/cj/subjects", json=admin_course)
         assert created_course.status_code == 201, created_course.text
         assert created_course.json()["is_custom"] is True
         after_course = student_client.get("/api/v1/cj?week_start=2026-10-05")
         assert any(subject["short_name"] == "APES" for subject in after_course.json()["subjects"])
+        assert any(subject["short_name"] == "ES Lab" for subject in after_course.json()["subjects"])
+        assert super_client.delete(
+            f"/api/v1/cj/subjects/{created_course.json()['id']}"
+        ).status_code == 204
+        assert super_client.delete(f"/api/v1/cj/subjects/{assigned_subject}").status_code == 422
     app.state.engine.dispose()

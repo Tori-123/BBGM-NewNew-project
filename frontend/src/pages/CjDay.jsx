@@ -3,6 +3,9 @@ import { Link, Navigate, useSearchParams } from "react-router-dom";
 import { api } from "../api";
 import CjPortalBadge from "../components/CjPortalBadge";
 import CjSchedulePicker from "../components/CjSchedulePicker";
+import CjStudentActions from "../components/CjStudentActions";
+import CjDateNavigation from "../components/CjDateNavigation";
+import CjTooltip from "../components/CjTooltip";
 import {
   PERIOD_COUNT,
   SCHEDULE_KEY,
@@ -18,6 +21,8 @@ import {
   previousSchoolDay,
 } from "../cjDates";
 import { useLiveRefresh } from "../live";
+import { isExamComplete, useHomeworkProgress } from "../cjProgress";
+import { colorTint, courseColor, DEFAULT_CJ_COLOR, FIXED_PERIODS } from "../cjColors";
 
 const ISO = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -29,7 +34,7 @@ export function CjWeekRedirect() {
 }
 
 function readSavedSchedule(subjects) {
-  const profile = window.localStorage.getItem(SCHEDULE_PROFILE_KEY) || "11Ac";
+  const profile = window.localStorage.getItem(SCHEDULE_PROFILE_KEY) || "custom";
   let saved = null;
   try {
     saved = JSON.parse(window.localStorage.getItem(SCHEDULE_KEY) || "null");
@@ -41,9 +46,7 @@ function readSavedSchedule(subjects) {
 
 export default function CjDay({
   portal = "student",
-  calendarPath = "/cj/student/calendar",
   detailPath = "/cj/student/course",
-  weekPath = "/cj/student/week",
 }) {
   const [params, setParams] = useSearchParams();
   const raw = params.get("date") || "";
@@ -55,11 +58,12 @@ export default function CjDay({
   const [data, setData] = useState(null);
   const [selected, setSelected] = useState([]);
   const [draftSelection, setDraftSelection] = useState([]);
-  const [profile, setProfile] = useState("11Ac");
-  const [draftProfile, setDraftProfile] = useState("11Ac");
+  const [profile, setProfile] = useState("custom");
+  const [draftProfile, setDraftProfile] = useState("custom");
   const [pickerOpen, setPickerOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const homeworkProgress = useHomeworkProgress();
 
   const loadDay = useCallback(async () => {
     setLoading(true);
@@ -123,28 +127,40 @@ export default function CjDay({
   return (
     <section className="mt-8">
       <CjPortalBadge portal={portal} />
-        <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        {portal === "student" ? (
+          <CjDateNavigation
+            date={date}
+            mode="day"
+            eyebrow={`Daily CJ · ${profile === "custom" ? "Manual" : profile}`}
+            detail={`${selectedCount} courses · 11 periods`}
+            onPrevious={() => moveDay(previousSchoolDay(date))}
+            onNext={() => moveDay(nextSchoolDay(date))}
+          />
+        ) : (
+          <div className="flex items-center gap-2">
+          <CjTooltip label="Previous school day" align="left">
+            <button type="button" aria-label="Previous school day" onClick={() => moveDay(previousSchoolDay(date))} className="h-9 w-9 border border-black text-lg">‹</button>
+          </CjTooltip>
+          <div>
           <p className="font-sans text-[11px] uppercase tracking-[0.16em] text-[#1A4FBF]">
-            Daily CJ · {profile}
+            Daily CJ · {profile === "custom" ? "Manual" : profile}
           </p>
           <h1 className="mt-1 font-sans text-2xl font-semibold">{heading}</h1>
           <p className="mt-1 font-sans text-xs text-neutral-500">{selectedCount} courses · 11 periods</p>
-        </div>
-        <div className="flex flex-wrap items-center gap-2 font-sans text-xs">
-          <button type="button" aria-label="Previous day" title="Previous day" onClick={() => moveDay(previousSchoolDay(date))} className="h-9 w-9 border border-black text-lg">‹</button>
-          <Link aria-label="Weekly view" title="Weekly view" to={`${weekPath}?start=${isoDate(weekStart)}`} className="flex h-9 w-9 items-center justify-center border border-black text-inherit no-underline">▦</Link>
-          <Link aria-label="Calendar" title="Calendar" to={calendarPath} className="flex h-9 w-9 items-center justify-center border border-black text-inherit no-underline">◫</Link>
-          <button type="button" aria-label="Next day" title="Next day" onClick={() => moveDay(nextSchoolDay(date))} className="h-9 w-9 border border-black text-lg">›</button>
-          <button
-            type="button"
-            disabled={!data}
-            onClick={() => setPickerOpen((open) => !open)}
-            className="bg-black px-3 py-2 text-white disabled:opacity-40"
-          >
-            Courses
-          </button>
-        </div>
+          </div>
+          <CjTooltip label="Next school day" align="left">
+            <button type="button" aria-label="Next school day" onClick={() => moveDay(nextSchoolDay(date))} className="h-9 w-9 border border-black text-lg">›</button>
+          </CjTooltip>
+          </div>
+        )}
+        <CjStudentActions
+          onToday={() => setParams({ date: isoDate(new Date()) })}
+          onRefresh={loadDay}
+          onCourses={() => setPickerOpen((open) => !open)}
+          coursesOpen={pickerOpen}
+          coursesDisabled={!data}
+        />
       </div>
 
       {pickerOpen ? (
@@ -197,18 +213,23 @@ export default function CjDay({
       )}
 
       <div className="mt-4 grid gap-4 lg:grid-cols-2">
-        <HomeworkList homework={homework} subjects={data?.subjects || []} loading={loading} />
-        <ExamList exams={exams} subjects={data?.subjects || []} loading={loading} />
+        <HomeworkList homework={homework} subjects={data?.subjects || []} loading={loading} progress={homeworkProgress} />
+        <ExamList exams={exams} subjects={data?.subjects || []} loading={loading} weekStart={weekStart} />
       </div>
     </section>
   );
 }
 
 function CourseRow({ period, subject, entry, date, detailPath }) {
+  const accent = courseColor(subject, period);
+  const useCourseColor = Boolean(subject) && !FIXED_PERIODS.has(period);
   const content = (
-    <article className={`grid min-h-14 gap-2 bg-white px-3 py-2 transition-colors sm:grid-cols-[125px_1fr] ${subject ? "hover:bg-[#f7f9fd]" : ""}`}>
+    <article
+      className="grid min-h-14 gap-2 bg-white px-3 py-2 transition-colors sm:grid-cols-[125px_1fr]"
+      style={useCourseColor ? { backgroundColor: colorTint(accent), boxShadow: `inset 3px 0 0 ${accent}` } : undefined}
+    >
       <div className="flex items-center gap-2 border-b border-neutral-200 pb-2 sm:border-b-0 sm:border-r sm:pb-0 sm:pr-3">
-        <span className="inline-block bg-black px-2 py-1 font-sans text-[10px] text-white">P{period}</span>
+        <span className="inline-block bg-black px-2 py-1 font-sans text-[10px] text-white" style={useCourseColor ? { backgroundColor: accent } : undefined}>P{period}</span>
         <p className="font-sans text-[10px] text-neutral-600">{periodTimeLabel(period)}</p>
       </div>
       {subject ? (
@@ -218,9 +239,9 @@ function CourseRow({ period, subject, entry, date, detailPath }) {
             <p className="truncate font-sans text-[10px] text-neutral-500">{subject.teacher} · {subject.room}</p>
           </div>
           <div className="grid min-w-0 gap-2 sm:grid-cols-3">
-            <Info label="IC" value={entry?.ic} />
-            <Info label="HW" value={entry?.hw} />
-            <Info label="A" value={entry?.announcement} />
+            <Info label="IC" value={entry?.ic} color={accent} />
+            <Info label="HW" value={entry?.hw} color={accent} />
+            <Info label="A" value={entry?.announcement} color={accent} />
           </div>
         </div>
       ) : (
@@ -233,35 +254,48 @@ function CourseRow({ period, subject, entry, date, detailPath }) {
   return <Link to={`${detailPath}?${query}`} className="block text-inherit no-underline">{content}</Link>;
 }
 
-function Info({ label, value }) {
+function Info({ label, value, color }) {
   return (
     <div>
-      <p className="font-sans text-[10px] uppercase tracking-[0.14em] text-[#1A4FBF]">{label}</p>
+      <p className="font-sans text-[10px] uppercase tracking-[0.14em]" style={{ color }}>{label}</p>
       <p className="truncate font-sans text-[11px] leading-4">{value || "—"}</p>
     </div>
   );
 }
 
-function HomeworkList({ homework, subjects, loading }) {
+function HomeworkList({ homework, subjects, loading, progress }) {
   const subjectMap = new Map(subjects.map((subject) => [subject.id, subject]));
   return (
     <section className="border border-black bg-white p-3">
       <h2 className="flex items-center gap-2 font-sans text-sm font-semibold"><span className="flex h-6 w-6 items-center justify-center bg-[#1A4FBF] text-white">✓</span>Today's homework</h2>
       {loading ? <p className="mt-2 font-sans text-xs text-neutral-500">Loading…</p> : homework.length ? (
         <div className="mt-2 grid gap-1.5">
-          {homework.map((entry) => (
-            <article key={entry.id} className="border-l-2 border-[#1A4FBF] bg-[#f6f8fd] px-2 py-1.5">
-              <p className="font-sans text-[9px] uppercase tracking-[0.1em] text-[#1A4FBF]">{subjectMap.get(entry.subject_id)?.short_name || entry.subject_id}</p>
-              <p className="font-sans text-xs">{entry.hw}</p>
-            </article>
-          ))}
+          {homework.map((entry) => {
+            const complete = progress.isComplete(entry);
+            const subject = subjectMap.get(entry.subject_id);
+            const accent = courseColor(subject, entry.period);
+            const useCourseColor = !FIXED_PERIODS.has(entry.period);
+            return (
+              <label
+                key={entry.id}
+                className={`flex cursor-pointer gap-2 border-l-2 bg-[#f6f8fd] px-2 py-1.5 ${complete ? "opacity-55" : ""}`}
+                style={useCourseColor ? { borderColor: accent, backgroundColor: colorTint(accent) } : { borderColor: DEFAULT_CJ_COLOR }}
+              >
+                <input type="checkbox" checked={complete} onChange={() => progress.toggle(entry)} className="mt-0.5 h-4 w-4" style={{ accentColor: useCourseColor ? accent : DEFAULT_CJ_COLOR }} />
+                <span>
+                  <span className={`block font-sans text-[9px] uppercase tracking-[0.1em] ${complete ? "line-through" : ""}`} style={{ color: useCourseColor ? accent : DEFAULT_CJ_COLOR }}>{subject?.short_name || entry.subject_id}</span>
+                  <span className={`block font-sans text-xs ${complete ? "line-through" : ""}`}>{entry.hw}</span>
+                </span>
+              </label>
+            );
+          })}
         </div>
       ) : <p className="mt-2 font-sans text-xs text-neutral-500">No homework posted today.</p>}
     </section>
   );
 }
 
-function ExamList({ exams, subjects, loading }) {
+function ExamList({ exams, subjects, loading, weekStart }) {
   const subjectMap = new Map(subjects.map((subject) => [subject.id, subject]));
   return (
     <section className="border border-black bg-white p-3">
@@ -272,11 +306,12 @@ function ExamList({ exams, subjects, loading }) {
         <div className="mt-2 grid gap-1.5">
           {exams.map((exam) => {
             const subject = subjectMap.get(exam.subject_id);
+            const complete = isExamComplete(exam, weekStart);
             return (
-              <article key={exam.id} className="border-l-2 border-[#1A4FBF] bg-[#f6f8fd] px-2 py-1.5">
-                <p className="font-sans text-[11px] uppercase tracking-[0.14em] text-neutral-500">{exam.time}{exam.location ? ` · ${exam.location}` : ""}</p>
-                <h3 className="mt-1 font-sans text-sm font-semibold">{subject ? `${subject.short_name} · ${exam.title}` : exam.title}</h3>
-                {exam.note ? <p className="mt-1 font-sans text-sm text-neutral-600">{exam.note}</p> : null}
+              <article key={exam.id} className={`border-l-2 border-[#1A4FBF] bg-[#f6f8fd] px-2 py-1.5 ${complete ? "opacity-55" : ""}`}>
+                <p className={`font-sans text-[11px] uppercase tracking-[0.14em] text-neutral-500 ${complete ? "line-through" : ""}`}>{complete ? "✓ " : ""}{exam.time}{exam.location ? ` · ${exam.location}` : ""}</p>
+                <h3 className={`mt-1 font-sans text-sm font-semibold ${complete ? "line-through" : ""}`}>{subject ? `${subject.short_name} · ${exam.title}` : exam.title}</h3>
+                {exam.note ? <p className={`mt-1 font-sans text-sm text-neutral-600 ${complete ? "line-through" : ""}`}>{exam.note}</p> : null}
               </article>
             );
           })}
