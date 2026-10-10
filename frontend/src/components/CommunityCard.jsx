@@ -5,7 +5,7 @@ import { useAuth } from "../auth";
 import { uploadSrc } from "../avatar";
 import { formatRelative } from "../format";
 import { useI18n } from "../i18n";
-import { TitleLine } from "./ui";
+import { TitleLine, ButtonSpinner } from "./ui";
 import { Avatar } from "./Avatar";
 
 function CommentIcon() {
@@ -112,6 +112,7 @@ export function CommunityCard({ post }) {
               aria-pressed={liked}
             >
               <LikeIcon filled={liked} />
+              {saving ? <ButtonSpinner /> : null}
               <span>{likeCount}</span>
             </button>
           </div>

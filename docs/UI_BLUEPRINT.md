@@ -50,6 +50,8 @@
 - 报头：左搜索框（外形保留；提交不调接口，在报头下出一条静态说明）。中：斜体衬线字标 `Elegram` 链回 `/`。右：静态「OWNED BY / 广东智云建材有限公司」。
 - 标语静态：`YOUR STORIES. YOUR VOICE. YOUR PAGE.`
 - 导航：`NEWS`（`/`）`DRAFTS`（`/news/drafts`）`FORUM` `CJ` `OPINION`。`CJ` 与 `FORUM` 同一行，链到 `/cj`。`DRAFTS` 只在 `role` 为 `editor` 或 `super_admin` 时出现。当前路由下划黑线。无 `SUBMIT`，无单独的 News 列表项。Forum 发帖在栏目页内。News 稿在 `/news/drafts`。
+- CJ 欢迎屏：`/cj` 仍只按角色跳到学生、老师或管理页。跳转之后，若这次登录还没看过欢迎屏，内容区左上角显示大号衬线 “Welcome, {display_name}”（中文 “欢迎，{display_name}”），约 1.8 秒淡入，淡入结束后再停一会儿，大约 3.2 秒后才渲染课表。标记在 `localStorage`，键带用户 `id`。重新登录或退出时清除。淡入结束前离开 CJ 不写入标记。已在 CJ 内换日期或课程不再播放。
+- 会等待接口的按钮：请求从发出到返回期间，按钮文字旁显示转圈，并且不可再点。页面初次加载仍用原来的“正在读取”文案，不盖整页。
 - 页脚声明（非 schema）：`Owned by 广东智云建材有限公司.`
 
 **栏目枚举 → 导航文案（展示层，不是新字段）**
@@ -188,7 +190,7 @@ Photo of the Day / Track of the Day / Student Art：静态标题+空图框+固�
 
 | 状态 | 表现 |
 | --- | --- |
-| 首次 | 窄表。登录：`email` `password`，表下链 `/reset-password`（Forgot password）。注册：`display_name` `email` `password`、「发送验证码」、`code`，以及勾选同意用户协议。点 “user agreement” 在当前页打开浮层，不离开注册表。浮层内 “I agree” 勾选并关闭；点关闭或遮罩则勾选不变。未勾选不提交；勾选后 body 带 `accept_terms: true`。注册与找回密码的密码框不走系统 Strong Password / 浏览器自动生成，由用户自己输入。 |
+| 首次 | 窄表。登录：`email` `password`，表下链 `/reset-password`（Forgot password）。注册：`display_name` `email` `password`、「发送验证码」、`code`，以及勾选同意用户协议。发送按钮下始终写明：正在把验证码发到这个邮箱，验证码 2 分钟后失效。发送成功后按钮进入 60 秒倒计时且不可再点，剩余秒数记在 `sessionStorage`（按邮箱和 `purpose=register`）。改邮箱后按新邮箱重算倒计时。点 “user agreement” 在当前页打开浮层，不离开注册表。浮层内 “I agree” 勾选并关闭；点关闭或遮罩则勾选不变。未勾选不提交；勾选后 body 带 `accept_terms: true`。注册与找回密码的密码框不走系统 Strong Password / 浏览器自动生成，由用户自己输入。 |
 | 422 | 字段下 ← `error.fields[]`。非 `@basischina.com` 只显示 email 错误，不进入等待验证码态。`accept_terms` 错误显示在勾选下方。 |
 | 401 `invalid_credentials` | 表单上沿 ← `error.message`（Email or password is incorrect.）。 |
 | 409 `email_taken` | `email` 下 ← `fields[].message` 或 `error.message`。 |
@@ -199,7 +201,7 @@ Photo of the Day / Track of the Day / Student Art：静态标题+空图框+固�
 
 | 状态 | 表现 |
 | --- | --- |
-| 首次 | 窄表：`email`、「发送验证码」、`code`、新 `password`。 |
+| 首次 | 窄表：`email`、「发送验证码」、`code`、新 `password`。发送按钮下始终写明正在把验证码发到这个邮箱，2 分钟后失效。发送成功后按钮 60 秒内不可再点，剩余秒数记在 `sessionStorage`（按邮箱和 `purpose=reset`）。仍保留“若该邮箱有账号，验证码已发出”，不泄露邮箱是否注册。 |
 | 422 | 字段下 ← `error.fields[]`。非校内邮箱只显示 email 错误。 |
 | 204 | 提示已更新，链去 `/sign-in`。不自动登录。 |
 | 503 | 表单顶 ← `error.message`。 |

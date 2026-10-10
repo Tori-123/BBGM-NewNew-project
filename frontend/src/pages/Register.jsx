@@ -2,7 +2,8 @@ import { useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { api, fieldMessage, safeNext } from "../api";
 import { useAuth } from "../auth";
-import { ErrorBanner, FieldError, FrontPageLink, ManualPasswordInput, SectionRule } from "../components/ui";
+import { ButtonSpinner, ErrorBanner, FieldError, FrontPageLink, ManualPasswordInput, SectionRule } from "../components/ui";
+import { useCodeCooldown } from "../emailCodeWait";
 import { useI18n } from "../i18n";
 import { TermsDialog } from "./Terms";
 
@@ -22,12 +23,16 @@ export default function Register() {
   const [acceptTerms, setAcceptTerms] = useState(false);
   const [termsError, setTermsError] = useState("");
   const [termsOpen, setTermsOpen] = useState(false);
+  const { secondsLeft, begin: beginWait } = useCodeCooldown("register", email);
+  const waiting = secondsLeft > 0;
 
   async function onSendCode() {
+    if (waiting || sendingCode) return;
     setSendingCode(true);
     setError(null);
     try {
       await api.sendEmailCode({ email, purpose: "register" });
+      beginWait();
       setCodeSent(true);
     } catch (err) {
       setCodeSent(false);
@@ -126,15 +131,17 @@ export default function Register() {
             />
             <button
               type="button"
-              disabled={sendingCode}
+              disabled={sendingCode || waiting}
               onClick={onSendCode}
-              className="shrink-0 border border-black px-3 py-2 font-sans text-[11px] uppercase tracking-[0.16em]"
+              className="inline-flex shrink-0 items-center gap-2 border border-black px-3 py-2 font-sans text-[11px] uppercase tracking-[0.16em] disabled:opacity-40"
             >
-              {sendingCode ? t("register.sending") : t("register.send")}
+              {sendingCode ? <ButtonSpinner /> : null}
+              {sendingCode ? t("register.sending") : waiting ? t("code.wait", { seconds: secondsLeft }) : t("register.send")}
             </button>
           </div>
           <FieldError message={fieldMessage(error, "code")} />
-          {codeSent && !fieldMessage(error, "code") && !emailError ? (
+          <p className="mt-2 font-sans text-sm text-neutral-500">{t("code.hint")}</p>
+          {(codeSent || waiting) && !fieldMessage(error, "code") && !emailError ? (
             <p className="mt-2 font-sans text-sm text-neutral-500">{t("register.sent")}</p>
           ) : null}
         </div>
@@ -171,8 +178,9 @@ export default function Register() {
         <button
           type="submit"
           disabled={submitting}
-          className="rounded-[2px] bg-black px-5 py-2 font-sans text-[11px] uppercase tracking-[0.18em] text-white"
+          className="inline-flex items-center gap-2 rounded-[2px] bg-black px-5 py-2 font-sans text-[11px] uppercase tracking-[0.18em] text-white disabled:opacity-40"
         >
+          {submitting ? <ButtonSpinner /> : null}
           {t("register.submit")}
         </button>
       </form>

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { api } from "../api";
 import CjPortalBadge from "../components/CjPortalBadge";
+import { ButtonSpinner } from "../components/ui";
 import { dateForDay, dateFromIso, isoDate, mondayIso } from "../cjDates";
 import { useI18n } from "../i18n";
 
@@ -31,7 +32,8 @@ export default function CjAdmin({ portal = "admin" }) {
   const [courseTeacher, setCourseTeacher] = useState("");
   const [courseRoom, setCourseRoom] = useState("");
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
+  const [busyKey, setBusyKey] = useState("");
+  const saving = Boolean(busyKey);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [teamsStatus, setTeamsStatus] = useState(null);
@@ -78,19 +80,19 @@ export default function CjAdmin({ portal = "admin" }) {
   }, [teacherMode, searchParams, t]);
 
   async function handleTeamsConnect() {
-    setSaving(true);
+    setBusyKey("teams-connect");
     setTeamsError("");
     try {
       const payload = await api.connectTeams();
       window.location.assign(payload.authorize_url);
     } catch (connectError) {
       setTeamsError(connectError instanceof Error ? connectError.message : t("cj.teamsError"));
-      setSaving(false);
+      setBusyKey("");
     }
   }
 
   async function handleTeamsPreview() {
-    setSaving(true);
+    setBusyKey("teams-preview");
     setTeamsError("");
     setNotice("");
     try {
@@ -99,12 +101,12 @@ export default function CjAdmin({ portal = "admin" }) {
       setTeamsPreview(null);
       setTeamsError(previewError instanceof Error ? previewError.message : t("cj.teamsError"));
     } finally {
-      setSaving(false);
+      setBusyKey("");
     }
   }
 
   async function handleTeamsApply() {
-    setSaving(true);
+    setBusyKey("teams-apply");
     setTeamsError("");
     try {
       const result = await api.applyTeamsCj({ week_start: weekStart, entries: teamsPreview.entries });
@@ -114,7 +116,7 @@ export default function CjAdmin({ portal = "admin" }) {
     } catch (applyError) {
       setTeamsError(applyError instanceof Error ? applyError.message : t("cj.teamsError"));
     } finally {
-      setSaving(false);
+      setBusyKey("");
     }
   }
 
@@ -138,7 +140,7 @@ export default function CjAdmin({ portal = "admin" }) {
     const file = event.target.files?.[0];
     event.target.value = "";
     if (!file) return;
-    setSaving(true);
+    setBusyKey("photo");
     setNotice("");
     try {
       const result = await api.recognizeCj(file, { weekStart, dayIndex });
@@ -152,13 +154,13 @@ export default function CjAdmin({ portal = "admin" }) {
     } catch (photoError) {
       setNotice(photoError instanceof Error ? photoError.message : t("cj.saveFailed"));
     } finally {
-      setSaving(false);
+      setBusyKey("");
     }
   }
 
   async function handleCjSave(event) {
     event.preventDefault();
-    setSaving(true);
+    setBusyKey("cj-save");
     setNotice("");
     try {
       await api.saveCj({ week_start: weekStart, day_index: dayIndex, subject_id: subjectId, ic, hw, announcement });
@@ -167,13 +169,13 @@ export default function CjAdmin({ portal = "admin" }) {
     } catch (saveError) {
       setNotice(saveError instanceof Error ? saveError.message : t("cj.saveFailed"));
     } finally {
-      setSaving(false);
+      setBusyKey("");
     }
   }
 
   async function handleExamSave(event) {
     event.preventDefault();
-    setSaving(true);
+    setBusyKey("exam-save");
     setNotice("");
     try {
       await api.saveExam({
@@ -192,13 +194,13 @@ export default function CjAdmin({ portal = "admin" }) {
     } catch (saveError) {
       setNotice(saveError instanceof Error ? saveError.message : t("cj.saveFailed"));
     } finally {
-      setSaving(false);
+      setBusyKey("");
     }
   }
 
   async function handleCourseSave(event) {
     event.preventDefault();
-    setSaving(true);
+    setBusyKey("course-save");
     setNotice("");
     try {
       const created = await api.createCjSubject({
@@ -219,13 +221,13 @@ export default function CjAdmin({ portal = "admin" }) {
     } catch (saveError) {
       setNotice(saveError instanceof Error ? saveError.message : "Could not add course.");
     } finally {
-      setSaving(false);
+      setBusyKey("");
     }
   }
 
   async function handleExamDelete() {
     if (!examId || !window.confirm("Delete this exam? Students will no longer see it.")) return;
-    setSaving(true);
+    setBusyKey("exam-delete");
     setNotice("");
     try {
       await api.deleteExam(examId);
@@ -235,13 +237,13 @@ export default function CjAdmin({ portal = "admin" }) {
     } catch (deleteError) {
       setNotice(deleteError instanceof Error ? deleteError.message : "Could not delete exam.");
     } finally {
-      setSaving(false);
+      setBusyKey("");
     }
   }
 
   async function handleCourseDelete(subject) {
     if (!window.confirm(`Delete ${subject.name}? Its CJ entries and exams will also be removed.`)) return;
-    setSaving(true);
+    setBusyKey(`course-delete:${subject.id}`);
     setNotice("");
     try {
       await api.deleteCjSubject(subject.id);
@@ -250,7 +252,7 @@ export default function CjAdmin({ portal = "admin" }) {
     } catch (deleteError) {
       setNotice(deleteError instanceof Error ? deleteError.message : "Could not delete course.");
     } finally {
-      setSaving(false);
+      setBusyKey("");
     }
   }
 
@@ -314,16 +316,18 @@ export default function CjAdmin({ portal = "admin" }) {
               type="button"
               disabled={saving || !teamsStatus?.microsoft_configured}
               onClick={handleTeamsConnect}
-              className="border border-black px-5 py-2 font-sans text-[11px] uppercase tracking-[0.16em] disabled:opacity-40"
+              className="inline-flex items-center gap-2 border border-black px-5 py-2 font-sans text-[11px] uppercase tracking-[0.16em] disabled:opacity-40"
             >
+              {busyKey === "teams-connect" ? <ButtonSpinner /> : null}
               {t("cj.teamsConnect")}
             </button>
             <button
               type="button"
               disabled={saving || !teamsStatus?.teams_connected || !teamsStatus?.deepseek_configured}
               onClick={handleTeamsPreview}
-              className="bg-black px-5 py-2 font-sans text-[11px] uppercase tracking-[0.16em] text-white disabled:opacity-40"
+              className="inline-flex items-center gap-2 bg-black px-5 py-2 font-sans text-[11px] uppercase tracking-[0.16em] text-white disabled:opacity-40"
             >
+              {busyKey === "teams-preview" ? <ButtonSpinner /> : null}
               {t("cj.teamsImport")}
             </button>
           </div>
@@ -362,8 +366,9 @@ export default function CjAdmin({ portal = "admin" }) {
                     type="button"
                     disabled={saving}
                     onClick={handleTeamsApply}
-                    className="bg-black px-5 py-2 font-sans text-[11px] uppercase tracking-[0.16em] text-white disabled:opacity-40"
+                    className="inline-flex items-center gap-2 bg-black px-5 py-2 font-sans text-[11px] uppercase tracking-[0.16em] text-white disabled:opacity-40"
                   >
+                    {busyKey === "teams-apply" ? <ButtonSpinner /> : null}
                     {t("cj.teamsConfirm")}
                   </button>
                 ) : null}
@@ -419,7 +424,10 @@ export default function CjAdmin({ portal = "admin" }) {
               </label>
             </div>
             <label className="mt-4 block font-sans text-[11px] uppercase tracking-[0.14em] text-[#1A4FBF]">
-              {t("cj.photo")}
+              <span className="inline-flex items-center gap-2">
+                {t("cj.photo")}
+                {busyKey === "photo" ? <ButtonSpinner /> : null}
+              </span>
               <input
                 type="file"
                 accept="image/jpeg,image/png,image/webp"
@@ -432,8 +440,9 @@ export default function CjAdmin({ portal = "admin" }) {
             <TextField label="IC" value={ic} onChange={setIc} />
             <TextField label="HW" value={hw} onChange={setHw} />
             <TextField label="A" value={announcement} onChange={setAnnouncement} />
-            <button type="submit" disabled={saving || loading || !subjectId} className="mt-4 bg-black px-5 py-2 font-sans text-[11px] uppercase tracking-[0.16em] text-white disabled:opacity-40">
-              {saving ? t("cj.saving") : t("cj.saveEntry")}
+            <button type="submit" disabled={saving || loading || !subjectId} className="mt-4 inline-flex items-center gap-2 bg-black px-5 py-2 font-sans text-[11px] uppercase tracking-[0.16em] text-white disabled:opacity-40">
+              {busyKey === "cj-save" ? <ButtonSpinner /> : null}
+              {busyKey === "cj-save" ? t("cj.saving") : t("cj.saveEntry")}
             </button>
           </form>
           <EntryList
@@ -495,11 +504,13 @@ export default function CjAdmin({ portal = "admin" }) {
             <LineField label={t("cj.location")} value={examLocation} onChange={setExamLocation} />
             <TextField label={t("cj.note")} value={examNote} onChange={setExamNote} />
             <div className="mt-4 flex flex-wrap gap-2">
-              <button type="submit" disabled={saving || loading || !examSubjectId || !examTitle.trim()} className="bg-black px-5 py-2 font-sans text-[11px] uppercase tracking-[0.16em] text-white disabled:opacity-40">
-                {saving ? t("cj.saving") : t("cj.saveExam")}
+              <button type="submit" disabled={saving || loading || !examSubjectId || !examTitle.trim()} className="inline-flex items-center gap-2 bg-black px-5 py-2 font-sans text-[11px] uppercase tracking-[0.16em] text-white disabled:opacity-40">
+                {busyKey === "exam-save" ? <ButtonSpinner /> : null}
+                {busyKey === "exam-save" ? t("cj.saving") : t("cj.saveExam")}
               </button>
               {examId ? (
-                <button type="button" disabled={saving} onClick={handleExamDelete} className="border border-red-700 px-5 py-2 font-sans text-[11px] uppercase tracking-[0.16em] text-red-700 disabled:opacity-40">
+                <button type="button" disabled={saving} onClick={handleExamDelete} className="inline-flex items-center gap-2 border border-red-700 px-5 py-2 font-sans text-[11px] uppercase tracking-[0.16em] text-red-700 disabled:opacity-40">
+                  {busyKey === "exam-delete" ? <ButtonSpinner /> : null}
                   Delete exam
                 </button>
               ) : null}
@@ -542,8 +553,9 @@ export default function CjAdmin({ portal = "admin" }) {
               <LineField label="Teacher" value={courseTeacher} onChange={setCourseTeacher} />
               <LineField label="Room" value={courseRoom} onChange={setCourseRoom} />
             </div>
-            <button type="submit" disabled={saving || !courseName.trim() || !courseShortName.trim()} className="mt-4 bg-black px-5 py-2 font-sans text-[11px] uppercase tracking-[0.16em] text-white disabled:opacity-40">
-              {saving ? "Adding…" : "Add course"}
+            <button type="submit" disabled={saving || !courseName.trim() || !courseShortName.trim()} className="mt-4 inline-flex items-center gap-2 bg-black px-5 py-2 font-sans text-[11px] uppercase tracking-[0.16em] text-white disabled:opacity-40">
+              {busyKey === "course-save" ? <ButtonSpinner /> : null}
+              {busyKey === "course-save" ? "Adding…" : "Add course"}
             </button>
           </form>
           <aside className="border border-black p-4">
@@ -556,7 +568,8 @@ export default function CjAdmin({ portal = "admin" }) {
                     <span className="text-xs text-neutral-500">G{subject.grade} · {subject.class_section} · P{subject.default_period}</span>
                   </div>
                   {!teacherMode && subject.is_custom ? (
-                    <button type="button" disabled={saving} onClick={() => handleCourseDelete(subject)} className="border border-red-700 px-2 py-1 text-[10px] uppercase tracking-[0.12em] text-red-700 disabled:opacity-40">
+                    <button type="button" disabled={saving} onClick={() => handleCourseDelete(subject)} className="inline-flex items-center gap-1 border border-red-700 px-2 py-1 text-[10px] uppercase tracking-[0.12em] text-red-700 disabled:opacity-40">
+                      {busyKey === `course-delete:${subject.id}` ? <ButtonSpinner /> : null}
                       Delete
                     </button>
                   ) : (

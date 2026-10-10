@@ -5,7 +5,7 @@ import { useAuth } from "../auth";
 import { uploadSrc } from "../avatar";
 import { Avatar } from "../components/Avatar";
 import { LikeIcon } from "../components/CommunityCard";
-import { ErrorBanner, FieldError, FrontPageLink, Headline, ImageWell, Kicker, TitleLine } from "../components/ui";
+import { ErrorBanner, FieldError, FrontPageLink, Headline, ImageWell, Kicker, TitleLine, ButtonSpinner } from "../components/ui";
 import { canDeletePosts, formatDateline } from "../format";
 import { useI18n } from "../i18n";
 import { mergeLiveFloors, useLiveRefresh } from "../live";
@@ -54,6 +54,7 @@ function ForumLike({ post }) {
       aria-pressed={liked}
     >
       <LikeIcon filled={liked} />
+      {saving ? <ButtonSpinner /> : null}
       <span>{likeCount}</span>
     </button>
   );
@@ -71,6 +72,7 @@ export default function PostDetail() {
   const [commentTotal, setCommentTotal] = useState(0);
   const [commentPage, setCommentPage] = useState(1);
   const [commentError, setCommentError] = useState(null);
+  const [deleting, setDeleting] = useState(false);
   const [commentBody, setCommentBody] = useState("");
   const [commentSubmitting, setCommentSubmitting] = useState(false);
   const [ready, setReady] = useState(false);
@@ -147,6 +149,7 @@ export default function PostDetail() {
 
   async function onDelete() {
     if (!post || !window.confirm(t("post.deleteConfirm"))) return;
+    setDeleting(true);
     setError(null);
     try {
       await api.deletePost(postId);
@@ -159,6 +162,8 @@ export default function PostDetail() {
         return;
       }
       setError(err);
+    } finally {
+      setDeleting(false);
     }
   }
 
@@ -266,8 +271,10 @@ export default function PostDetail() {
             <button
               type="button"
               onClick={onDelete}
-              className="mt-8 font-sans text-[11px] uppercase tracking-[0.18em] text-red-700"
+              disabled={deleting}
+              className="mt-8 inline-flex items-center gap-2 font-sans text-[11px] uppercase tracking-[0.18em] text-red-700 disabled:opacity-40"
             >
+              {deleting ? <ButtonSpinner /> : null}
               {t("post.delete")}
             </button>
           ) : null}
@@ -326,8 +333,9 @@ export default function PostDetail() {
                   <button
                     type="submit"
                     disabled={commentSubmitting}
-                    className="mt-4 rounded-[2px] bg-black px-5 py-2 font-sans text-[11px] uppercase tracking-[0.18em] text-white"
+                    className="mt-4 inline-flex items-center gap-2 rounded-[2px] bg-black px-5 py-2 font-sans text-[11px] uppercase tracking-[0.18em] text-white disabled:opacity-40"
                   >
+                    {commentSubmitting ? <ButtonSpinner /> : null}
                     {t("post.postComment")}
                   </button>
                 </form>

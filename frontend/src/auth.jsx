@@ -2,6 +2,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { ApiError, api } from "./api";
+import { clearCjHello } from "./cjHello";
 import { useLiveRefresh } from "./live";
 
 const AuthContext = createContext(null);
@@ -58,10 +59,12 @@ export function AuthProvider({ children }) {
   useLiveRefresh(ready && Boolean(user), refreshMe);
 
   const signIn = useCallback((profile) => {
+    clearCjHello(profile?.id);
     setUser(profile);
   }, []);
 
   const signOut = useCallback(async () => {
+    const userId = user?.id;
     try {
       await api.logout();
     } catch (err) {
@@ -69,6 +72,7 @@ export function AuthProvider({ children }) {
         throw err;
       }
     }
+    clearCjHello(userId);
     setUser(null);
     if (
       location.pathname === "/me/posts" ||
@@ -80,7 +84,7 @@ export function AuthProvider({ children }) {
     ) {
       navigate("/");
     }
-  }, [location.pathname, navigate]);
+  }, [user, location.pathname, navigate]);
 
   const value = useMemo(
     () => ({ user, ready, signIn, signOut, setUser }),

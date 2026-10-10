@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { api, fieldMessage, safeNext } from "../api";
 import { useAuth } from "../auth";
-import { ErrorBanner, FieldError, FrontPageLink, SectionRule } from "../components/ui";
+import { ButtonSpinner, ErrorBanner, FieldError, FrontPageLink, SectionRule } from "../components/ui";
 import { useI18n } from "../i18n";
 
 export default function SignIn() {
@@ -70,8 +70,9 @@ export default function SignIn() {
         <button
           type="submit"
           disabled={submitting}
-          className="rounded-[2px] bg-black px-5 py-2 font-sans text-[11px] uppercase tracking-[0.18em] text-white"
+          className="inline-flex items-center gap-2 rounded-[2px] bg-black px-5 py-2 font-sans text-[11px] uppercase tracking-[0.18em] text-white disabled:opacity-40"
         >
+          {submitting ? <ButtonSpinner /> : null}
           {t("signIn.submit")}
         </button>
       </form>

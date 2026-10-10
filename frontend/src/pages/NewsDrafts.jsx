@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { ApiError, api, fieldMessage } from "../api";
 import { useAuth } from "../auth";
-import { ErrorBanner, FieldError, FrontPageLink, SectionRule } from "../components/ui";
+import { ButtonSpinner, ErrorBanner, FieldError, FrontPageLink, SectionRule } from "../components/ui";
 import { canEditNews } from "../format";
 import { useI18n } from "../i18n";
 import { useLiveRefresh } from "../live";
@@ -110,7 +110,7 @@ function StaticRail({ kicker, title, note, wellClassName = "h-28" }) {
   );
 }
 
-function DraftBoard({ draft, isSuper, error, onSave, onSubmit, onApprove, onReject }) {
+function DraftBoard({ draft, isSuper, error, acting, onSave, onSubmit, onApprove, onReject }) {
   const { t } = useI18n();
   const [active, setActive] = useState(null);
   const blocks = Object.fromEntries(draft.blocks.map((block) => [block.position, block]));
@@ -249,6 +249,7 @@ function DraftBoard({ draft, isSuper, error, onSave, onSubmit, onApprove, onReje
           block={activeBlock}
           isSuper={isSuper}
           error={error}
+          acting={acting}
           onSave={(heading, body) => onSave(active + 1, activeBlock, heading, body)}
           onSubmit={(heading, body) => onSubmit(active + 1, activeBlock, heading, body)}
           onApprove={() => onApprove(activeBlock)}
@@ -259,7 +260,7 @@ function DraftBoard({ draft, isSuper, error, onSave, onSubmit, onApprove, onReje
   );
 }
 
-function SlotEditor({ block, isSuper, error, onSave, onSubmit, onApprove, onReject }) {
+function SlotEditor({ block, isSuper, error, acting, onSave, onSubmit, onApprove, onReject }) {
   const { t } = useI18n();
   const [heading, setHeading] = useState(block?.heading || "");
   const [body, setBody] = useState(block?.draft_body || "");
@@ -296,30 +297,37 @@ function SlotEditor({ block, isSuper, error, onSave, onSubmit, onApprove, onReje
         </p>
       ) : null}
       <div className="mt-3 flex flex-wrap gap-4">
-        <button type="submit" className="font-sans text-[11px] uppercase tracking-[0.18em] text-[#1A4FBF]">
+        <button type="submit" disabled={Boolean(acting)} className="inline-flex items-center gap-2 font-sans text-[11px] uppercase tracking-[0.18em] text-[#1A4FBF] disabled:opacity-40">
+          {acting === "save" ? <ButtonSpinner /> : null}
           {t("drafts.save")}
         </button>
         <button
           type="button"
+          disabled={Boolean(acting)}
           onClick={() => onSubmit(heading, body)}
-          className="font-sans text-[11px] uppercase tracking-[0.18em] text-[#1A4FBF]"
+          className="inline-flex items-center gap-2 font-sans text-[11px] uppercase tracking-[0.18em] text-[#1A4FBF] disabled:opacity-40"
         >
+          {acting === "submit" ? <ButtonSpinner /> : null}
           {t("drafts.submit")}
         </button>
         {isSuper && block?.review_status === "pending" ? (
           <>
             <button
               type="button"
+              disabled={Boolean(acting)}
               onClick={onApprove}
-              className="font-sans text-[11px] uppercase tracking-[0.18em] text-[#1A4FBF]"
+              className="inline-flex items-center gap-2 font-sans text-[11px] uppercase tracking-[0.18em] text-[#1A4FBF] disabled:opacity-40"
             >
+              {acting === "approve" ? <ButtonSpinner /> : null}
               {t("drafts.approve")}
             </button>
             <button
               type="button"
+              disabled={Boolean(acting)}
               onClick={onReject}
-              className="font-sans text-[11px] uppercase tracking-[0.18em] text-red-700"
+              className="inline-flex items-center gap-2 font-sans text-[11px] uppercase tracking-[0.18em] text-red-700 disabled:opacity-40"
             >
+              {acting === "reject" ? <ButtonSpinner /> : null}
               {t("drafts.reject")}
             </button>
           </>
@@ -344,6 +352,7 @@ export default function NewsDrafts() {
   const [title, setTitle] = useState("");
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [acting, setActing] = useState("");
 
   useEffect(() => {
     if (!ready) return;
@@ -405,6 +414,7 @@ export default function NewsDrafts() {
 
   async function createDraft(event) {
     event.preventDefault();
+    setActing("create");
     setError(null);
     try {
       const created = await api.createDraft(title.trim());
@@ -413,11 +423,14 @@ export default function NewsDrafts() {
       openDraft(created);
     } catch (err) {
       setError(err);
+    } finally {
+      setActing("");
     }
   }
 
   async function saveSlot(position, block, heading, body, thenSubmit = false) {
     if (!draft) return;
+    setActing(thenSubmit ? "submit" : "save");
     setError(null);
     try {
       const saved = block
@@ -427,16 +440,21 @@ export default function NewsDrafts() {
       openDraft(thenSubmit ? await api.submitBlock(draft.id, nextBlock.id) : saved);
     } catch (err) {
       setError(err);
+    } finally {
+      setActing("");
     }
   }
 
-  async function reviewSlot(block, action) {
+  async function reviewSlot(block, action, key) {
     if (!draft || !block) return;
+    setActing(key);
     setError(null);
     try {
       openDraft(await action(draft.id, block.id));
     } catch (err) {
       setError(err);
+    } finally {
+      setActing("");
     }
   }
 
@@ -458,7 +476,8 @@ export default function NewsDrafts() {
           className="mt-2 w-full border-0 border-b border-black bg-transparent py-2 font-serif text-2xl outline-none"
         />
         <FieldError message={fieldMessage(error, "title")} />
-        <button type="submit" className="mt-3 font-sans text-[11px] uppercase tracking-[0.18em] text-[#1A4FBF]">
+        <button type="submit" disabled={Boolean(acting)} className="mt-3 inline-flex items-center gap-2 font-sans text-[11px] uppercase tracking-[0.18em] text-[#1A4FBF] disabled:opacity-40">
+          {acting === "create" ? <ButtonSpinner /> : null}
           {t("drafts.create")}
         </button>
       </form>
@@ -489,10 +508,11 @@ export default function NewsDrafts() {
           draft={draft}
           isSuper={user.role === "super_admin"}
           error={error}
+          acting={acting}
           onSave={(position, block, heading, body) => saveSlot(position, block, heading, body)}
           onSubmit={(position, block, heading, body) => saveSlot(position, block, heading, body, true)}
-          onApprove={(block) => reviewSlot(block, api.approveBlock)}
-          onReject={(block) => reviewSlot(block, api.rejectBlock)}
+          onApprove={(block) => reviewSlot(block, api.approveBlock, "approve")}
+          onReject={(block) => reviewSlot(block, api.rejectBlock, "reject")}
         />
       ) : null}
     </div>

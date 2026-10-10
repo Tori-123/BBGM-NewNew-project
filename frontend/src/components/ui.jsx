@@ -2,6 +2,15 @@ import { Link } from "react-router-dom";
 import { formatDateline } from "../format";
 import { useI18n } from "../i18n";
 
+export function ButtonSpinner() {
+  return (
+    <span
+      className="inline-block h-3 w-3 shrink-0 animate-spin rounded-full border-2 border-current border-t-transparent"
+      aria-hidden="true"
+    />
+  );
+}
+
 export function ImageWell({ className = "h-40" }) {
   return <div className={`bg-[#D6DEEE] ${className}`} aria-hidden="true" />;
 }

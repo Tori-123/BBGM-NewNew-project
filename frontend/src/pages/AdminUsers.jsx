@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { ApiError, api } from "../api";
 import { useAuth } from "../auth";
-import { ErrorBanner, FrontPageLink, SectionRule } from "../components/ui";
+import { ButtonSpinner, ErrorBanner, FrontPageLink, SectionRule } from "../components/ui";
 import { useI18n } from "../i18n";
 import { useLiveRefresh } from "../live";
 
@@ -20,6 +20,7 @@ export default function AdminUsers() {
   const [items, setItems] = useState([]);
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [pending, setPending] = useState("");
 
   useEffect(() => {
     if (!ready) return;
@@ -70,33 +71,36 @@ export default function AdminUsers() {
     setItems((current) => current.map((item) => (item.id === updated.id ? updated : item)));
   }
 
-  async function setRole(target, role) {
+  async function runAction(key, action) {
+    setPending(key);
     setError(null);
     try {
+      await action();
+    } catch (err) {
+      setError(err);
+    } finally {
+      setPending("");
+    }
+  }
+
+  function setRole(target, role) {
+    return runAction(`${target.id}:role:${role}`, async () => {
       replaceItem(await api.patchUserRole(target.id, role));
-    } catch (err) {
-      setError(err);
-    }
+    });
   }
 
-  async function setMuted(target, muted) {
-    setError(null);
-    try {
+  function setMuted(target, muted) {
+    return runAction(`${target.id}:muted`, async () => {
       replaceItem(await api.setUserMuted(target.id, muted));
-    } catch (err) {
-      setError(err);
-    }
+    });
   }
 
-  async function removeUser(target) {
-    if (!window.confirm(t("users.deleteConfirm", { name: target.display_name }))) return;
-    setError(null);
-    try {
+  function removeUser(target) {
+    if (!window.confirm(t("users.deleteConfirm", { name: target.display_name }))) return undefined;
+    return runAction(`${target.id}:delete`, async () => {
       await api.deleteUser(target.id);
       setItems((current) => current.filter((item) => item.id !== target.id));
-    } catch (err) {
-      setError(err);
-    }
+    });
   }
 
   if (!ready || !user || user.role !== "super_admin") return null;
@@ -129,28 +133,37 @@ export default function AdminUsers() {
                   <td className="py-3 text-right">
                     {locked ? null : (
                       <div className="flex flex-wrap justify-end gap-x-4 gap-y-2">
-                        {ROLES.filter((role) => role.value !== item.role).map((role) => (
-                          <button
-                            key={role.value}
-                            type="button"
-                            onClick={() => setRole(item, role.value)}
-                            className="uppercase tracking-[0.12em] text-[#1A4FBF]"
-                          >
-                            {t(`users.${role.value}`)}
-                          </button>
-                        ))}
+                        {ROLES.filter((role) => role.value !== item.role).map((role) => {
+                          const key = `${item.id}:role:${role.value}`;
+                          return (
+                            <button
+                              key={role.value}
+                              type="button"
+                              disabled={Boolean(pending)}
+                              onClick={() => setRole(item, role.value)}
+                              className="inline-flex items-center gap-1 uppercase tracking-[0.12em] text-[#1A4FBF] disabled:opacity-40"
+                            >
+                              {pending === key ? <ButtonSpinner /> : null}
+                              {t(`users.${role.value}`)}
+                            </button>
+                          );
+                        })}
                         <button
                           type="button"
+                          disabled={Boolean(pending)}
                           onClick={() => setMuted(item, !item.muted)}
-                          className="uppercase tracking-[0.12em] text-[#1A4FBF]"
+                          className="inline-flex items-center gap-1 uppercase tracking-[0.12em] text-[#1A4FBF] disabled:opacity-40"
                         >
+                          {pending === `${item.id}:muted` ? <ButtonSpinner /> : null}
                           {item.muted ? t("users.unmute") : t("users.mute")}
                         </button>
                         <button
                           type="button"
+                          disabled={Boolean(pending)}
                           onClick={() => removeUser(item)}
-                          className="uppercase tracking-[0.12em] text-red-700"
+                          className="inline-flex items-center gap-1 uppercase tracking-[0.12em] text-red-700 disabled:opacity-40"
                         >
+                          {pending === `${item.id}:delete` ? <ButtonSpinner /> : null}
                           {t("users.delete")}
                         </button>
                       </div>

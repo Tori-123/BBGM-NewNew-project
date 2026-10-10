@@ -23,6 +23,27 @@ body {
   min-height: 100vh;
 }
 
+@keyframes cj-welcome-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.cj-welcome-in {
+  animation: cj-welcome-in 1.8s ease-out both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cj-welcome-in {
+    animation: none;
+  }
+}
+
 .font-wordmark-elegram {
   font-family: var(--font-serif);
   font-style: italic;

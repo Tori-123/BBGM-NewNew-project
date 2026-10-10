@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Link, NavLink, Outlet, useLocation } from "react-router-dom";
 import { useAuth } from "../auth";
 import { Avatar } from "./Avatar";
+import { ButtonSpinner } from "./ui";
 import { canEditNews, CATEGORY_ROUTES, formatToday } from "../format";
 import { useI18n } from "../i18n";
 import { TermsDialog } from "../pages/Terms";
@@ -69,6 +70,7 @@ export default function PaperShell() {
   const [query, setQuery] = useState("");
   const [searchNotice, setSearchNotice] = useState(false);
   const [termsOpen, setTermsOpen] = useState(false);
+  const [signingOut, setSigningOut] = useState(false);
   const [openMenu, setOpenMenu] = useState(null);
 
   useEffect(() => {
@@ -100,10 +102,13 @@ export default function PaperShell() {
   }
 
   async function onSignOut() {
+    setSigningOut(true);
     try {
       await signOut();
     } catch {
       /* 401 still signs out in auth */
+    } finally {
+      setSigningOut(false);
     }
   }
 
@@ -173,7 +178,8 @@ export default function PaperShell() {
                     <Avatar avatar={user.avatar} size={28} />
                     {user.display_name}
                   </Link>
-                  <button type="button" onClick={onSignOut} className="uppercase">
+                  <button type="button" onClick={onSignOut} disabled={signingOut} className="inline-flex items-center gap-2 uppercase disabled:opacity-40">
+                    {signingOut ? <ButtonSpinner /> : null}
                     {t("shell.signOut")}
                   </button>
                 </>

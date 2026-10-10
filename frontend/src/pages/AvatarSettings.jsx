@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { ApiError, api, fieldMessage } from "../api";
 import { useAuth } from "../auth";
 import { Avatar, AVATAR_PRESETS } from "../components/Avatar";
-import { ErrorBanner, FieldError, FrontPageLink, SectionRule } from "../components/ui";
+import { ButtonSpinner, ErrorBanner, FieldError, FrontPageLink, SectionRule } from "../components/ui";
 import { useI18n } from "../i18n";
 
 export default function AvatarSettings() {
@@ -11,7 +11,7 @@ export default function AvatarSettings() {
   const { t } = useI18n();
   const navigate = useNavigate();
   const [error, setError] = useState(null);
-  const [saving, setSaving] = useState(false);
+  const [pending, setPending] = useState("");
 
   useEffect(() => {
     if (ready && !user) {
@@ -21,8 +21,10 @@ export default function AvatarSettings() {
 
   if (!ready || !user) return null;
 
+  const saving = Boolean(pending);
+
   async function onPreset(preset) {
-    setSaving(true);
+    setPending(preset);
     setError(null);
     try {
       const profile = await api.setAvatarPreset(preset);
@@ -35,7 +37,7 @@ export default function AvatarSettings() {
       }
       setError(err);
     } finally {
-      setSaving(false);
+      setPending("");
     }
   }
 
@@ -43,7 +45,7 @@ export default function AvatarSettings() {
     const file = event.target.files?.[0];
     event.target.value = "";
     if (!file) return;
-    setSaving(true);
+    setPending("upload");
     setError(null);
     try {
       const profile = await api.uploadAvatar(file);
@@ -56,7 +58,7 @@ export default function AvatarSettings() {
       }
       setError(err);
     } finally {
-      setSaving(false);
+      setPending("");
     }
   }
 
@@ -83,18 +85,22 @@ export default function AvatarSettings() {
             type="button"
             disabled={saving}
             onClick={() => onPreset(item.id)}
-            className={`border px-3 py-2 font-sans text-xs uppercase tracking-[0.12em] ${
+            className={`inline-flex flex-col items-center border px-3 py-2 font-sans text-xs uppercase tracking-[0.12em] disabled:opacity-40 ${
               user.avatar === `preset:${item.id}` ? "border-black" : "border-neutral-300"
             }`}
           >
             <Avatar avatar={`preset:${item.id}`} size={40} className="mx-auto" />
-            <span className="mt-2 block">{t(`avatar.${item.id}`)}</span>
+            <span className="mt-2 inline-flex items-center gap-1">
+              {pending === item.id ? <ButtonSpinner /> : null}
+              {t(`avatar.${item.id}`)}
+            </span>
           </button>
         ))}
       </div>
       <FieldError message={fieldMessage(error, "preset")} />
 
-      <label className="mt-8 block font-sans text-[11px] uppercase tracking-[0.16em] text-[#1A4FBF]" htmlFor="avatar-file">
+      <label className="mt-8 inline-flex items-center gap-2 font-sans text-[11px] uppercase tracking-[0.16em] text-[#1A4FBF]" htmlFor="avatar-file">
+        {pending === "upload" ? <ButtonSpinner /> : null}
         {t("avatar.upload")}
       </label>
       <input

@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { ApiError, api, fieldMessage } from "../api";
 import { useAuth } from "../auth";
-import { ErrorBanner, FieldError, FrontPageLink, ManualPasswordInput, SectionRule } from "../components/ui";
+import { ButtonSpinner, ErrorBanner, FieldError, FrontPageLink, ManualPasswordInput, SectionRule } from "../components/ui";
 import { useI18n } from "../i18n";
 
 export default function ChangePassword() {
@@ -86,8 +86,9 @@ export default function ChangePassword() {
         <button
           type="submit"
           disabled={submitting}
-          className="rounded-[2px] bg-black px-5 py-2 font-sans text-[11px] uppercase tracking-[0.18em] text-white"
+          className="inline-flex items-center gap-2 rounded-[2px] bg-black px-5 py-2 font-sans text-[11px] uppercase tracking-[0.18em] text-white disabled:opacity-40"
         >
+          {submitting ? <ButtonSpinner /> : null}
           {t("password.submit")}
         </button>
       </form>
