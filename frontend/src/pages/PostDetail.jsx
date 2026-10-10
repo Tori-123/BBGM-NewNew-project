@@ -4,10 +4,60 @@ import { ApiError, api, fieldMessage } from "../api";
 import { useAuth } from "../auth";
 import { uploadSrc } from "../avatar";
 import { Avatar } from "../components/Avatar";
+import { LikeIcon } from "../components/CommunityCard";
 import { ErrorBanner, FieldError, FrontPageLink, Headline, ImageWell, Kicker, TitleLine } from "../components/ui";
 import { canDeletePosts, formatDateline } from "../format";
 import { useI18n } from "../i18n";
 import { mergeLiveFloors, useLiveRefresh } from "../live";
+
+function ForumLike({ post }) {
+  const { user } = useAuth();
+  const { t } = useI18n();
+  const navigate = useNavigate();
+  const [likeCount, setLikeCount] = useState(post.like_count ?? 0);
+  const [liked, setLiked] = useState(Boolean(post.liked));
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (saving) return;
+    setLikeCount(post.like_count ?? 0);
+    setLiked(Boolean(post.liked));
+  }, [post.id, post.like_count, post.liked, saving]);
+
+  async function onLike() {
+    if (!user) {
+      navigate(`/sign-in?next=/posts/${post.id}`);
+      return;
+    }
+    if (saving) return;
+    setSaving(true);
+    try {
+      const result = liked ? await api.unlikePost(post.id) : await api.likePost(post.id);
+      setLikeCount(result.like_count);
+      setLiked(result.liked);
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 401) {
+        navigate(`/sign-in?next=/posts/${post.id}`);
+      }
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={onLike}
+      disabled={saving}
+      className={`mt-6 flex items-center gap-1.5 font-sans text-sm ${liked ? "text-[#1A4FBF]" : "text-neutral-500"}`}
+      aria-label={liked ? t("forum.unlike") : t("forum.like")}
+      aria-pressed={liked}
+    >
+      <LikeIcon filled={liked} />
+      <span>{likeCount}</span>
+    </button>
+  );
+}
 
 export default function PostDetail() {
   const { postId } = useParams();
@@ -209,6 +259,8 @@ export default function PostDetail() {
               {post.body}
             </div>
           )}
+
+          {isForum ? <ForumLike post={post} /> : null}
 
           {canDeletePosts(user) ? (
             <button

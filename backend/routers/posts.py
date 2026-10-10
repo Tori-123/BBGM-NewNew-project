@@ -18,7 +18,7 @@ from avatars import (
     parse_images,
     save_post_image,
 )
-from models import Comment, NewsBlock, Post, User, to_iso
+from models import Comment, NewsBlock, Post, PostLike, User, to_iso
 from schemas import (
     CATEGORIES,
     CATEGORY_MESSAGE,
@@ -48,7 +48,7 @@ from store import (
     remove_like,
     user_liked,
 )
-from validate import parse_optional_category, parse_page, parse_page_size, parse_uuid
+from validate import parse_forum_feed, parse_optional_category, parse_page, parse_page_size, parse_uuid
 
 router = APIRouter()
 
@@ -177,6 +177,7 @@ def _list_posts(
     category: str | None,
     author_id: str | None,
     viewer: User | None = None,
+    feed: str | None = None,
 ) -> dict:
     filters = [Post.status == "published"]
     if category is not None:
@@ -185,18 +186,42 @@ def _list_posts(
         filters.append(Post.category.in_(NEWSPAPER_CATEGORIES))
     if author_id is not None:
         filters.append(Post.author_id == author_id)
+    capped = feed in ("recommended", "latest")
+    offset = 0 if capped else (page - 1) * page_size
+    limit = 10 if capped else page_size
+    if feed == "recommended":
+        like_total = (
+            select(func.count(PostLike.id))
+            .where(PostLike.post_id == Post.id)
+            .correlate(Post)
+            .scalar_subquery()
+        )
+        comment_total = (
+            select(func.count(Comment.id))
+            .where(Comment.post_id == Post.id, Comment.parent_id.is_(None))
+            .correlate(Post)
+            .scalar_subquery()
+        )
+        score = like_total * 0.6 + comment_total * 0.4
+        order = (score.desc(), Post.created_at.desc())
+    else:
+        order = (Post.created_at.desc(),)
     try:
         total = db.scalar(select(func.count()).select_from(Post).where(*filters)) or 0
         rows = db.scalars(
             select(Post)
             .options(joinedload(Post.author))
             .where(*filters)
-            .order_by(Post.created_at.desc())
-            .offset((page - 1) * page_size)
-            .limit(page_size)
+            .order_by(*order)
+            .offset(offset)
+            .limit(limit)
         ).all()
     except SQLAlchemyError as exc:
         raise StorageError() from exc
+    if capped:
+        total = min(total, 10)
+        page = 1
+        page_size = 10
     previews = _forum_previews(db, rows) if category == "forum" else {}
     include_images = category == "forum"
     forum_ids = [post.id for post in rows if post.category == "forum"]
@@ -289,12 +314,18 @@ def list_posts(
     db: Session = Depends(get_db),
     viewer: User | None = Depends(get_optional_user),
     category: str | None = Query(default=None),
+    feed: str | None = Query(default=None),
     page: str | None = Query(default=None),
     page_size: str | None = Query(default=None),
 ):
     parsed_page = parse_page(page)
     parsed_size = parse_page_size(page_size)
     parsed_category = parse_optional_category(category)
+    parsed_feed = parse_forum_feed(feed, parsed_category)
+    if parsed_feed in ("recommended", "latest") and parsed_page != 1:
+        raise validation_error(
+            [{"field": "page", "message": "This forum feed only has the first page."}]
+        )
     return _list_posts(
         db,
         page=parsed_page,
@@ -302,6 +333,7 @@ def list_posts(
         category=parsed_category,
         author_id=None,
         viewer=viewer,
+        feed=parsed_feed,
     )
 
 

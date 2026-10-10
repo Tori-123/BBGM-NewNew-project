@@ -25,6 +25,7 @@ class Settings:
     microsoft_client_secret: str
     microsoft_tenant_id: str
     microsoft_redirect_uri: str
+    dashscope_api_key: str
 
 
 def _load_env_file(path: Path) -> None:
@@ -74,4 +75,5 @@ def load_settings() -> Settings:
         microsoft_client_secret=(os.environ.get("MICROSOFT_CLIENT_SECRET") or "").strip(),
         microsoft_tenant_id=(os.environ.get("MICROSOFT_TENANT_ID") or "").strip(),
         microsoft_redirect_uri=(os.environ.get("MICROSOFT_REDIRECT_URI") or "").strip(),
+        dashscope_api_key=(os.environ.get("DASHSCOPE_API_KEY") or "").strip(),
     )

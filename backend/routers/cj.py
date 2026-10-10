@@ -1,10 +1,11 @@
 import re
 from uuid import uuid4
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, File, Form, Request, UploadFile
 from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session
 
+from cj_vision import recognize_homework
 from deps import get_cj_editor, get_cj_viewer, get_db, get_super_admin
 from errors import ApiError, validation_error
 from models import CJEntry, CJTeacherSubject, Exam, Subject, User, to_iso, utc_now
@@ -13,6 +14,8 @@ router = APIRouter()
 
 _WEEK = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 _TIME = re.compile(r"^\d{2}:\d{2}$")
+_PHOTO_TYPES = {"image/jpeg", "image/png", "image/webp"}
+_PHOTO_LIMIT = 4 * 1024 * 1024
 
 _SUBJECTS = [
     ("advisory-11ac", "Morning Advisory · 11Ac", "Advisory", "#1d4ed8", 1, 1),
@@ -432,6 +435,94 @@ def save_cj(
         existing.updated_at = updated_at
     db.flush()
     return {"id": existing.id, "updated_at": updated_at}
+
+
+def _clip(value: str) -> str:
+    return value.strip()[:800]
+
+
+@router.post("/cj/recognize")
+async def recognize_cj_photo(
+    request: Request,
+    image: UploadFile = File(...),
+    week_start: str = Form(""),
+    day_index: str = Form(""),
+    _: User = Depends(get_cj_editor),
+    db: Session = Depends(get_db),
+):
+    week = _week_or_error(week_start)
+    try:
+        day = int(day_index)
+    except ValueError:
+        day = -1
+    if day < 0 or day > 4:
+        raise validation_error([{"field": "day_index", "message": "Choose Monday through Friday."}])
+    content_type = (image.content_type or "").split(";")[0].strip().lower()
+    if content_type not in _PHOTO_TYPES:
+        raise validation_error([{"field": "image", "message": "Use a jpeg, png, or webp photo."}])
+    raw = await image.read()
+    if not raw or len(raw) > _PHOTO_LIMIT:
+        raise validation_error([{"field": "image", "message": "Photo must be under 4MB."}])
+
+    _ensure_seed(db, week)
+    subjects = db.scalars(select(Subject).order_by(Subject.sort_order, Subject.name)).all()
+    reading = recognize_homework(
+        request.app.state.settings.dashscope_api_key,
+        raw,
+        content_type,
+        [{"id": row.id, "name": row.name} for row in subjects],
+    )
+    subject = next((row for row in subjects if row.id == reading["subject_id"]), None)
+    if subject is None:
+        wanted = reading["subject_id"].lower()
+        subject = next(
+            (row for row in subjects if row.name.lower() == wanted or row.short_name.lower() == wanted),
+            None,
+        )
+    if subject is None:
+        raise validation_error([{"field": "subject_id", "message": "Could not match this photo to a course."}])
+
+    ic = _clip(reading["ic"])
+    hw = _clip(reading["hw"] or reading["transcribed"])
+    announcement = _clip(reading["announcement"])
+    if not any((ic, hw, announcement)):
+        raise validation_error([{"field": "image", "message": "Could not read homework from this photo."}])
+
+    updated_at = to_iso(utc_now())
+    existing = _slot(db, week, day, subject.period, subject.id)
+    if existing is None:
+        existing = CJEntry(
+            id=str(uuid4()),
+            week_start=week,
+            day_index=day,
+            period=subject.period,
+            subject_id=subject.id,
+            ic=ic,
+            hw=hw,
+            announcement=announcement,
+            updated_at=updated_at,
+        )
+        db.add(existing)
+    else:
+        if ic:
+            existing.ic = ic
+        if hw:
+            existing.hw = hw
+        if announcement:
+            existing.announcement = announcement
+        existing.updated_at = updated_at
+    db.flush()
+    return {
+        "id": existing.id,
+        "subject_id": subject.id,
+        "subject_name": subject.name,
+        "ic": existing.ic,
+        "hw": existing.hw,
+        "announcement": existing.announcement,
+        "transcribed": _clip(reading["transcribed"]),
+        "inferred": _clip(reading["inferred"]),
+        "updated_at": existing.updated_at,
+    }
 
 
 @router.put("/cj/exams")

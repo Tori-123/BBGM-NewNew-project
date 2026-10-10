@@ -14,12 +14,14 @@
 | `/news` | 旧路径 | — | 重定向到 `/` |
 | `/news/drafts` | News 草稿 | 需 `editor` 或 `super_admin` | `GET/POST /api/v1/news/drafts` 与板块提交、同意、退回 |
 | `/sports` | 旧路径 | — | 重定向到 `/` |
-| `/forum` | Forum 卡片列表 | 公开 | `GET /api/v1/posts?category=forum`；绑 `author.avatar` `title` `author.display_name` `excerpt` `created_at` `images[0]` `reply_count` `like_count` `liked`。气泡进详情；拇指赞/取消 |
+| `/forum` | Forum 推荐 | 公开 | `GET /api/v1/posts?category=forum&feed=recommended`。分数 `0.6 × 赞 + 0.4 × 评论`，取前 10。绑 `author.avatar` `title` `author.display_name` `excerpt` `created_at` `images[0]` `reply_count` `like_count` `liked` |
+| `/forum/latest` | Forum 最新 | 公开 | `feed=latest`。按时间前 10 |
+| `/forum/all` | Forum 所有 | 公开 | `feed=all`。按时间分页 |
 | `/cj` | CJ 角色入口 | 需登录 | `student` → `/cj/student`；`teacher` → `/cj/teacher`；`super_admin` → `/cj/admin`；其他角色回首页 |
 | `/cj/student` | 学生端月历 | 需 `student` | 每一行整周链到 `/cj/student/week?start=`；Period 选择存在浏览器本地 |
 | `/cj/student/week` | 学生端周视图 | 需 `student` | `GET /api/v1/cj?week_start=`，周一至周五五列同时展示 Period 1–8，并单列考试安排 |
 | `/cj/student/day` | 学生端旧单日页 | 需 `student` | 保留旧链接兼容，不作为月历主入口 |
-| `/cj/teacher` | 老师端 | 需 `teacher` | 只读取和写入超级管理员分配给该老师的唯一学科，包括该学科 CJ 与考试；不显示其他学科 |
+| `/cj/teacher` | 老师端 | 需 `teacher` | 只读取和写入超级管理员分配给该老师的唯一学科，包括该学科 CJ 与考试；不显示其他学科。每日 CJ 可上传作业照片，`POST /api/v1/cj/recognize` 后把 IC / HW / A 写入所选日期，并标出裁切补全 |
 | `/cj/admin` | CJ 完整管理端 | 仅 `super_admin` | 管理全部 CJ、考试与老师学科分配；可连接 Teams 并在预览确认后写入当周 IC / HW / A。不再使用共享口令 |
 | `/cj/admin/student-preview` | 学生端只读预览 | 仅 `super_admin` | 与学生周视图读取同一份 CJ，供管理端在独立标签页验证保存结果；不放宽学生端路由权限 |
 | `/cj/day` `/cj/week` | 旧路径 | 需 `student` | `/cj/week` 转到学生端周视图；`/cj/day` 保留单日兼容页 |
@@ -133,7 +135,8 @@ Photo of the Day / Track of the Day / Student Art：静态标题+空图框+固�
 | Forum | **不用 StoryRow**。每条独立模块卡：`author.avatar`、`author.display_name`、`created_at`、`title`（链详情）、`excerpt`、有则 `images[0]`。底栏：气泡图标 + `reply_count`（链 `/posts/{id}`）；拇指图标 + `like_count`（已登录切换赞；游客去 `/sign-in?next=/forum`）。**不**展示 `reply_preview`。 |
 | 发帖 | Forum：右下角固定蓝色圆形加号。已登录点开浮层表单；未登录加号去 `/sign-in?next=/forum`。`opinion` 无发帖。News 不在本页发稿，草稿在导航 `DRAFTS`。 |
 | 空 | `items.length === 0`：图框保留，“No stories in {栏目名} yet.” 不链独立发帖页。 |
-| 停留 | 约每 4 秒再请求当前栏目 `page=1`（页签隐藏暂停）。新帖按 `created_at` 出现在已有列表顶部；已点过的 Older 页保留。Forum 卡上的 `reply_count` / `like_count` / `liked` 随这次响应更新。不转圈；后台失败不盖错误条。首次加载失败后若拉到数据则清错误。 |
+| 栏目 | Forum 主导航下：推荐、最新、所有。当前项字色 `#1A4FBF` 并带下划线。推荐与最新不显示 Older stories。 |
+| 停留 | 约每 4 秒再请求当前栏目 `page=1`（页签隐藏暂停）。最新与所有：新帖出现在列表顶部。推荐：0 赞且 0 评论的新帖不插到第一位。所有已点过的 Older 页保留。Forum 卡上的 `reply_count` / `like_count` / `liked` 随这次响应更新。不转圈；后台失败不盖错误条。首次加载失败后若拉到数据则清错误。 |
 | 错误 | 栏目名下 `ErrorBanner` ← `error.message`。`opinion` 不发请求，直接空态句。 |
 
 ### 3.3 详情 `/posts/:postId`
@@ -142,7 +145,7 @@ Photo of the Day / Track of the Day / Student Art：静态标题+空图框+固�
 | --- | --- |
 | 加载 | 图框+标题横线。 |
 | 成功 | kicker←`category`；标题←`title`；byline←`author.display_name`、`created_at`。Forum 正文←`body`。News 按 `blocks[]` 分段渲染 `heading` 与 `body`，不展示未同意板块。 |
-| Forum | `category===forum` 时正文下请求 `GET /comments`。楼主与每条评论显示 `author.avatar`。有 `images[]` 则在正文下展示实图，不用校报占位图框。评论显示 `author.display_name`、`body`。不显示楼号，没有「新楼层」，也不能回复某一条评论。已登录显示评论框；未登录显示去登录。校报详情**不**请求评论，图框仍是 CSS 占位。停留时约每 4 秒再请求详情与已加载的评论页；有新评论则追加。输入框内容不丢。后台失败不盖错误条。精选表不在本页。 |
+| Forum | `category===forum` 时正文下有与列表相同的拇指（`like_count` / `liked`；未登录去登录），并请求 `GET /comments`。楼主与每条评论显示 `author.avatar`。有 `images[]` 则在正文下展示实图，不用校报占位图框。评论显示 `author.display_name`、`body`。不显示楼号，没有「新楼层」，也不能回复某一条评论。已登录显示评论框；未登录显示去登录。校报详情**不**请求评论、不加拇指，图框仍是 CSS 占位。停留时约每 4 秒再请求详情与已加载的评论页；有新评论则追加。输入框内容不丢。后台失败不盖错误条。精选表不在本页。 |
 | 删帖 | `role` 为 `admin` 或 `super_admin` 时显示 `Delete`。确认后 `DELETE /api/v1/posts/{id}`，成功回到该帖栏目（Forum 去 `/forum`，News 去 `/`）。`403` 用 `ErrorBanner`。 |
 | 空 / 404 | `error.code === not_found`：衬线 “Story not found.” 无假文。 |
 | 错误 | `503`/`400`：`ErrorBanner` ← `error.message`。 |

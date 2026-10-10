@@ -20,7 +20,7 @@ function CommentIcon() {
   );
 }
 
-function LikeIcon({ filled }) {
+export function LikeIcon({ filled }) {
   return (
     <svg
       viewBox="0 0 24 24"

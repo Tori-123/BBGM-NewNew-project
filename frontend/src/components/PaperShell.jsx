@@ -244,6 +244,34 @@ export default function PaperShell() {
           ))}
         </nav>
 
+        {location.pathname === "/forum" || location.pathname.startsWith("/forum/") ? (
+          <nav
+            className="flex flex-wrap items-center justify-center gap-x-8 gap-y-2 border-b border-neutral-200 py-3"
+            aria-label="Forum"
+          >
+            {[
+              { to: "/forum", end: true, label: "forum.recommended" },
+              { to: "/forum/latest", label: "forum.latest" },
+              { to: "/forum/all", label: "forum.all" },
+            ].map((item) => (
+              <NavLink
+                key={item.to}
+                to={item.to}
+                end={item.end}
+                className={({ isActive }) =>
+                  `font-sans text-[13px] ${
+                    isActive
+                      ? "text-[#1A4FBF] underline decoration-2 underline-offset-[7px]"
+                      : "text-neutral-900 hover:text-[#1A4FBF]"
+                  }`
+                }
+              >
+                {t(item.label)}
+              </NavLink>
+            ))}
+          </nav>
+        ) : null}
+
         {searchNotice ? (
           <p className="mt-3 font-sans text-sm text-neutral-500">{t("shell.searchLater")}</p>
         ) : null}

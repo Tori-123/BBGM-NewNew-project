@@ -93,12 +93,13 @@ export const api = {
   sendEmailCode: (body) => request("/auth/email-codes", { method: "POST", body: JSON.stringify(body) }),
   resetPassword: (body) => request("/auth/password-reset", { method: "POST", body: JSON.stringify(body) }),
   logout: () => request("/auth/logout", { method: "POST" }),
-  listPosts: ({ category, page = 1, pageSize = 20 } = {}) => {
+  listPosts: ({ category, feed, page = 1, pageSize = 20 } = {}) => {
     const query = new URLSearchParams({
       page: String(page),
       page_size: String(pageSize),
     });
     if (category) query.set("category", category);
+    if (feed) query.set("feed", feed);
     return request(`/posts?${query}`);
   },
   getPost: (id) => request(`/posts/${encodeURIComponent(id)}`),
@@ -198,6 +199,13 @@ export const api = {
       method: "PUT",
       body: JSON.stringify(body),
     }),
+  recognizeCj: (file, { weekStart, dayIndex }) => {
+    const body = new FormData();
+    body.append("image", file);
+    body.append("week_start", weekStart);
+    body.append("day_index", String(dayIndex));
+    return request("/cj/recognize", { method: "POST", body });
+  },
   saveExam: (body) =>
     request("/cj/exams", {
       method: "PUT",

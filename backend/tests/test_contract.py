@@ -1,5 +1,8 @@
+from datetime import datetime, timedelta, timezone
+
 from fastapi.testclient import TestClient
 from sqlalchemy import func, select
+from sqlalchemy.orm import Session
 
 from errors import StorageError
 from mail import peek_console_code
@@ -1229,4 +1232,106 @@ def test_cj_role_portals_and_subject_scoping(tmp_path, monkeypatch):
             f"/api/v1/cj/subjects/{created_course.json()['id']}"
         ).status_code == 204
         assert super_client.delete(f"/api/v1/cj/subjects/{assigned_subject}").status_code == 422
+    app.state.engine.dispose()
+
+
+def test_cj_photo_files_homework(tmp_path, monkeypatch):
+    app = _make_app(tmp_path, monkeypatch, admin_email="sasha.lin@basischina.com")
+
+    def fake_reading(_key, _image, _content_type, subjects):
+        match = next(item for item in subjects if item["id"] == "ap-calculus-11ac")
+        return {
+            "subject_id": match["id"],
+            "ic": "Limits review",
+            "hw": "Complete FRQ Set 2",
+            "announcement": "",
+            "transcribed": "Complete FRQ",
+            "inferred": "Set 2",
+        }
+
+    monkeypatch.setattr("routers.cj.recognize_homework", fake_reading)
+    png = b"\x89PNG\r\n\x1a\n" + b"\x00" * 32
+    with TestClient(app) as client, TestClient(app) as student:
+        created = _register(client, "sasha.lin@basischina.com", "super-desk-41", "Sasha Lin")
+        assert created.status_code == 201, created.text
+        _register(student, "mia.chen@basischina.com", "student-hall-42", "Mia Chen")
+        denied = student.post(
+            "/api/v1/cj/recognize",
+            data={"week_start": "2026-10-05", "day_index": "0"},
+            files={"image": ("hw.png", png, "image/png")},
+        )
+        assert denied.status_code == 403
+        filed = client.post(
+            "/api/v1/cj/recognize",
+            data={"week_start": "2026-10-05", "day_index": "0"},
+            files={"image": ("hw.png", png, "image/png")},
+        )
+        assert filed.status_code == 200, filed.text
+        body = filed.json()
+        assert body["subject_id"] == "ap-calculus-11ac"
+        assert body["hw"] == "Complete FRQ Set 2"
+        assert body["inferred"] == "Set 2"
+        listed = client.get("/api/v1/cj?week_start=2026-10-05")
+        saved = next(item for item in listed.json()["entries"] if item["id"] == body["id"])
+        assert saved["hw"] == "Complete FRQ Set 2"
+        assert saved["day_index"] == 0
+    app.state.engine.dispose()
+
+
+def test_forum_feeds_rank_by_likes_or_time(tmp_path, monkeypatch):
+    app = _make_app(tmp_path, monkeypatch)
+    with TestClient(app) as client:
+        registered = _register(client, "jordan.hale@basischina.com", "east-hall-8", "Jordan Hale")
+        assert registered.status_code == 201, registered.text
+        ids = []
+        for index in range(11):
+            created = client.post(
+                "/api/v1/posts",
+                json={"title": f"Forum note {index}", "body": "Still on the board.", "category": "forum"},
+            )
+            assert created.status_code == 201, created.text
+            ids.append(created.json()["id"])
+        opened = datetime(2026, 10, 1, tzinfo=timezone.utc)
+        with Session(app.state.engine) as db:
+            for index, post_id in enumerate(ids):
+                db.get(Post, post_id).created_at = opened + timedelta(seconds=index)
+            db.commit()
+        liked = client.post(f"/api/v1/posts/{ids[0]}/likes")
+        assert liked.status_code == 201, liked.text
+        for body_text in ("First note.", "Second note."):
+            commented = client.post(f"/api/v1/posts/{ids[5]}/comments", json={"body": body_text})
+            assert commented.status_code == 201, commented.text
+        one_comment = client.post(f"/api/v1/posts/{ids[10]}/comments", json={"body": "One note."})
+        assert one_comment.status_code == 201, one_comment.text
+
+        recommended = client.get("/api/v1/posts?category=forum&feed=recommended&page_size=50")
+        assert recommended.status_code == 200, recommended.text
+        body = recommended.json()
+        assert body["total"] == 10
+        assert len(body["items"]) == 10
+        assert body["page_size"] == 10
+        assert [item["id"] for item in body["items"][:3]] == [ids[5], ids[0], ids[10]]
+        assert body["items"][0]["reply_count"] == 2
+        assert body["items"][1]["like_count"] == 1
+        assert ids[1] not in {item["id"] for item in body["items"]}
+
+        default = client.get("/api/v1/posts?category=forum")
+        assert default.json()["items"][0]["id"] == ids[5]
+
+        latest = client.get("/api/v1/posts?category=forum&feed=latest")
+        assert latest.json()["total"] == 10
+        assert len(latest.json()["items"]) == 10
+        assert latest.json()["items"][0]["id"] == ids[10]
+
+        everything = client.get("/api/v1/posts?category=forum&feed=all")
+        assert everything.json()["total"] == 11
+        assert everything.json()["items"][0]["id"] == ids[10]
+
+        deeper = client.get("/api/v1/posts?category=forum&feed=recommended&page=2")
+        assert deeper.status_code == 422
+        assert any(field["field"] == "page" for field in deeper.json()["error"]["fields"])
+
+        mixed = client.get("/api/v1/posts?category=news&feed=recommended")
+        assert mixed.status_code == 422
+        assert any(field["field"] == "feed" for field in mixed.json()["error"]["fields"])
     app.state.engine.dispose()
