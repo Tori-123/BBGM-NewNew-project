@@ -81,6 +81,7 @@ Must 服务主故事 P1-US1（Forum 发帖被看见）以及角色、跟帖、Ne
 | M10 | 写操作留痕 | Forum 发帖或创建 News 草稿成功时记录 `author_id`、`created_at`；服务端另写一条审计记录（谁、何时、创建了哪篇帖）。 |
 | M11 | Forum | 与 News、CJ 平级的单一讨论区；一个列表，不是用户自建多吧。 |
 | M26 | CJ | 与 Forum 平级的课表栏，必须登录并按角色进入三个独立入口。学生端从月历按整周进入周一至周五五列只读视图，Period 1–8 自选学科只存在浏览器本地；每位老师由超级管理员分配一个 CJ 学科，只能读取和更新该学科的 CJ 与考试；`super_admin` 管理端可读取和修改全部 CJ、考试以及老师学科分配。考试必须选择学科，学生端自动显示学科前缀。`editor` 与普通 `admin` 不自动获得 CJ 权限。 |
+| M27 | Teams 群聊生成当周 CJ | 仅 `super_admin`。一个已在目标群里的 Teams 账号经 Microsoft 登录一次，服务器只保存刷新令牌。管理端选择周次后先预览，确认后才把群聊文字交给 DeepSeek `deepseek-flash`，总结成已有学科的 IC / HW / A 并写入 `CJEntry`。不下载附件。对不上学科、星期或超长的条目跳过。学生周视图仍读原来的 CJ 字段。未连接或上游失败时不写入半截 CJ。 |
 | M12 | Forum 评论 | 仅 Forum 详情：帖子下的评论。未登录可读；登录可写。不新增楼层，不写楼中楼。校报详情不加评论。 |
 | M13 | 角色 | `student` / `teacher` / `editor` / `admin` / `super_admin`。`ADMIN_EMAIL` 在注册或登录时升为 `super_admin`。 |
 | M14 | News 分板块草稿 | `editor` 与 `super_admin` 在 `/news/drafts` 新建稿并按板块保存、提交。`super_admin` 可同意或退回单个板块。公开 News 只含已同意板块。已上线板块再改，仍须再次同意后才替换线上正文。 |
@@ -121,7 +122,7 @@ Must 服务主故事 P1-US1（Forum 发帖被看见）以及角色、跟帖、Ne
 | W1 | 教务、选课、成绩、官方通知替换系统 | 与校园发帖无关。 |
 | W2 | 关注图谱、推荐算法、付费专栏 | 工期与主故事无关；README 已排除。 |
 | W3 | 原生 App、直播、活动售票 / 支付 | 非 Web 第一版范围；不接支付合规。 |
-| W4 | 未评估的 AI 写作或审核模型 | README 明确不默认上线。 |
+| W4 | 未评估的 AI 写作或审核模型 | 除 M27：超管把 Teams 群聊总结写入当周 CJ。不做 AI 审核，不自动改帖，不给学生或老师直接调用模型。 |
 | W5 | 向量库、微服务拆分、指定云厂商 | 未评估，不写入本版承诺。 |
 | W6 | 用户自建吧、校报帖下评论、楼层与楼中楼 | Forum 只有一个吧；评论直接挂在帖子上。 |
 | W7 | 单条删评、下架状态、完整审核后台 | 管理员可删整帖（M21）。不能只删一楼，没有 `hidden` 状态。News 审稿只按板块同意或退回。 |
@@ -193,7 +194,7 @@ Elegram 应用（Web 页面 + 服务端）
 应用存储（用户、会话或等价凭证、帖子、评论、审计记录）
 ```
 
-第一版 **无必须第三方产品 API**。发验证码走通用 SMTP（环境变量），不绑定某一云厂商。学校 SSO 未对接。
+发帖主路径无必须第三方产品 API。发验证码走通用 SMTP（环境变量），不绑定某一云厂商。M27 只在超级管理员确认导入时调用 Microsoft Graph 与 DeepSeek，密钥只在环境变量。学校 SSO 未对接。
 
 ### 5.2 核心实体
 
@@ -211,6 +212,7 @@ Elegram 应用（Web 页面 + 服务端）
 | Subject | id, name, short_name, color, period, sort_order | CJ 学科目录。学生端不按 `period` 固定排课 |
 | CJTeacherSubject | id, user_id, subject_id | 超级管理员给每位老师分配的唯一 CJ 学科；老师端据此过滤 CJ 与考试的读取和写入 |
 | CJEntry | id, week_start, day_index, period, subject_id, ic, hw, announcement, updated_at | 某一周、某一天、某一学科的 IC / HW / A |
+| TeamsConnection | 加密后的刷新令牌, updated_at | 全站一条。接口不返回令牌。Microsoft 登录成功后写入，预览时用来读群聊 |
 | Exam | id, week_start, day_index, subject_id, title, time, location, note, updated_at | 某一周、某一学科的考试安排；前端用学科目录自动补显示前缀 |
 
 `category` 枚举：`news`、`forum`。无 `category` 的列表只含 `news`。
@@ -249,10 +251,11 @@ Comment（新评论不挂到另一条评论下）
 | 超级管理员改角色 / 禁言 | User 列表 | User.role（`student` / `teacher` / `editor` / `admin`）或 `muted`。禁言不废除会话 |
 | 超级管理员删用户 | User | 删除 User、Session、其 Post、Comment、PostLike、NewsBlock |
 | 删帖 | Post | 先写 SystemNotice 给作者，再删除 Post 及其 Comment、NewsBlock、PostLike、配图与该帖 AuditEvent |
+| 超管从 Teams 导入 CJ | TeamsConnection、Subject | 预览不写 CJEntry。确认后覆盖该周对应学科的 IC / HW / A |
 
 未登录：只读 `published` Post 与 Forum 评论与赞数。  
 `student`：写 Forum 帖、评论与主帖点赞。  
 `editor`：另写 News 草稿并提交板块。  
 `admin`：删除帖子。  
-`super_admin`：另改角色、禁言、删除用户、写草稿、同意或退回板块、删除帖子。  
+`super_admin`：另改角色、禁言、删除用户、写草稿、同意或退回板块、删除帖子，并按 M27 导入 Teams CJ。  
 存储失败时：上述写动作整笔失败，不出现「有详情 URL 但库中无行」或「有行无审计」的半成功（审计与帖子同一事务，或等价回滚）。

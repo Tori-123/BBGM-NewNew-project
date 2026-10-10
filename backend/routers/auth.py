@@ -29,6 +29,7 @@ from schemas import (
     SetAvatarPresetBody,
     UserPrivate,
 )
+from config import load_settings
 from security import COOKIE_NAME, hash_password, sign_cookie_value, unsign_cookie_value, verify_password
 from store import (
     apply_admin_email,
@@ -64,18 +65,23 @@ def _user_private(user: User) -> dict:
     ).model_dump()
 
 
+def _cookie_secure() -> bool:
+    return load_settings().frontend_origin.startswith("https://")
+
+
 def _set_session_cookie(response: Response, token: str, secret: str) -> None:
     response.set_cookie(
         key=COOKIE_NAME,
         value=sign_cookie_value(token, secret),
         httponly=True,
         samesite="lax",
+        secure=_cookie_secure(),
         path="/",
     )
 
 
 def _clear_session_cookie(response: Response) -> None:
-    response.delete_cookie(key=COOKIE_NAME, path="/", samesite="lax")
+    response.delete_cookie(key=COOKIE_NAME, path="/", samesite="lax", secure=_cookie_secure())
 
 
 @router.post("/auth/email-codes", status_code=204)

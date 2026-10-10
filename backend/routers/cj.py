@@ -129,8 +129,7 @@ def _slot(db: Session, week_start: str, day_index: int, period: int, subject_id:
     )
 
 
-def _ensure_seed(db: Session, week_start: str) -> None:
-    now = to_iso(utc_now())
+def _ensure_subjects(db: Session) -> None:
     for subject_id, name, short_name, color, period, sort_order in _SUBJECTS:
         details = _SUBJECT_DETAILS[subject_id]
         row = db.get(Subject, subject_id)
@@ -164,6 +163,11 @@ def _ensure_seed(db: Session, week_start: str) -> None:
             row.required = details["required"]
             row.is_custom = False
     db.flush()
+
+
+def _ensure_seed(db: Session, week_start: str) -> None:
+    now = to_iso(utc_now())
+    _ensure_subjects(db)
 
     for index, entry in enumerate(_SAMPLE_ENTRIES):
         day_index, period, subject_id, ic, hw, announcement = entry

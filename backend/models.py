@@ -204,6 +204,21 @@ class CJEntry(Base):
     updated_at: Mapped[str] = mapped_column(String(32), nullable=False)
 
 
+class TeamsConnection(Base):
+    __tablename__ = "teams_connections"
+
+    id: Mapped[str] = mapped_column(String(16), primary_key=True)
+    refresh_token: Mapped[str] = mapped_column(Text, nullable=False)
+    updated_at: Mapped[str] = mapped_column(String(32), nullable=False)
+
+
+class TeamsOAuthState(Base):
+    __tablename__ = "teams_oauth_states"
+
+    state: Mapped[str] = mapped_column(String(80), primary_key=True)
+    created_at: Mapped[str] = mapped_column(String(32), nullable=False)
+
+
 class EmailCode(Base):
     __tablename__ = "email_codes"
 
