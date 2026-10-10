@@ -1,5 +1,8 @@
+from datetime import datetime, timedelta, timezone
+
 from fastapi.testclient import TestClient
 from sqlalchemy import func, select
+from sqlalchemy.orm import Session
 
 from errors import StorageError
 from mail import peek_console_code
@@ -1288,8 +1291,18 @@ def test_forum_feeds_rank_by_likes_or_time(tmp_path, monkeypatch):
             )
             assert created.status_code == 201, created.text
             ids.append(created.json()["id"])
+        opened = datetime(2026, 10, 1, tzinfo=timezone.utc)
+        with Session(app.state.engine) as db:
+            for index, post_id in enumerate(ids):
+                db.get(Post, post_id).created_at = opened + timedelta(seconds=index)
+            db.commit()
         liked = client.post(f"/api/v1/posts/{ids[0]}/likes")
         assert liked.status_code == 201, liked.text
+        for body_text in ("First note.", "Second note."):
+            commented = client.post(f"/api/v1/posts/{ids[5]}/comments", json={"body": body_text})
+            assert commented.status_code == 201, commented.text
+        one_comment = client.post(f"/api/v1/posts/{ids[10]}/comments", json={"body": "One note."})
+        assert one_comment.status_code == 201, one_comment.text
 
         recommended = client.get("/api/v1/posts?category=forum&feed=recommended&page_size=50")
         assert recommended.status_code == 200, recommended.text
@@ -1297,13 +1310,13 @@ def test_forum_feeds_rank_by_likes_or_time(tmp_path, monkeypatch):
         assert body["total"] == 10
         assert len(body["items"]) == 10
         assert body["page_size"] == 10
-        assert body["items"][0]["id"] == ids[0]
-        assert body["items"][0]["like_count"] == 1
-        assert body["items"][1]["id"] == ids[10]
+        assert [item["id"] for item in body["items"][:3]] == [ids[5], ids[0], ids[10]]
+        assert body["items"][0]["reply_count"] == 2
+        assert body["items"][1]["like_count"] == 1
         assert ids[1] not in {item["id"] for item in body["items"]}
 
         default = client.get("/api/v1/posts?category=forum")
-        assert default.json()["items"][0]["id"] == ids[0]
+        assert default.json()["items"][0]["id"] == ids[5]
 
         latest = client.get("/api/v1/posts?category=forum&feed=latest")
         assert latest.json()["total"] == 10

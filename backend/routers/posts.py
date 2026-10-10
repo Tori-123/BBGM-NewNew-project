@@ -189,13 +189,23 @@ def _list_posts(
     capped = feed in ("recommended", "latest")
     offset = 0 if capped else (page - 1) * page_size
     limit = 10 if capped else page_size
-    like_total = (
-        select(func.count(PostLike.id))
-        .where(PostLike.post_id == Post.id)
-        .correlate(Post)
-        .scalar_subquery()
-    )
-    order = (like_total.desc(), Post.created_at.desc()) if feed == "recommended" else (Post.created_at.desc(),)
+    if feed == "recommended":
+        like_total = (
+            select(func.count(PostLike.id))
+            .where(PostLike.post_id == Post.id)
+            .correlate(Post)
+            .scalar_subquery()
+        )
+        comment_total = (
+            select(func.count(Comment.id))
+            .where(Comment.post_id == Post.id, Comment.parent_id.is_(None))
+            .correlate(Post)
+            .scalar_subquery()
+        )
+        score = like_total * 0.6 + comment_total * 0.4
+        order = (score.desc(), Post.created_at.desc())
+    else:
+        order = (Post.created_at.desc(),)
     try:
         total = db.scalar(select(func.count()).select_from(Post).where(*filters)) or 0
         rows = db.scalars(

@@ -27,13 +27,17 @@ function ComposeFab({ to, onClick }) {
   );
 }
 
+function recommendScore(post) {
+  return 0.6 * (post.like_count ?? 0) + 0.4 * (post.reply_count ?? 0);
+}
+
 function placePublished(current, post, feed) {
   const rest = current.filter((item) => item.id !== post.id);
   if (feed === "recommended") {
-    const next = [...rest, { ...post, like_count: post.like_count ?? 0 }];
+    const next = [...rest, post];
     next.sort((left, right) => {
-      const likes = (right.like_count ?? 0) - (left.like_count ?? 0);
-      if (likes) return likes;
+      const score = recommendScore(right) - recommendScore(left);
+      if (score) return score;
       return String(right.created_at).localeCompare(String(left.created_at));
     });
     return next.slice(0, 10);

@@ -14,7 +14,7 @@
 | `/news` | 旧路径 | — | 重定向到 `/` |
 | `/news/drafts` | News 草稿 | 需 `editor` 或 `super_admin` | `GET/POST /api/v1/news/drafts` 与板块提交、同意、退回 |
 | `/sports` | 旧路径 | — | 重定向到 `/` |
-| `/forum` | Forum 推荐 | 公开 | `GET /api/v1/posts?category=forum&feed=recommended`。按赞前 10。绑 `author.avatar` `title` `author.display_name` `excerpt` `created_at` `images[0]` `reply_count` `like_count` `liked` |
+| `/forum` | Forum 推荐 | 公开 | `GET /api/v1/posts?category=forum&feed=recommended`。分数 `0.6 × 赞 + 0.4 × 评论`，取前 10。绑 `author.avatar` `title` `author.display_name` `excerpt` `created_at` `images[0]` `reply_count` `like_count` `liked` |
 | `/forum/latest` | Forum 最新 | 公开 | `feed=latest`。按时间前 10 |
 | `/forum/all` | Forum 所有 | 公开 | `feed=all`。按时间分页 |
 | `/cj` | CJ 角色入口 | 需登录 | `student` → `/cj/student`；`teacher` → `/cj/teacher`；`super_admin` → `/cj/admin`；其他角色回首页 |
@@ -136,7 +136,7 @@ Photo of the Day / Track of the Day / Student Art：静态标题+空图框+固�
 | 发帖 | Forum：右下角固定蓝色圆形加号。已登录点开浮层表单；未登录加号去 `/sign-in?next=/forum`。`opinion` 无发帖。News 不在本页发稿，草稿在导航 `DRAFTS`。 |
 | 空 | `items.length === 0`：图框保留，“No stories in {栏目名} yet.” 不链独立发帖页。 |
 | 栏目 | Forum 主导航下：推荐、最新、所有。当前项字色 `#1A4FBF` 并带下划线。推荐与最新不显示 Older stories。 |
-| 停留 | 约每 4 秒再请求当前栏目 `page=1`（页签隐藏暂停）。最新与所有：新帖出现在列表顶部。推荐：0 赞新帖不插到第一位。所有已点过的 Older 页保留。Forum 卡上的 `reply_count` / `like_count` / `liked` 随这次响应更新。不转圈；后台失败不盖错误条。首次加载失败后若拉到数据则清错误。 |
+| 停留 | 约每 4 秒再请求当前栏目 `page=1`（页签隐藏暂停）。最新与所有：新帖出现在列表顶部。推荐：0 赞且 0 评论的新帖不插到第一位。所有已点过的 Older 页保留。Forum 卡上的 `reply_count` / `like_count` / `liked` 随这次响应更新。不转圈；后台失败不盖错误条。首次加载失败后若拉到数据则清错误。 |
 | 错误 | 栏目名下 `ErrorBanner` ← `error.message`。`opinion` 不发请求，直接空态句。 |
 
 ### 3.3 详情 `/posts/:postId`
