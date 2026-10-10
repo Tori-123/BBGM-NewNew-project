@@ -37,7 +37,9 @@ export default function App() {
             <Route path="/news/drafts" element={<NewsDrafts />} />
             <Route path="/news" element={<Navigate to="/" replace />} />
             <Route path="/sports" element={<Navigate to="/" replace />} />
-            <Route path="/forum" element={<Category category="forum" title="Forum" />} />
+            <Route path="/forum" element={<Category category="forum" feed="recommended" title="Forum" />} />
+            <Route path="/forum/latest" element={<Category category="forum" feed="latest" title="Forum" />} />
+            <Route path="/forum/all" element={<Category category="forum" feed="all" title="Forum" />} />
             <Route path="/cj" element={<CjPortal />} />
             <Route path="/cj/student" element={<RequireCjRole roles={["student"]}><CjWeek /></RequireCjRole>} />
             <Route path="/cj/student/calendar" element={<RequireCjRole roles={["student"]}><CjMonth /></RequireCjRole>} />

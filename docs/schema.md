@@ -84,7 +84,7 @@ Content-Type: application/json
 | 分页 Query | `page` 整数 ≥ 1，默认 `1`；`page_size` 整数 1–50，默认 `20` |
 | 分页非法 | `400` + `bad_request` |
 | 列表成功 | `{ "items": [...], "page", "page_size", "total" }`；空列表 `items` 为 `[]`，`total` 为 `0` |
-| 排序 | 已发布帖按 `created_at` 降序；Forum 楼层按 `created_at` 升序（楼号 1 起） |
+| 排序 | 无 `category`、News、我的帖子按 `created_at` 降序。Forum 见 `feed`。楼层按 `created_at` 升序（楼号 1 起） |
 
 ### 共享字段形状
 
@@ -396,14 +396,17 @@ Content-Type: application/json
 | 参数 | 类型 | 必填 | 约束 |
 | --- | --- | --- | --- |
 | `category` | string | 否 | 若出现必须是 `news` \| `forum` |
-| `page` | integer | 否 | ≥ 1，默认 1 |
-| `page_size` | integer | 否 | 1–50，默认 20 |
+| `feed` | string | 否 | 仅 `category=forum`。`recommended` \| `latest` \| `all`。缺省为 `recommended` |
+| `page` | integer | 否 | ≥ 1，默认 1。`recommended` 与 `latest` 只允许 1 |
+| `page_size` | integer | 否 | 1–50，默认 20。`recommended` 与 `latest` 忽略此值，固定最多 10 条 |
 
 **Response**
 
 - `200` `{ items: PostSummary[], page, page_size, total }`
 - `400` `bad_request`（`page` / `page_size` 非法）
-- `422` `validation_error`（`category` 有值但不在枚举内）
+- `422` `validation_error`（`category` 有值但不在枚举内；`feed` 非法，或与非 `forum` 栏目同时出现；`recommended` / `latest` 的 `page` 大于 1）
+
+`feed=recommended`：按 `like_count` 降序，相同则 `created_at` 降序，最多 10 条，`total` 不超过 10。`feed=latest`：按 `created_at` 降序，最多 10 条，`total` 不超过 10。`feed=all`：按 `created_at` 降序并分页。
 - `503` `storage_unavailable`
 
 停留页面时客户端可重复请求本接口（建议间隔 ≥ 4 秒；页签隐藏时暂停），用同一 JSON 合并列表。不新增 query、不另开 WebSocket / SSE。
@@ -856,6 +859,43 @@ Forum 详情停留时可重复请求本接口（间隔与列表相同），合�
 - `404` `not_found`（学科不存在）
 - `422` `validation_error`
 - `503` `storage_unavailable`
+
+#### `POST /api/v1/cj/recognize`
+
+老师或 `super_admin` 上传一张作业照片。服务端把图和学科目录交给百炼 `qwen3-vl-flash`，按返回的学科写入该周该日的 CJ。已有条目时，只覆盖模型给出的非空 IC / HW / A。
+
+**Request** `multipart/form-data`
+
+| 字段 | 类型 | 必填 | 约束 |
+| --- | --- | --- | --- |
+| `image` | file | 是 | jpeg、png 或 webp，不超过 4MB |
+| `week_start` | string | 是 | `YYYY-MM-DD` |
+| `day_index` | string | 是 | `0`–`4` |
+
+**Response**
+
+- `200`
+
+```json
+{
+  "id": "entry-id",
+  "subject_id": "ap-calculus-11ac",
+  "subject_name": "AP Calculus AB · 11Ac",
+  "ic": "Limits review",
+  "hw": "Complete FRQ Set 2",
+  "announcement": "",
+  "transcribed": "Complete FRQ Set 2",
+  "inferred": "Q1–4",
+  "updated_at": "2026-10-10T02:00:00Z"
+}
+```
+
+`transcribed` 是照片里看得见的文字。`inferred` 只放裁切后补上的部分。
+
+- `401` `unauthenticated`
+- `403` `forbidden`
+- `422` `validation_error`（图片、日期，或对不上学科）
+- `503` `service_unavailable`（未配置 `DASHSCOPE_API_KEY`，或百炼没有返回可用结果）
 
 #### `PUT /api/v1/cj/exams`
 

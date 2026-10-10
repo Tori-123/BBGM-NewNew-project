@@ -74,6 +74,28 @@ export default function CjAdmin({ portal = "admin" }) {
     [data],
   );
 
+  async function handlePhoto(event) {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+    setSaving(true);
+    setNotice("");
+    try {
+      const result = await api.recognizeCj(file, { weekStart, dayIndex });
+      setSubjectId(result.subject_id);
+      setNotice(
+        result.inferred
+          ? `${t("cj.photoFiled")} ${result.subject_name}. ${result.inferred}`
+          : `${t("cj.photoFiled")} ${result.subject_name}.`,
+      );
+      await loadWeek();
+    } catch (photoError) {
+      setNotice(photoError instanceof Error ? photoError.message : t("cj.saveFailed"));
+    } finally {
+      setSaving(false);
+    }
+  }
+
   async function handleCjSave(event) {
     event.preventDefault();
     setSaving(true);
@@ -249,6 +271,17 @@ export default function CjAdmin({ portal = "admin" }) {
                 </select>
               </label>
             </div>
+            <label className="mt-4 block font-sans text-[11px] uppercase tracking-[0.14em] text-[#1A4FBF]">
+              {t("cj.photo")}
+              <input
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                disabled={saving || loading}
+                onChange={handlePhoto}
+                className="mt-2 block w-full font-sans text-sm normal-case tracking-normal"
+              />
+            </label>
+            <p className="mt-1 font-sans text-xs normal-case tracking-normal text-neutral-500">{t("cj.photoHint")}</p>
             <TextField label="IC" value={ic} onChange={setIc} />
             <TextField label="HW" value={hw} onChange={setHw} />
             <TextField label="A" value={announcement} onChange={setAnnouncement} />

@@ -40,6 +40,20 @@ def parse_optional_category(value: str | None) -> str | None:
     return value
 
 
+FORUM_FEEDS = ("recommended", "latest", "all")
+FEED_MESSAGE = "Must be one of: recommended, latest, all."
+
+
+def parse_forum_feed(value: str | None, category: str | None) -> str | None:
+    if value is None or value == "":
+        return "recommended" if category == "forum" else None
+    if category != "forum":
+        raise validation_error([{"field": "feed", "message": "feed applies only to forum."}])
+    if value not in FORUM_FEEDS:
+        raise validation_error([{"field": "feed", "message": FEED_MESSAGE}])
+    return value
+
+
 def parse_uuid(value: str, field: str = "post_id") -> str:
     try:
         return str(UUID(value))

@@ -20,6 +20,7 @@ class Settings:
     smtp_user: str
     smtp_password: str
     smtp_from: str
+    dashscope_api_key: str
 
 
 def _load_env_file(path: Path) -> None:
@@ -64,4 +65,5 @@ def load_settings() -> Settings:
         smtp_user=smtp_user,
         smtp_password=os.environ.get("SMTP_PASSWORD") or "",
         smtp_from=smtp_from,
+        dashscope_api_key=(os.environ.get("DASHSCOPE_API_KEY") or "").strip(),
     )

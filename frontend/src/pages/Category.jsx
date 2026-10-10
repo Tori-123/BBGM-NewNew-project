@@ -27,7 +27,22 @@ function ComposeFab({ to, onClick }) {
   );
 }
 
-export default function Category({ category, title }) {
+function placePublished(current, post, feed) {
+  const rest = current.filter((item) => item.id !== post.id);
+  if (feed === "recommended") {
+    const next = [...rest, { ...post, like_count: post.like_count ?? 0 }];
+    next.sort((left, right) => {
+      const likes = (right.like_count ?? 0) - (left.like_count ?? 0);
+      if (likes) return likes;
+      return String(right.created_at).localeCompare(String(left.created_at));
+    });
+    return next.slice(0, 10);
+  }
+  if (feed === "latest") return [post, ...rest].slice(0, 10);
+  return [post, ...rest];
+}
+
+export default function Category({ category, title, feed }) {
   const { user } = useAuth();
   const { t } = useI18n();
   const heading = category === "forum" ? t("nav.forum") : title;
@@ -50,7 +65,7 @@ export default function Category({ category, title }) {
     setReady(false);
     setWriting(false);
     api
-      .listPosts({ category, page: 1, pageSize: 20 })
+      .listPosts({ category, feed, page: 1, pageSize: 20 })
       .then((data) => {
         if (cancelled) return;
         setItems(data.items);
@@ -74,17 +89,17 @@ export default function Category({ category, title }) {
     return () => {
       cancelled = true;
     };
-  }, [category]);
+  }, [category, feed]);
 
   const refreshList = useCallback(
     () =>
-      api.listPosts({ category, page: 1, pageSize }).then((data) => {
-        setItems((current) => mergeLivePosts(current, data.items));
+      api.listPosts({ category, feed, page: 1, pageSize }).then((data) => {
+        setItems((current) => (feed === "all" ? mergeLivePosts(current, data.items) : data.items));
         setPageSize(data.page_size);
         setTotal(data.total);
         setError(null);
       }),
-    [category, pageSize],
+    [category, feed, pageSize],
   );
 
   useLiveRefresh(ready, refreshList);
@@ -102,7 +117,7 @@ export default function Category({ category, title }) {
     const next = page + 1;
     setLoadingMore(true);
     api
-      .listPosts({ category, page: next, pageSize })
+      .listPosts({ category, feed, page: next, pageSize })
       .then((data) => {
         setItems((current) => [...current, ...data.items]);
         setPage(data.page);
@@ -115,12 +130,12 @@ export default function Category({ category, title }) {
   }
 
   function onPublished(post) {
-    setItems((current) => [post, ...current.filter((item) => item.id !== post.id)]);
-    setTotal((current) => current + 1);
+    setItems((current) => placePublished(current, post, feed));
+    setTotal((current) => (feed === "recommended" || feed === "latest" ? Math.min(10, current + 1) : current + 1));
     setWriting(false);
   }
 
-  const hasOlder = total > page * pageSize;
+  const hasOlder = feed === "all" && total > page * pageSize;
 
   return (
     <div className="mt-8">
