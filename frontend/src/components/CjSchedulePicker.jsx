@@ -2,15 +2,15 @@ import {
   CLASS_BUNDLES,
   GRADE_OPTIONS,
   PERIOD_COUNT,
+  courseOptionLabel,
   defaultSchedule,
   normalizeSchedule,
   periodTimeLabel,
-  subjectsForProfile,
+  subjectsForPeriod,
 } from "../cjDates";
 
 export default function CjSchedulePicker({ subjects, profile, selection, onProfileChange, onSelectionChange, onSave }) {
   const bundle = CLASS_BUNDLES[profile] || null;
-  const availableSubjects = subjectsForProfile(subjects, profile);
   const locked = new Set(bundle?.lockedPeriods || []);
 
   function applyBundle(nextProfile) {
@@ -86,8 +86,8 @@ export default function CjSchedulePicker({ subjects, profile, selection, onProfi
                 onChange={(event) => updatePeriod(index, event.target.value)}
               >
                 <option value="">Free period / no course</option>
-                {availableSubjects.map((subject) => (
-                  <option key={subject.id} value={subject.id}>{subject.name}</option>
+                {subjectsForPeriod(subjects, profile, period).map((subject) => (
+                  <option key={subject.id} value={subject.id}>{courseOptionLabel(subject)}</option>
                 ))}
               </select>
             </label>

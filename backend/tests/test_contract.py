@@ -1104,7 +1104,7 @@ def test_cj_role_portals_and_subject_scoping(tmp_path, monkeypatch):
         all_cj = super_client.get("/api/v1/cj?week_start=2026-10-05")
         assert all_cj.status_code == 200, all_cj.text
         all_subjects = all_cj.json()["subjects"]
-        assert len(all_subjects) == 19
+        assert len(all_subjects) == 28
         assert {subject["grade"] for subject in all_subjects} == {11}
         assert {subject["class_section"] for subject in all_subjects} == {"Ac", "Mc", "All"}
         assert any(subject["default_period"] == 11 for subject in all_subjects)

@@ -2,7 +2,7 @@ export const SCHOOL_NAME = "BASIS Bilingual School Guangming Shenzhen";
 export const WEEKDAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
 export const WEEKDAY_SHORT = ["MON", "TUE", "WED", "THU", "FRI"];
 export const PERIOD_COUNT = 11;
-export const SCHEDULE_KEY = "cj-schedule-v5";
+export const SCHEDULE_KEY = "cj-schedule-v7";
 export const SCHEDULE_PROFILE_KEY = "cj-schedule-profile-v2";
 
 export const PERIOD_TIMES = [
@@ -46,21 +46,21 @@ export const CLASS_BUNDLES = {
   },
   "11Mc": {
     label: "Grade 11 · Mc",
-    description: "Applies the fixed 11Mc courses. Open periods remain available for electives.",
+    description: "Fixed periods 1, 2, 5, 6, 7, 8, and 10. Periods 3, 4, 9, and 11 stay open for electives.",
     schedule: [
       "advisory-11mc",
-      "ap-euro-11mc",
       "ap-lang-11mc",
+      "ap-micro-bruce",
+      "study-hall",
       "ap-calculus-11mc",
       "chinese-11mc",
-      "",
       "lunch-11mc",
       "ae-11mc",
-      "",
-      "",
-      "",
+      "ap-physics",
+      "ap-euro-11mc",
+      "ap-csa",
     ],
-    lockedPeriods: [1, 2, 3, 4, 5, 7, 8],
+    lockedPeriods: [1, 2, 5, 6, 7, 8, 10],
   },
 };
 
@@ -168,6 +168,25 @@ export function subjectsForProfile(subjects, profile) {
   return subjects.filter(
     (subject) => Number(subject.grade) === 11 && ["All", section].includes(subject.class_section),
   );
+}
+
+export function subjectsForPeriod(subjects, profile, period) {
+  const available = subjectsForProfile(subjects, profile);
+  const bundle = CLASS_BUNDLES[profile];
+  if (bundle?.lockedPeriods.includes(period)) {
+    const id = bundle.schedule[period - 1];
+    return available.filter((subject) => subject.id === id);
+  }
+  return available.filter((subject) => {
+    if (Number(subject.default_period) !== period) return false;
+    if (bundle && subject.required) return false;
+    return true;
+  });
+}
+
+export function courseOptionLabel(subject) {
+  if (subject.short_name === "Study Hall") return "Study Hall";
+  return subject.name;
 }
 
 export function previousSchoolDay(date) {
