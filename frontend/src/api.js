@@ -85,6 +85,8 @@ export const api = {
   me: () => request("/me"),
   changePassword: (body) =>
     request("/me/password", { method: "PUT", body: JSON.stringify(body) }),
+  changeDisplayName: (display_name) =>
+    request("/me/display-name", { method: "PUT", body: JSON.stringify({ display_name }) }),
   setAvatarPreset: (preset) =>
     request("/me/avatar", { method: "PUT", body: JSON.stringify({ preset }) }),
   uploadAvatar: (file) => uploadFile("/me/avatar", file),

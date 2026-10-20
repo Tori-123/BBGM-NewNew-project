@@ -2,7 +2,7 @@ import json
 from datetime import datetime, timezone
 from uuid import uuid4
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Index, Integer, String, Text, UniqueConstraint, create_engine, event
+from sqlalchemy import Boolean, DateTime, ForeignKey, Index, Integer, String, Text, UniqueConstraint, create_engine, event, inspect
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship, sessionmaker
 
 
@@ -41,6 +41,7 @@ class User(CoreBase):
     avatar: Mapped[str] = mapped_column(String(160), nullable=False, default="preset:oak")
     muted: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     terms_accepted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    display_name_changed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
 
     sessions: Mapped[list["SessionRecord"]] = relationship(back_populates="user")
@@ -342,6 +343,18 @@ def _drop_sports_and_backfill_blocks(conn) -> None:
         )
 
 
+def _ensure_column(engine, table: str, column: str, ddl: str) -> None:
+    """Add a column to an existing table on any dialect (create_all won't alter)."""
+    inspector = inspect(engine)
+    if not inspector.has_table(table):
+        return
+    existing = {item["name"] for item in inspector.get_columns(table)}
+    if column in existing:
+        return
+    with engine.begin() as conn:
+        conn.exec_driver_sql(f"ALTER TABLE {table} ADD COLUMN {column} {ddl}")
+
+
 def migrate_core_schema(engine) -> None:
     if engine.dialect.name == "sqlite":
         with engine.begin() as conn:
@@ -391,6 +404,7 @@ def migrate_core_schema(engine) -> None:
                 if subject_cols and column not in subject_cols:
                     conn.exec_driver_sql(f"ALTER TABLE subjects ADD COLUMN {column} {definition}")
     CoreBase.metadata.create_all(engine)
+    _ensure_column(engine, "users", "display_name_changed_at", "DATETIME NULL")
     if engine.dialect.name == "sqlite":
         with engine.begin() as conn:
             tables = {

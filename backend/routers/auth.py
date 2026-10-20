@@ -28,6 +28,7 @@ from schemas import (
     PasswordResetBody,
     RegisterBody,
     SetAvatarPresetBody,
+    UpdateDisplayNameBody,
     UserPrivate,
 )
 from config import load_settings
@@ -46,6 +47,7 @@ from store import (
 from identity import dump_roles, primary_role, user_roles
 from validate import (
     change_password_field_errors,
+    display_name_field_errors,
     email_code_field_errors,
     login_field_errors,
     normalize_email,
@@ -66,6 +68,7 @@ def _user_private(user: User) -> dict:
         muted=bool(user.muted),
         terms_accepted_at=to_iso(user.terms_accepted_at) if user.terms_accepted_at else None,
         created_at=to_iso(user.created_at),
+        display_name_changed_at=to_iso(user.display_name_changed_at) if user.display_name_changed_at else None,
     ).model_dump()
 
 
@@ -265,6 +268,43 @@ def change_password(
     except SQLAlchemyError as exc:
         db.rollback()
         raise StorageError() from exc
+
+
+@router.put("/me/display-name")
+def change_display_name(
+    body: UpdateDisplayNameBody,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_core_db),
+):
+    fields = display_name_field_errors(body.display_name)
+    if fields:
+        raise validation_error(fields)
+
+    name = body.display_name.strip()
+    if name == user.display_name:
+        return _user_private(user)
+
+    now = utc_now()
+    last = user.display_name_changed_at
+    if last is not None and (last.year, last.month) == (now.year, now.month):
+        if now.month == 12:
+            next_at = now.replace(year=now.year + 1, month=1, day=1, hour=0, minute=0, second=0, microsecond=0)
+        else:
+            next_at = now.replace(month=now.month + 1, day=1, hour=0, minute=0, second=0, microsecond=0)
+        raise ApiError(
+            429,
+            "display_name_change_limit",
+            f"You can change your display name once per month. Next change available on {next_at:%Y-%m-%d}.",
+            [{"field": "display_name", "message": f"Next change available on {next_at:%Y-%m-%d}."}],
+        )
+
+    user.display_name = name
+    user.display_name_changed_at = now
+    try:
+        db.flush()
+    except SQLAlchemyError as exc:
+        raise StorageError() from exc
+    return _user_private(user)
 
 
 @router.put("/me/avatar")

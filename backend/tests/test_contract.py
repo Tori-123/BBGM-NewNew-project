@@ -9,7 +9,7 @@ import avatars
 from errors import StorageError
 from mail import peek_console_code
 from main import create_app
-from models import AuditEvent, Post
+from models import AuditEvent, Post, User, utc_now
 from validate import normalize_email
 
 
@@ -1750,3 +1750,46 @@ def test_forum_activity_badge_tracks_other_people_only(tmp_path, monkeypatch):
         assert other.delete(f"/api/v1/posts/{post_id}/likes").status_code == 200
         assert author.get("/api/v1/me/forum-activity").json()["unread"] == 0
     app.state.engine.dispose()
+
+
+def test_display_name_can_change_once_per_month(tmp_path, monkeypatch):
+    app = _make_app(tmp_path, monkeypatch, admin_email="jordan.hale@basischina.com")
+    with TestClient(app) as client:
+        registered = _register(client, "jordan.hale@basischina.com", "east-hall-8", "Jordan Hale")
+        assert registered.status_code == 201, registered.text
+        user_id = registered.json()["id"]
+        assert registered.json()["display_name_changed_at"] is None
+
+        # Submitting the same name is a no-op and does not consume the monthly change.
+        same = client.put("/api/v1/me/display-name", json={"display_name": "Jordan Hale"})
+        assert same.status_code == 200, same.text
+        assert same.json()["display_name_changed_at"] is None
+
+        changed = client.put("/api/v1/me/display-name", json={"display_name": "Jordan H."})
+        assert changed.status_code == 200, changed.text
+        assert changed.json()["display_name"] == "Jordan H."
+        assert changed.json()["display_name_changed_at"].endswith("Z")
+        assert client.get("/api/v1/me").json()["display_name"] == "Jordan H."
+
+        blocked = client.put("/api/v1/me/display-name", json={"display_name": "Jordan Again"})
+        assert blocked.status_code == 429, blocked.text
+        assert blocked.json()["error"]["code"] == "display_name_change_limit"
+
+        blank = client.put("/api/v1/me/display-name", json={"display_name": "   "})
+        assert blank.status_code == 422
+        too_long = client.put("/api/v1/me/display-name", json={"display_name": "x" * 41})
+        assert too_long.status_code == 422
+
+        # Simulate a change made last month: the account can rename again.
+        with Session(app.state.core_engine) as db:
+            user = db.get(User, user_id)
+            user.display_name_changed_at = utc_now() - timedelta(days=40)
+            db.commit()
+        allowed = client.put("/api/v1/me/display-name", json={"display_name": "Jordan Again"})
+        assert allowed.status_code == 200, allowed.text
+        assert allowed.json()["display_name"] == "Jordan Again"
+    app.state.engine.dispose()
+
+    with TestClient(app) as guest:
+        unauth = guest.put("/api/v1/me/display-name", json={"display_name": "Nope"})
+        assert unauth.status_code == 401

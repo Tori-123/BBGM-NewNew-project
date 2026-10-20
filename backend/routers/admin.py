@@ -25,6 +25,7 @@ def _user_private(user: User) -> dict:
         muted=bool(user.muted),
         terms_accepted_at=to_iso(user.terms_accepted_at) if user.terms_accepted_at else None,
         created_at=to_iso(user.created_at),
+        display_name_changed_at=to_iso(user.display_name_changed_at) if user.display_name_changed_at else None,
     ).model_dump()
 
 

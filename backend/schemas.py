@@ -58,6 +58,12 @@ class SetAvatarPresetBody(BaseModel):
     preset: str
 
 
+class UpdateDisplayNameBody(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    display_name: str
+
+
 class AuthorPublic(BaseModel):
     id: str
     display_name: str
@@ -73,6 +79,7 @@ class UserPrivate(BaseModel):
     muted: bool
     terms_accepted_at: str | None
     created_at: str
+    display_name_changed_at: str | None = None
 
 
 class ReplyPreview(BaseModel):

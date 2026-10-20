@@ -77,6 +77,8 @@ export default function AvatarSettings() {
         </div>
       </div>
 
+      <DisplayNameForm user={user} setUser={setUser} navigate={navigate} />
+
       <p className="mt-8 font-sans text-[11px] uppercase tracking-[0.16em] text-[#1A4FBF]">{t("avatar.presets")}</p>
       <div className="mt-3 flex flex-wrap gap-3">
         {AVATAR_PRESETS.map((item) => (
@@ -113,5 +115,100 @@ export default function AvatarSettings() {
       />
       <FieldError message={fieldMessage(error, "file")} />
     </div>
+  );
+}
+
+function sameUtcMonth(iso) {
+  if (!iso) return false;
+  const then = new Date(iso);
+  const now = new Date();
+  return (
+    then.getUTCFullYear() === now.getUTCFullYear() &&
+    then.getUTCMonth() === now.getUTCMonth()
+  );
+}
+
+function nextMonthLabel(iso) {
+  const then = new Date(iso);
+  const next = new Date(Date.UTC(then.getUTCFullYear(), then.getUTCMonth() + 1, 1));
+  return next.toISOString().slice(0, 10);
+}
+
+function DisplayNameForm({ user, setUser, navigate }) {
+  const { t } = useI18n();
+  const [name, setName] = useState(user.display_name);
+  const [error, setError] = useState(null);
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const locked = sameUtcMonth(user.display_name_changed_at);
+
+  useEffect(() => {
+    setName(user.display_name);
+  }, [user.display_name]);
+
+  async function onSubmit(event) {
+    event.preventDefault();
+    if (locked || saving) return;
+    setSaving(true);
+    setError(null);
+    setSaved(false);
+    try {
+      const profile = await api.changeDisplayName(name.trim());
+      setUser(profile);
+      setSaved(true);
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 401) {
+        setUser(null);
+        navigate("/sign-in?next=/me/avatar");
+        return;
+      }
+      setError(err);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  const banner = error && !error.fields?.length ? error : null;
+
+  return (
+    <form onSubmit={onSubmit} autoComplete="off" className="mt-8 border-t border-neutral-200 pt-6">
+      <p className="font-sans text-[11px] uppercase tracking-[0.16em] text-[#1A4FBF]">{t("name.title")}</p>
+      <p className="mt-2 font-sans text-xs text-neutral-500">{t("name.hint")}</p>
+      <ErrorBanner error={banner} />
+      <div className="mt-3 flex flex-wrap items-end gap-3">
+        <div>
+          <label
+            className="block font-sans text-[13px] uppercase tracking-[0.16em] text-[#1A4FBF]"
+            htmlFor="display_name"
+          >
+            {t("name.label")}
+          </label>
+          <input
+            id="display_name"
+            type="text"
+            maxLength={40}
+            value={name}
+            disabled={locked || saving}
+            onChange={(event) => setName(event.target.value)}
+            className="mt-2 w-64 border border-neutral-400 px-3 py-2 font-sans text-sm disabled:bg-neutral-100 disabled:opacity-60"
+          />
+          <FieldError message={fieldMessage(error, "display_name")} />
+        </div>
+        <button
+          type="submit"
+          disabled={locked || saving || !name.trim() || name.trim() === user.display_name}
+          className="inline-flex items-center gap-2 rounded-[2px] bg-black px-6 py-2.5 font-sans text-[13px] uppercase tracking-[0.16em] text-white disabled:opacity-40"
+        >
+          {saving ? <ButtonSpinner /> : null}
+          {t("name.submit")}
+        </button>
+      </div>
+      {saved ? <p className="mt-2 font-sans text-xs text-[#1A4FBF]">{t("name.updated")}</p> : null}
+      {locked ? (
+        <p className="mt-2 font-sans text-xs text-neutral-500">
+          {t("name.locked", { date: nextMonthLabel(user.display_name_changed_at) })}
+        </p>
+      ) : null}
+    </form>
   );
 }

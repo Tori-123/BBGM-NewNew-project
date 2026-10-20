@@ -109,6 +109,15 @@ def register_field_errors(
     return fields
 
 
+def display_name_field_errors(display_name: str) -> list[dict[str, str]]:
+    name = (display_name or "").strip()
+    if not name or len(name) > 40:
+        return [{"field": "display_name", "message": "Display name must be 1–40 characters."}]
+    if any(ch in name for ch in "\r\n\t"):
+        return [{"field": "display_name", "message": "Display name must be a single line."}]
+    return []
+
+
 def login_field_errors(email: str, password: str) -> list[dict[str, str]]:
     fields: list[dict[str, str]] = []
     email_error = email_field_error(email)
